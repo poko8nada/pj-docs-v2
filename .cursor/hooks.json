@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": ".cursor/hooks/pre-guard.sh",
+        "matcher": ".*",
+        "failClosed": true,
+        "timeout": 10
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/post-lint.sh",
+        "timeout": 10
+      }
+    ]
+  }
+}
