@@ -5,17 +5,23 @@ description: Use when user says "I'm stuck", "I don't understand", "What should 
 
 # Stuck
 
+## Preparation
+
+- Gain a comprehensive understanding of the project, not just the scope that was requested.
+
 ## Blockage Types
 
-| Type                | Signal                                           | Response                        |
-| ------------------- | ------------------------------------------------ | ------------------------------- |
-| Error or Bugs       | Stack trace, unexpected output, Bugs occer       | 1 cause, 1 fix, how to verify   |
-| Design or Functions | "Which way should I go?", "How should I design?" | 2 options, 1 tradeoff each      |
-| Blank page          | "Where should I start?", no code yet             | Smallest visible vertical slice |
+| Type                | Signal                                           | Response                      |
+| ------------------- | ------------------------------------------------ | ----------------------------- |
+| Error or Bugs       | Stack trace, unexpected output, Bugs occer       | 1 cause, 1 fix, how to verify |
+| Design or Functions | "Which way should I go?", "How should I design?" | 2 options, 1 tradeoff each    |
+| Blank page          | "Where should I start?", no code yet             | visible vertical slice        |
+
+Especially for Blank, you should give advices with a clear understanding of the context.  
+If need more info, discuss with user.
 
 ## Instructions
 
 - Gain a comprehensive understanding of the project, not just the scope that was requested.
 - Never offer more than one solution path at a time.
-- End every response with a concrete next action takeable within 10 minutes.
 - Depending on the situation, Load the `complement skill` to intervene.

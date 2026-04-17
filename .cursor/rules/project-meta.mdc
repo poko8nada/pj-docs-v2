@@ -18,6 +18,7 @@ alwaysApply: true
 
 - Codes, Tests, and Issues are the only docments that represents the project.
 - No Spec Driven. Do not create documentation unless explicitly user asked.
+- **BUT** we can have only `README.md`. That's why "Semi" Issue Driven.
 
 ## Best Practice First
 
