@@ -1,10 +1,10 @@
 {
-  "name": "basic",
+  "name": "project-starter",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:remote": "vite rebuild && wrangler dev --remote",
+    "dev:remote": "pnpm run rebuild && wrangler dev --remote",
     "clean": "rm -rf .vite dist node_modules/.vite",
     "build": "vite build --mode client && vite build",
     "rebuild": "pnpm run clean && pnpm run build",
