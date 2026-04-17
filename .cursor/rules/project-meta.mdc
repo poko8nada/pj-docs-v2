@@ -5,6 +5,15 @@ alwaysApply: true
 
 # Project Guidelines
 
+## Strict enforcement of rules
+
+- The rules in the same directory must be strictly followed before performing any file operations.
+- These rules must be strictly followed, rather than relying on your own judgment.
+
+### file types
+
+` **/*.tsx, **/*.test.tsx, **/*.ts, **/*.test.ts, **/*.js, **/*.test.js, **/*.md, **/*.css`
+
 ## Semi Issue Driven
 
 - Codes, Tests, and Issues are the only docments that represents the project.

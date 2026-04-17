@@ -34,8 +34,3 @@ lerna-debug.log*
 .DS_Store
 
 .playwright-cli
-
-seeds/**/career.md
-seeds/**/resume.md
-seeds/**/stack.md
-seeds/resume-assets/resume/*
