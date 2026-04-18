@@ -10,6 +10,8 @@ When editing Markdown in this repository:
 
 1. Bold (`**…**`) — Use only where emphasis is genuinely useful (e.g. a critical warning or a defined term once). Do not sprinkle bold across every label or phrase; it reads noisy and unprofessional.
 
+As a general rule, limit it to one per paragraph, no matter how long the paragraph is.
+
 2. Tables — Prefer small tables (few columns, short cell text). For long explanations, multi-line facts, or many items, use headings and nested bullet lists instead. Large or wide tables are hard to scan in context and often hide nuance that lists make explicit.
 
 If a table would need wrapped paragraphs or very wide cells, split it into sections or bullets.

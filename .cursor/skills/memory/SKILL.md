@@ -5,6 +5,11 @@ description: This allows you to save and retrieve reusable knowledge across sess
 
 # Memory
 
+## Preparation
+
+- Reload `.cursor/rules/project-meta.mdc` and incorporate it into the signal for this skill execution.
+- Gain a comprehensive understanding of the project, not just the scope that was requested.
+
 ## Location
 
 - Memory root: `~/.cursor/memories/`. This is global root.
@@ -23,7 +28,7 @@ Also, be sure to make active use of this skill whenever you come across knowledg
 - Complex troubleshooting methods or pitfalls
 - Research findings obtained through significant effort
 
-If you think or user says to make permanent memory, set `isPermanent` to `true`.
+If you think or user says to make permanent memory, set `isPermanent` to `true`. Or when user says "とりあえず", "一旦", "一時的に" and so on, set `isPermanent` to `false`.
 If you remember, increase the `timesRemembered` field.
 If you update, increase the `timesUpdated` field.
 
@@ -35,6 +40,7 @@ If you update, increase the `timesUpdated` field.
   summary: "1-2 lines: what this memory contains and why it matters"
   created: YYYY-MM-DD
   updated: YYYY-MM-DD
+  project: "project-name" # This is root directory name
   isPermanent: true # boolean to indicate if this memory is permanent
   timesRemembered: 1 # increment this every time you recall this memory
   timesUpdated: 1 # increment this every time you update this memory

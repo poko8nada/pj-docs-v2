@@ -5,6 +5,11 @@ description: Manages GitHub Issues using gh CLI — creation, decomposition, upd
 
 # Issue Management
 
+## Preparation
+
+- Reload `.cursor/rules/project-meta.mdc` and incorporate it into the signal for this skill execution.
+- Gain a comprehensive understanding of the project, not just the scope that was requested.
+
 ## Principle
 
 - If the intent is unclear, discuss it with the user so that you can write it in the format below.

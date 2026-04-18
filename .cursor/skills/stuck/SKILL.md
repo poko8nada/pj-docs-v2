@@ -7,6 +7,7 @@ description: Use when user says "I'm stuck", "I don't understand", "What should 
 
 ## Preparation
 
+- Reload `.cursor/rules/project-meta.mdc` and incorporate it into the signal for this skill execution.
 - Gain a comprehensive understanding of the project, not just the scope that was requested.
 
 ## Blockage Types

@@ -7,6 +7,7 @@ description: Use when user ask about code and you fill in the details (user ask 
 
 ## Preparation
 
+- Reload `.cursor/rules/project-meta.mdc` and incorporate it into the signal for this skill execution.
 - Gain a comprehensive understanding of the project, not just the scope that was requested.
 
 ### When User Asks
