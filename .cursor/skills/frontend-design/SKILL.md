@@ -1,122 +1,130 @@
 ---
 name: frontend-design
-description: Design and refine frontend interfaces at the depth the user needs — from layout cleanup to full visual redesign with atmosphere. Use this skill when the user asks to build, style, or improve web components, pages, or applications. Supports three levels of design intervention.
+description: Design and refine frontend interfaces at the depth the user needs. Use when the user asks to build, style, or improve web components, pages, or applications.
 ---
 
-This skill guides frontend design work at three levels of depth — from quick structural cleanup to full visual redesign with atmosphere and animation. The level determines what you are allowed to change and how much discussion is needed before writing code.
+## Overview
+
+Design quality is determined in this order: **Lv1 (70%) → Lv2 (20%) → Lv3 (10%)**.
+Lv2 and Lv3 collapse without a solid Lv1 foundation.
 
 ---
 
 ## Step 0: Determine the Level
 
-**If the user explicitly specifies a level** (e.g., "lv1", "lv2", "just clean up the spacing", "full redesign"), use that level and proceed.
+Infer from the user's words before asking:
 
-**If the user does not specify**, ask before doing anything else:
+| User says | Level |
+|---|---|
+| "整えて" "fix spacing" "clean up" | Lv1 |
+| "かっこよくして" "redesign" "make it look good" | Lv2 |
+| "印象に残る" "memorable" "wow factor" | Lv3 |
 
-> "What level of design work are you looking for?
->
-> - **Lv1** — Fix layout and hierarchy only (spacing, sizing, alignment). No color or font changes.
-> - **Lv2** — Full visual redesign: typography, color, layout. I'll ask a few quick questions first.
-> - **Lv3** — Everything in Lv2, plus atmosphere, depth, and animation."
+If ambiguous, ask once:
 
-Do not write any code until the level is confirmed.
+> - **Lv1** — Structure and hierarchy only. No color or font changes.
+> - **Lv2** — Full visual redesign. I'll ask a few questions first.
+> - **Lv3** — Lv2 + atmosphere, depth, signature interaction.
+
+---
+
+## Step 1: Analyze Before Touching Code
+
+Before writing anything, read the existing UI and state:
+- What is the primary message this UI must communicate?
+- Where does the visual hierarchy break down?
+- What is the worst offender — spacing, contrast, alignment, or grouping?
+
+Do not skip this. Local fixes without global diagnosis produce local improvements at best.
 
 ---
 
 ## Level 1 — Structure & Hierarchy
 
-**Goal**: Make the existing content clear, readable, and organized.
+**Goal**: Make it immediately clear what matters and in what order.
 
-**What you may change**:
+### Scope
+**Allowed**: spacing, size relationships, alignment, grouping, component proportion, basic interaction states (hover, focus, active, disabled)
+**Off-limits**: font families, color palette, layout paradigm changes, animation
 
-- Spacing and padding between elements
-- Font size relationships (relative scale only — no font family changes)
-- Alignment and grouping (proximity, visual flow)
-- Element sizing and proportion
+### Think in 3 phases
 
-**What you must NOT change**:
+**Phase 1 — Macro (全体構図)**
+Before touching elements, assess the whole canvas:
+- Is the visual center where it should be?
+- Does the negative space feel intentional or leftover?
+- Can you trace a clear visual path from most to least important?
 
-- Font families or font weight choices
-- Color palette or theme
-- Layout paradigm (e.g., don't switch from a list to a grid)
-- Animations or visual effects
+**Phase 2 — Hierarchy (ジャンプ率)**
+Apply CRAP. The most common failure is insufficient contrast — sizes that are too close, weights that don't commit.
+- **Be bold. If you think the size difference is enough, make it bigger.**
+- H1 vs body, primary CTA vs secondary action — the gap should be uncomfortable before it's right.
+- Proximity should make groupings feel obvious without labels.
 
-**How to think about it**:
-Apply the four principles: contrast (size/weight), repetition (consistent patterns), alignment (invisible grid), and proximity (group related things). The goal is not to redesign — it is to reveal the structure that was already intended but not clearly expressed.
+**Phase 3 — Micro (要素間の関係)**
+- Every element aligns to something — not just locally, but within the whole grid.
+- Consistent spacing units (4px / 8px base). Repetition builds trust.
+
+### Self-evaluation (required)
+After implementing, step back and ask:
+1. Can a new user identify the #1 priority in under 3 seconds?
+2. Is anything sitting in an ambiguous position — not clearly part of a group, not clearly separate?
+3. Is the contrast ratio between hierarchy levels large enough to feel intentional?
+
+If any answer is "no" or "maybe", fix it before finishing.
 
 ---
 
 ## Level 2 — Visual Language
 
-**Goal**: Define what this interface _is_ — its personality, audience, and aesthetic point of view — then execute it in typography, color, and spatial composition.
+**Goal**: Establish what this interface *is* — its voice, personality, and aesthetic conviction.
+Lv1 rules apply in full. Lv2 adds: typography, color, spatial composition, and interaction personality.
 
-### 2a. Ask First (Required)
+### Ask first (required)
+1. Who uses this, and what problem does it solve?
+2. What emotional tone? (e.g., professional, playful, urgent, calm, editorial)
+3. Constraints — framework, existing system, anything to preserve?
 
-Before writing any code, ask the user these questions. Do not skip this step, even if you think the context is clear.
+### Design direction
+Commit to a specific aesthetic before writing code. Not "modern and clean" — pick an extreme:
+brutally minimal / maximalist / retro-futuristic / luxury / brutalist / organic / utilitarian / editorial
 
-> 1. What problem does this interface solve, and who uses it?
-> 2. What's the emotional tone? (e.g., professional, playful, minimal, bold, calm, urgent)
-> 3. Any constraints — framework, existing design system, colors to keep?
+- **Typography**: Font choice establishes personality faster than anything else. Avoid Inter, Roboto, Arial, Space Grotesk. Pair a distinctive display font with a refined body font.
+- **Color**: One dominant, one or two sharp accents. Use CSS variables. No timid, evenly spread palettes.
+- **Layout**: Asymmetry, generous negative space, or controlled density. Avoid predictable symmetry.
 
-Wait for the user's response before proceeding.
-
-### 2b. Design Thinking
-
-After the discussion, commit to a clear aesthetic direction before touching code:
-
-- **Tone**: Pick a specific extreme — brutally minimal, maximalist, retro-futuristic, organic, luxury, editorial, brutalist, art deco, soft, utilitarian, etc. Don't pick "modern and clean." Commit.
-- **Typography**: Choose fonts that carry the tone. Avoid Inter, Roboto, Arial, Space Grotesk. Pair a distinctive display font with a refined body font. Font choice is the single fastest way to establish personality.
-- **Color**: One dominant color, one or two sharp accents. Use CSS variables. Avoid timid, evenly-distributed palettes.
-- **Spatial Composition**: Asymmetry, overlap, diagonal flow, generous negative space — or controlled density. Avoid predictable symmetric layouts.
-
-**CRITICAL**: Intentionality over intensity. Refined minimalism and bold maximalism are both valid — what matters is that every choice is deliberate and serves the tone.
-
-### 2c. Implement
-
-Write production-grade code that is:
-
-- Functional and complete
-- Cohesive in its aesthetic point of view
-- Precise in spacing and typographic detail (Lv1 principles apply here too)
+### Interaction states (Lv2)
+Hover, focus, and active states carry personality. A luxury UI transitions slowly; a brutalist UI snaps. Design states intentionally — don't use browser defaults.
 
 ---
 
 ## Level 3 — Atmosphere & Memory
 
-**Goal**: Complete Lv2, then ask: _what is the one thing someone will remember about this interface?_ Build that into the surface.
+**Goal**: Lv2, plus one thing the user will remember.
 
-### 3a. Complete Lv2 First
+Lv2 must be complete first. Then ask: *what is the single most memorable thing this interface could do?* Build that — and only that.
 
-All of Lv2 applies — including the required discussion in step 2a. Do not skip it.
+### Atmosphere
+- No solid backgrounds. Use gradient meshes, noise, layered transparency, or grain — matched to the aesthetic.
+- Depth through shadow, z-axis layering, or parallax.
 
-### 3b. Atmosphere Layer
+### Interaction (Lv3)
+Motion should feel inevitable for this UI, not generic:
+- **Load**: One orchestrated entrance. Staggered reveals beat scattered micro-interactions.
+- **Interaction**: Hover and focus states that surprise without distracting.
+- **Scroll**: Trigger effects on viewport entry when it serves the narrative.
 
-After the visual language is established, add depth and atmosphere:
+Match animation character to aesthetic — brutalist moves snap; luxury moves slowly.
+Prefer CSS-only for HTML. Use Motion library for React.
 
-- **Backgrounds**: Avoid solid colors. Use gradient meshes, noise textures, geometric patterns, layered transparencies, grain overlays — matched to the aesthetic.
-- **Depth**: Dramatic shadows, layered elements, parallax, z-axis hierarchy.
-- **Details**: Decorative borders, custom cursors, subtle texture, carefully crafted empty space.
-
-### 3c. Motion (Context-Specific)
-
-Animation should feel inevitable for this particular interface — not generic. Ask: does motion _serve the tone_, or is it just decoration?
-
-- **Load**: One well-orchestrated entrance with staggered reveals. More impactful than scattered micro-interactions.
-- **Interaction**: Hover states, transitions, and focus states that surprise without distracting.
-- **Scroll**: Trigger effects as content enters the viewport when it adds to the narrative.
-
-Prefer CSS-only for HTML. Use the Motion library for React. Match animation complexity to the aesthetic — a brutalist design should move bluntly; a luxury design should move slowly.
-
-### 3d. The Memorable Detail
-
-Every Lv3 implementation should have one thing that couldn't exist in any other context — a detail that is specific to _this_ interface's purpose, audience, and tone. It doesn't have to be large. It has to be intentional.
+### The signature detail
+One element that could not exist in any other context. Specific to this UI's purpose, audience, and tone. Doesn't need to be large — must be intentional.
 
 ---
 
 ## Always
 
-- Never use purple gradients on white backgrounds.
-- Never default to the same fonts across generations (Inter, Roboto, Space Grotesk).
-- Never produce cookie-cutter layouts that could belong to any project.
-- Vary between light and dark themes; vary aesthetic directions; vary structural approaches.
-- Match implementation complexity to the aesthetic vision. Elegance in minimalism requires as much craft as maximalist excess.
+- Never default to the same fonts (Inter, Roboto, Space Grotesk) — vary every time.
+- Never produce a layout that could belong to any other project.
+- Never be conservative with contrast. If in doubt, push harder.
+- Vary light/dark and aesthetic direction across generations.

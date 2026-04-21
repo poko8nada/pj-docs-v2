@@ -41,6 +41,9 @@ If you update, increase the `timesUpdated` field.
   created: YYYY-MM-DD
   updated: YYYY-MM-DD
   project: "project-name" # This is root directory name
+  tags: # comma separated tags
+    - tag1
+    - tag2
   isPermanent: true # boolean to indicate if this memory is permanent
   timesRemembered: 1 # increment this every time you recall this memory
   timesUpdated: 1 # increment this every time you update this memory
@@ -55,8 +58,13 @@ If you update, increase the `timesUpdated` field.
 # list summaries quickly
 rg "^summary:" ~/.cursor/memories/ --no-ignore --hidden
 
-# filter by keyword
+# filter
 rg "^summary:.*keyword" ~/.cursor/memories/ --no-ignore --hidden -i
+rg "^project:.*keyword" ~/.cursor/memories/ --no-ignore --hidden -i
+rg "^tags:.*keyword" ~/.cursor/memories/ --no-ignore --hidden -i
+
+# permanent memories
+rg "^isPermanent: true" ~/.cursor/memories/ --no-ignore --hidden
 ```
 
 ## Quality guidelines

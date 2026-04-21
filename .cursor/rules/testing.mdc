@@ -10,6 +10,7 @@ alwaysApply: false
 
 - Test files live alongside the implementation: `[name].test.ts` in the same directory.
 - Never place tests in a separate top-level `__tests__` directory — breaks grep-ability.
+- Include Japanese translations in the comments for each test description. While all code and documentation should be written in English, and it is generally considered best to keep comments to a minimum, this is an exception.
 
 ## What to Test
 

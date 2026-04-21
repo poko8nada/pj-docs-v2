@@ -7,10 +7,12 @@ alwaysApply: true
 
 ## Rules about file operations
 
-- The rules in the same directory must be strictly followed before performing any file operations.
-- These rules must be followed, rather than relying on your own judgment.
+- There are rules for each file type in the same directory.
+- These rules matched by globs must be loaded in advance and strictly followed.
+- These must be followed, rather than relying on your own judgment.
+- Here's how to improve the quality of your work.
 
-### file types
+### globs 
 
 ` **/*.tsx, **/*.test.tsx, **/*.ts, **/*.test.ts, **/*.js, **/*.test.js, **/*.md, **/*.css`
 
@@ -18,7 +20,7 @@ alwaysApply: true
 
 - Codes, Tests, and Issues are the only docments that represents the project.
 - No Spec Driven. Do not create documentation unless explicitly user asked.
-- **BUT** we can have only `README.md`. That's why "Semi" Issue Driven.
+- But we can have only `README.md`. That's why "Semi" Issue Driven.
 
 ## Best Practice First
 

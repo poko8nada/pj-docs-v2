@@ -3,6 +3,18 @@
 INPUT=$(cat)
 PROJECT_DIR="${CURSOR_PROJECT_DIR:-$(pwd)}"
 
+# --- README ---
+README_CONTENT=""
+README_FILE=$(find "$PROJECT_DIR" -maxdepth 1 -type f \
+  \( -iname 'README.md' -o -iname 'README.rst' -o -iname 'README.txt' -o -iname 'README' \) \
+  | head -1)
+
+if [ -n "$README_FILE" ]; then
+  README_CONTENT=$(cat "$README_FILE")
+else
+  README_CONTENT="README not found."
+fi
+
 # --- Project structure ---
 STRUCTURE=""
 if command -v tree &>/dev/null; then
@@ -34,6 +46,10 @@ done < <(find "$PROJECT_DIR" \
   -not -path '*/node_modules/*' \
   -not -path '*/dist/*' \
   -not -path '*/__pycache__/*' \
+  -not -iname 'README.md' \
+  -not -iname 'README.rst' \
+  -not -iname 'README.txt' \
+  -not -iname 'README' \
   -type f \
   \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \
      -o -name '*.py' -o -name '*.go' -o -name '*.rs' \
@@ -62,7 +78,10 @@ else
 fi
 
 # --- Output ---
-CONTEXT="== PROJECT STRUCTURE ==
+CONTEXT="== README ==
+$README_CONTENT
+
+== PROJECT STRUCTURE ==
 $STRUCTURE
 
 == SOURCE FILES ==
