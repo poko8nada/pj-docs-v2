@@ -37,6 +37,22 @@ When the requested task is clearly large, list the proposed decomposed issues fo
 
 Use the existing `gh-cli` skill (available at user/global level) for all operations: creating, updating, closing, and linking issues.
 
+### Adding issues to the Project after creation
+
+After creating an issue, **always** add it to Project #1 immediately — no need to confirm with the user.
+
+```bash
+# Capture the URL at creation time
+ISSUE_URL=$(gh issue create --title "..." --body "..." --json url -q .url)
+
+# Add to Project #1 (get the owner username from project-meta.mdc)
+gh project item-add 1 --owner <username> --url $ISSUE_URL
+```
+
+- Always pass `--json url -q .url` to `gh issue create` to capture the URL into a variable.
+- Run `gh project item-add` right after creation, without asking the user.
+- Retrieve the `--owner` value from `project-meta.mdc`.
+
 ## Format
 
 Use the following Markdown template when creating or suggesting a new issue. Write the content in **natural Japanese**.
