@@ -1,59 +1,63 @@
 ---
 name: issue
-description: Manages GitHub Issues using gh CLI — creation, decomposition, update, and close. Load when asked to create a new issue, break down a large task into issues, update issue status, or close an issue after a PR is merged. User decides whether to create an issue. Agent handles all gh CLI operations.
+description: Manages GitHub Issues using gh CLI — creation, decomposition, update, and close. Load when asked to create a new issue, break down a large task into issues, update issue status, or close an issue after a PR is merged. The user ultimately decides whether to create an issue. The agent handles all gh CLI operations.
 ---
 
 # Issue Management
 
 ## Preparation
 
-- Reload `.cursor/rules/project-meta.mdc` and incorporate it into the signal for this skill execution.
-- Gain a comprehensive understanding of the project, not just the scope that was requested.
+- Reload `.cursor/rules/project-meta.mdc` and incorporate it into the context for this skill execution.
+- Understand the overall project context, current architecture, and existing code style before proposing or creating issues.
 
 ## Principle
 
-- If the intent is unclear, discuss it with the user so that you can write it in the format below.
-- User decides whether to create. Agent handles creation, updates, and closing.
-- 1 Issue = 1 PR — scope each issue to what can be completed in a single PR.
-- Issues are the session-to-session bridge — always reference the issue number in commits and PRs.
+- The user decides whether to create an issue. The agent handles creation, updates, and closing via gh CLI.
+- Prioritize meaningful scope over strict "1 issue = 1 PR". One issue should represent a coherent piece of work that feels natural to complete in one (or a small number of) PR(s).
+- Avoid over-decomposition. If a task is too large to finish comfortably in one PR, propose a reasonable breakdown first and ask for user approval before creating multiple issues.
+- Issues serve as session-to-session memory and future reference. Always reference the issue number in commits and PR descriptions (e.g., Closes #123 or #123).
 
 ## Granularity Guide
 
-**Good scope**
+**Good scope (recommended for most cases)**
 
-- Add a specific feature function with tests
-- Fix a specific bug
-- Refactor a specific module
+- Add or improve a specific feature / component with related changes and tests
+- Fix a specific bug (including reproduction steps and verification)
+- Refactor a specific module or area without changing behavior
+- Update documentation or configuration for one clear purpose
 
-**Too large — decompose first**
+**Too large — propose decomposition first**
 
-- "Implement authentication" → break into: session management, login flow, token refresh, etc.
-- "Redesign dashboard" → break into individual components or data-fetching concerns
+- "Implement full authentication" → break into login flow, session management, token handling, error cases, etc.
+- "Redesign the entire dashboard" → break into UI components, data fetching, state management, responsiveness, etc.
 
-When asked to implement something large, list the decomposed Issues for human approval before creating them.
+When the requested task is clearly large, list the proposed decomposed issues for user confirmation before creating them.
 
 ## Commands
 
-- You already have `gh-cli` skill in user level (global). Use it to create, update, and close issues.
+Use the existing `gh-cli` skill (available at user/global level) for all operations: creating, updating, closing, and linking issues.
 
 ## Format
 
-Use this template for issues.
+Use the following Markdown template when creating or suggesting a new issue. Write the content in **natural Japanese**.
 
 ```Markdown
-## Why
+## 背景・目的 (why)
 
-<one sentence in Japanese>
+<briefly describe the reasons and background for this change in 1 to 3 sentences.>
 
-## What
+## やること (what)
 
-<bullets scoped to one PR in Japanese>
+<list the specific tasks to be performed in this issue (and the corresponding PR) in bullet points.You may include relevant files and considerations.Summarize the scope so that it fits naturally within a single PR.>
 
-## Done when
+## 受け入れ条件 (Acceptance Criteria)
 
-- [ ] <criteria in Japanese>
+- [ ] <confirmed that it works as expected>
+- [ ] <related tests have passed (if applicable)>
+- [ ] <edge cases and error handling have been taken into account>
+- [ ] <the user have reviewed it himself and confirmed that it is in good working order>
 
 ## Notes
 
-<decisions or discussion summary in Japanese — omit if empty>
+<Feel free to note any design decisions, items to review later, related issues, or points to keep in mind. (If there is nothing to note, leave this section blank.)>
 ```
