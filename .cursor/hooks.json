@@ -13,6 +13,10 @@
       {
         "command": ".cursor/hooks/post-lint.sh",
         "timeout": 10
+      },
+      {
+        "command": ".cursor/hooks/set-state.sh",
+        "timeout": 10
       }
     ],
     "sessionStart": [
@@ -20,6 +24,7 @@
         "command": ".cursor/hooks/session-init.sh",
         "timeout": 30
       }
-    ]
+    ],
+    "stop": [{ "command": ".cursor/hooks/add-rules.sh", "timeout": 30 }]
   }
 }

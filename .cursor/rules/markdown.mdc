@@ -12,6 +12,6 @@ When editing Markdown in this repository:
 
 As a general rule, limit it to one per paragraph, no matter how long the paragraph is.
 
-2. Tables — Prefer small tables (few columns, short cell text). For long explanations, multi-line facts, or many items, use headings and nested bullet lists instead. Large or wide tables are hard to scan in context and often hide nuance that lists make explicit.
+2. Tables — We recommend using small tables (those with few columns and short cell text). If you have long explanations, facts spanning multiple lines, or a large number of items, use headings or nested bullet points instead. However, since tables are more visually clear than bullet points, please make an effort to use them as long as they meet the above guidelines.
 
-If a table would need wrapped paragraphs or very wide cells, split it into sections or bullets.
+If a table absolutely requires line breaks or has very wide cells, please break it up into sections or bulleted lists.

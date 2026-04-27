@@ -1,30 +1,52 @@
 # プロジェクトスターター
 
-新規リポを複製して始めるための土台。依存・TypeScript・品質ツール・Git フック・Cursor 向け設定まで入れてあり、アプリの骨組みは各自で足す前提。
+![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-template-lightgrey)
+![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen?logo=node.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript)
+![pnpm](https://img.shields.io/badge/pnpm-managed-F69220?logo=pnpm&logoColor=white)
 
-方針（ドキュメントはコード・テスト・Issue を中心にする等）は [`AGENTS.md`](AGENTS.md) と [`.cursor/rules/project-meta.mdc`](.cursor/rules/project-meta.mdc)。
+## Table of Contents
 
-## セットアップ
+- [Overview](#overview)
+- [Getting Started](#getting-started)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Contributing](#contributing)
+- [License](#license)
 
-1. テンプレとしてコピーする。
-2. [`package.json`](package.json) の `name` などをプロジェクト用に直す。
-3. `pnpm install`（`prepare` で Lefthook が入り、`.cursor/hooks/*.sh` に実行権限が付く）。
+## Overview
 
-## このリポに含まれるもの
+このリポジトリは Hono / HonoX 向けのスターターです。Vite・Cloudflare Workers 用ツールチェーン、Tailwind、Vitest が入っています。
 
-- package: [`package.json`](package.json) Hono / HonoX、Vite、Wrangler、Tailwind、Vitest、oxlint / oxfmt
-- TS: [`tsconfig.json`](tsconfig.json)
-- Git: [`lefthook.yaml`](lefthook.yaml)コミット: format + lint、プッシュ: `tsc --noEmit`
-- AI: [`.cursor/`](.cursor/)（ルール・スキル・フック）
-- Result型: [`utils/types.ts`](utils/types.ts) の `Result` 型
+## Getting Started
 
-## このリポに含まれないもの
+### Prerequisites
 
-アプリのエントリ、`vite.config`、`wrangler.toml`、ルーティング・ページなど。ここが未整備だと `pnpm dev` / `pnpm build` / `pnpm preview` / `pnpm deploy` は動かないことがある。
+- [Node.js](https://nodejs.org/) 18 以上（LTS 推奨）
+- [pnpm](https://pnpm.io/)（コアパックは `packageManager` 未指定のため、チームでバージョンを揃えると安全）
 
-環境変数は `.env` や `.dev.vars`（共有用ファイル名は `.gitignore` の `.env.*` と衝突しないようにする）。
+### Installation
 
-## スクリプト
+1. テンプレとしてリポジトリを複製または Use this template でコピーする。
+2. [`package.json`](package.json) の `name` などをプロジェクト用に変更する。
+3. 依存をインストールする（`prepare` で Lefthook が入り、`.cursor/hooks/*.sh` に実行権限が付く）。
+
+```bash
+pnpm install
+```
+
+アプリが未整備でも、現状の TypeScript とツールだけなら次で検証できる。
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm format:check
+pnpm test:run
+```
+
+## Usage
 
 | コマンド                            | 用途                                           |
 | ----------------------------------- | ---------------------------------------------- |
@@ -40,4 +62,11 @@
 | `pnpm format` / `pnpm format:check` | oxfmt                                          |
 | `pnpm typecheck`                    | `tsc --noEmit`                                 |
 
-アプリ未整備でも、現状の TS とツールだけなら `pnpm typecheck`・`pnpm lint`・`pnpm format:check`・（テストファイルがあれば）`pnpm test:run` で確認できる。
+## Contributing
+
+- コミット前に Lefthook（format / lint）、プッシュ前に `tsc --noEmit` が走る。
+- 大きな方針変更は Issue か PR 説明で共有するとよい。
+
+## License
+
+MIT（リポジトリルートに `LICENSE` を置く場合はその文面に従う。未配置ならプロジェクト側でライセンスを明記すること）。

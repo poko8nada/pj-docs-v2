@@ -14,11 +14,11 @@ Lv2 and Lv3 collapse without a solid Lv1 foundation.
 
 Infer from the user's words before asking:
 
-| User says | Level |
-|---|---|
-| "整えて" "fix spacing" "clean up" | Lv1 |
-| "かっこよくして" "redesign" "make it look good" | Lv2 |
-| "印象に残る" "memorable" "wow factor" | Lv3 |
+| User says                                       | Level |
+| ----------------------------------------------- | ----- |
+| "整えて" "fix spacing" "clean up"               | Lv1   |
+| "かっこよくして" "redesign" "make it look good" | Lv2   |
+| "印象に残る" "memorable" "wow factor"           | Lv3   |
 
 If ambiguous, ask once:
 
@@ -31,6 +31,7 @@ If ambiguous, ask once:
 ## Step 1: Analyze Before Touching Code
 
 Before writing anything, read the existing UI and state:
+
 - What is the primary message this UI must communicate?
 - Where does the visual hierarchy break down?
 - What is the worst offender — spacing, contrast, alignment, or grouping?
@@ -44,6 +45,7 @@ Do not skip this. Local fixes without global diagnosis produce local improvement
 **Goal**: Make it immediately clear what matters and in what order.
 
 ### Scope
+
 **Allowed**: spacing, size relationships, alignment, grouping, component proportion, basic interaction states (hover, focus, active, disabled)
 **Off-limits**: font families, color palette, layout paradigm changes, animation
 
@@ -51,22 +53,27 @@ Do not skip this. Local fixes without global diagnosis produce local improvement
 
 **Phase 1 — Macro (全体構図)**
 Before touching elements, assess the whole canvas:
+
 - Is the visual center where it should be?
 - Does the negative space feel intentional or leftover?
 - Can you trace a clear visual path from most to least important?
 
 **Phase 2 — Hierarchy (ジャンプ率)**
 Apply CRAP. The most common failure is insufficient contrast — sizes that are too close, weights that don't commit.
+
 - **Be bold. If you think the size difference is enough, make it bigger.**
 - H1 vs body, primary CTA vs secondary action — the gap should be uncomfortable before it's right.
 - Proximity should make groupings feel obvious without labels.
 
 **Phase 3 — Micro (要素間の関係)**
+
 - Every element aligns to something — not just locally, but within the whole grid.
 - Consistent spacing units (4px / 8px base). Repetition builds trust.
 
 ### Self-evaluation (required)
+
 After implementing, step back and ask:
+
 1. Can a new user identify the #1 priority in under 3 seconds?
 2. Is anything sitting in an ambiguous position — not clearly part of a group, not clearly separate?
 3. Is the contrast ratio between hierarchy levels large enough to feel intentional?
@@ -77,15 +84,17 @@ If any answer is "no" or "maybe", fix it before finishing.
 
 ## Level 2 — Visual Language
 
-**Goal**: Establish what this interface *is* — its voice, personality, and aesthetic conviction.
+**Goal**: Establish what this interface _is_ — its voice, personality, and aesthetic conviction.
 Lv1 rules apply in full. Lv2 adds: typography, color, spatial composition, and interaction personality.
 
 ### Ask first (required)
+
 1. Who uses this, and what problem does it solve?
 2. What emotional tone? (e.g., professional, playful, urgent, calm, editorial)
 3. Constraints — framework, existing system, anything to preserve?
 
 ### Design direction
+
 Commit to a specific aesthetic before writing code. Not "modern and clean" — pick an extreme:
 brutally minimal / maximalist / retro-futuristic / luxury / brutalist / organic / utilitarian / editorial
 
@@ -94,6 +103,7 @@ brutally minimal / maximalist / retro-futuristic / luxury / brutalist / organic 
 - **Layout**: Asymmetry, generous negative space, or controlled density. Avoid predictable symmetry.
 
 ### Interaction states (Lv2)
+
 Hover, focus, and active states carry personality. A luxury UI transitions slowly; a brutalist UI snaps. Design states intentionally — don't use browser defaults.
 
 ---
@@ -102,14 +112,17 @@ Hover, focus, and active states carry personality. A luxury UI transitions slowl
 
 **Goal**: Lv2, plus one thing the user will remember.
 
-Lv2 must be complete first. Then ask: *what is the single most memorable thing this interface could do?* Build that — and only that.
+Lv2 must be complete first. Then ask: _what is the single most memorable thing this interface could do?_ Build that — and only that.
 
 ### Atmosphere
+
 - No solid backgrounds. Use gradient meshes, noise, layered transparency, or grain — matched to the aesthetic.
 - Depth through shadow, z-axis layering, or parallax.
 
 ### Interaction (Lv3)
+
 Motion should feel inevitable for this UI, not generic:
+
 - **Load**: One orchestrated entrance. Staggered reveals beat scattered micro-interactions.
 - **Interaction**: Hover and focus states that surprise without distracting.
 - **Scroll**: Trigger effects on viewport entry when it serves the narrative.
@@ -118,6 +131,7 @@ Match animation character to aesthetic — brutalist moves snap; luxury moves sl
 Prefer CSS-only for HTML. Use Motion library for React.
 
 ### The signature detail
+
 One element that could not exist in any other context. Specific to this UI's purpose, audience, and tone. Doesn't need to be large — must be intentional.
 
 ---
