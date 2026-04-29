@@ -57,11 +57,11 @@ if [ -z "$rule_content" ]; then
   exit 0
 fi
 
-message="以下のルールに照らして確認し、違反があれば修正。全て満たしていれば何もしないで完了。
+message="Review your work against the following rules and make any necessary corrections if you find any violations. If all criteria are met, open the review screen in the difit skill. If you have already run difit, skip this step.
 
 $rule_content
 
-対象ファイル:
+Target files:
 $files"
 
 escaped=$(printf '%s' "$message" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/g' | tr -d '\n')
