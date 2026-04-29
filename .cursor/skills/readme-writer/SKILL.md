@@ -33,12 +33,6 @@ Generate sections in this order:
 
 [badges row]
 
-[one-line description]
-
-## Developer Notes           ← developer/AI-agent section (top)
-### Concept & Goals
-### Stack & Key Decisions
-
 ## Table of Contents         ← optional, only if README is long
 
 ## Overview                  ← user-facing starts here
@@ -49,6 +43,11 @@ Generate sections in this order:
 ## Configuration            ← if applicable
 ## Contributing             ← if applicable
 ## License
+
+## Developer Notes           ← developer/AI-agent section (top)
+### Concept & Goals
+### Stack & Key Decisions
+
 ```
 
 ---
@@ -137,7 +136,7 @@ When generating from scratch or improving, infer what you can from context:
 
 Ask only when you can't infer:
 
-- License type (default to MIT if no signal)
+- License type (default to **MIT** if no signal)
 - Version number (default to 0.1.0 if not mentioned)
 - Whether it's open source (affects Contributing section depth)
 
