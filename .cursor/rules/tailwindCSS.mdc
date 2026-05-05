@@ -17,6 +17,7 @@ alwaysApply: false
 - One component per file.
 - Props type colocated: inline in the same file or in `[name].types.ts` alongside — never in a separate global types file.
 - Mobile-first responsive design using Tailwind breakpoint prefixes (`sm:`, `md:`, `lg:`).
+- If project uses css framework or library, you must follow its conventions.
 
 ## Accessibility
 

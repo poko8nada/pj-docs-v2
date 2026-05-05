@@ -5,17 +5,6 @@ alwaysApply: true
 
 # Project Guidelines
 
-## Rules about file operations
-
-- There are rules for each file type in the same directory.
-- These rules matched by globs must be loaded in advance and strictly followed.
-- These must be followed, rather than relying on your own judgment.
-- Here's how to improve the quality of your work.
-
-### globs 
-
-` **/*.tsx, **/*.test.tsx, **/*.ts, **/*.test.ts, **/*.js, **/*.test.js, **/*.md, **/*.css`
-
 ## Semi Issue Driven
 
 - Codes, Tests, and Issues are the only docments that represents the project.

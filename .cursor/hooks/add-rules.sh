@@ -18,7 +18,7 @@ while IFS= read -r file; do
   case "$file" in
     *.ts|*.tsx)        rule="$rules_dir/typescript.mdc" ;;
     *.md|*.mdx)        rule="$rules_dir/markdown.mdc" ;;
-    *.css|*.html)      rule="$rules_dir/tailwindCSS.mdc" ;;
+    *.css|*.tsx)      rule="$rules_dir/tailwindCSS.mdc" ;;
     *.test.*|*.spec.*) rule="$rules_dir/testing.mdc" ;;
     *)                 rule="" ;;
   esac
