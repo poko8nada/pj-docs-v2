@@ -1,0 +1,25 @@
+---
+description: "Colocated tests, what to cover versus skip, and Result-type error paths for unit and feature tests."
+globs: "**/*.test.ts,**/*.test.tsx"
+alwaysApply: false
+---
+
+# Testing Rules
+
+## Colocation
+
+- Test files live alongside the implementation: `[name].test.ts` in the same directory.
+- Never place tests in a separate top-level `__tests__` directory — breaks grep-ability.
+- Include Japanese translations in the comments for each test description. While all code and documentation should be written in English, and it is generally considered best to keep comments to a minimum, this is an exception.
+
+## What to Test
+
+- Business logic and domain functions — not framework internals or third-party libraries.
+- Every `Result<T, E>` error path explicitly — not just the happy path.
+- API integrations: both success and failure cases.
+
+## What NOT to Test
+
+- CSS / styling details
+- Trivial code (simple getters, obvious mappings)
+- React/Vue rendering internals
