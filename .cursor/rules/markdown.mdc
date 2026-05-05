@@ -8,10 +8,10 @@ alwaysApply: false
 
 When editing Markdown in this repository:
 
-1. Bold (`**…**`) — Use only where emphasis is genuinely useful (e.g. a critical warning or a defined term once). Do not sprinkle bold across every label or phrase; it reads noisy and unprofessional.
+1. Bold (`**…**`) — Use this only when emphasis is truly necessary (e.g., important warnings or terms defined only once). Do not indiscriminately apply bold formatting to every label or phrase. Doing so makes the text look cluttered and hard to read, and appears unprofessional. However, avoiding it entirely results in text that is too plain and equally hard to read.
 
-As a general rule, limit it to one per paragraph, no matter how long the paragraph is.
+As a general rule, limit bold text to one instance per paragraph, regardless of the paragraph’s length.
 
-2. Tables — We recommend using small tables (those with few columns and short cell text). If you have long explanations, facts spanning multiple lines, or a large number of items, use headings or nested bullet points instead. However, since tables are more visually clear than bullet points, please make an effort to use them as long as they meet the above guidelines.
+2. Tables — We recommend using small or medium-sized tables with few columns and short cell text. As a general guideline, the total number of characters in all cells per row should be around 100. If a piece of information spans multiple rows, use headings or nested bullet points instead. However, since tables are more visually intuitive than bullet points, please make active use of them as long as they meet the guidelines above.
 
-If a table absolutely requires line breaks or has very wide cells, please break it up into sections or bulleted lists.
+As a general rule, if a table is included in the provided template, format the table according to the template, keep it as compact as possible, and avoid line breaks.

@@ -1,18 +1,7 @@
 #!/bin/sh
 # add-rules.sh
 
-input=$(cat)
-
-conversation_id=$(echo "$input" | grep -o '"conversation_id":"[^"]*"' | cut -d'"' -f4)
-workspace=$(echo "$input" | grep -o '"workspace_roots":\["[^"]*"' | cut -d'"' -f4)
-loop_count=$(echo "$input" | grep -o '"loop_count":[0-9]*' | cut -d':' -f2)
-
-if [ "${loop_count:-0}" -ge 3 ]; then
-  printf '{}'
-  exit 0
-fi
-
-state_file="$workspace/.cursor/hooks/state/$conversation_id.txt"
+state_file="$CURSOR_PROJECT_DIR/.cursor/hooks/state/pending.txt"
 
 if [ ! -f "$state_file" ]; then
   printf '{}'
@@ -22,7 +11,7 @@ fi
 files=$(cat "$state_file")
 rm "$state_file"
 
-rules_dir="$workspace/.cursor/rules"
+rules_dir="$CURSOR_PROJECT_DIR/.cursor/rules"
 collected_rules=""
 
 while IFS= read -r file; do
@@ -57,7 +46,7 @@ if [ -z "$rule_content" ]; then
   exit 0
 fi
 
-message="Review your work against the following rules and make any necessary corrections if you find any violations. If all criteria are met, open the review screen in the difit skill. If you have already run difit, skip this step.
+message="Review your work against the following rules and make any necessary corrections if you find any violations. If all criteria are met, open the review screen in the difit skill. If localhost:4966 is still running, skip this step.
 
 $rule_content
 
