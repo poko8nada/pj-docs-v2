@@ -32,10 +32,10 @@ If ambiguous, ask once:
 
 **Run for Lv2 / Lv3 only. Skip for Lv1.**
 
-Check if `.cursor/skills/ui-ux-pro-max/` exists. If it does, run:
+Check if `.opencode/skills/ui-ux-pro-max/` exists. If it does, run:
 
 ```bash
-python3 .cursor/skills/ui-ux-pro-max/scripts/search.py \
+python3 .opencode/skills/ui-ux-pro-max/scripts/search.py \
   "[product category / project description]" --design-system -p "[project name]"
 ```
 

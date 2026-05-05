@@ -7,12 +7,12 @@ description: This allows you to save and retrieve reusable knowledge across sess
 
 ## Preparation
 
-- Reload `.cursor/rules/project-meta.mdc` and incorporate it into the signal for this skill execution.
+- Reload `.opencode/rules/project-meta.mdc` and incorporate it into the signal for this skill execution.
 - Gain a comprehensive understanding of the project, not just the scope that was requested.
 
 ## Location
 
-- Memory root: `~/.cursor/memories/`. This is global root.
+- Memory root: `~/.opencode/memories/`. This is global root.
 
 ## When to use
 
@@ -56,15 +56,15 @@ If you update, increase the `timesUpdated` field.
 
 ```bash
 # list summaries quickly
-rg "^summary:" ~/.cursor/memories/ --no-ignore --hidden
+rg "^summary:" ~/.opencode/memories/ --no-ignore --hidden
 
 # filter
-rg "^summary:.*keyword" ~/.cursor/memories/ --no-ignore --hidden -i
-rg "^project:.*keyword" ~/.cursor/memories/ --no-ignore --hidden -i
-rg "^tags:.*keyword" ~/.cursor/memories/ --no-ignore --hidden -i
+rg "^summary:.*keyword" ~/.opencode/memories/ --no-ignore --hidden -i
+rg "^project:.*keyword" ~/.opencode/memories/ --no-ignore --hidden -i
+rg "^tags:.*keyword" ~/.opencode/memories/ --no-ignore --hidden -i
 
 # permanent memories
-rg "^isPermanent: true" ~/.cursor/memories/ --no-ignore --hidden
+rg "^isPermanent: true" ~/.opencode/memories/ --no-ignore --hidden
 ```
 
 ## Quality guidelines

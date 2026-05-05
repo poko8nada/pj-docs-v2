@@ -9,7 +9,7 @@ Act as tech lead and provide a code skeleton for the user to implement.
 
 ## Preparation
 
-- Reload `.cursor/rules/project-meta.mdc` and incorporate it into the signal for this skill execution.
+- Reload `.opencode/rules/project-meta.mdc` and incorporate it into the signal for this skill execution.
 - Gain a comprehensive understanding of the project, not just the scope that was requested.
 
 ## Steps

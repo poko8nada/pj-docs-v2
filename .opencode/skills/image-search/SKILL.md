@@ -9,7 +9,7 @@ Browser-use version of `image-search`.
 
 ## Authority
 
-- The fundamental browser behavior rules for this skill come from the base `browser-use` skill under `~/.cursor/skills/browser-use/SKILL.md`.
+- The fundamental browser behavior rules for this skill come from the base `browser-use` skill under `~/.opencode/skills/browser-use/SKILL.md`.
 - This skill must follow those base rules first, then apply the pakutaso-specific rules below.
 - If there is any conflict, prefer the stricter / lower-memory rule.
 
@@ -107,7 +107,7 @@ browser-use sessions
 Load the seen-image list to skip already-downloaded images:
 
 ```bash
-python3 .cursor/skills/image-search/scripts/load_seen.py
+python3 .opencode/skills/image-search/scripts/load_seen.py
 ```
 
 Outputs `---SEEN---` JSON. Store `seen_urls` in memory for Phase 3.
@@ -150,7 +150,7 @@ After the page loads cleanly, run:
 browser-use --headed --session "pakutaso" python "
 import importlib.util
 import pathlib
-p = pathlib.Path('.cursor/skills/image-search/scripts/extract_search_candidates.py').resolve()
+p = pathlib.Path('.opencode/skills/image-search/scripts/extract_search_candidates.py').resolve()
 s = importlib.util.spec_from_file_location('extract_search_candidates', p)
 m = importlib.util.module_from_spec(s)
 s.loader.exec_module(m)
@@ -159,10 +159,10 @@ for r in m.extract_candidates_from_html(browser.html):
 "
 ```
 
-Helper implementation (for edits and unit checks): `.cursor/skills/image-search/scripts/extract_search_candidates.py` — optional: save the search result HTML to a file and pipe it for a quick check:
+Helper implementation (for edits and unit checks): `.opencode/skills/image-search/scripts/extract_search_candidates.py` — optional: save the search result HTML to a file and pipe it for a quick check:
 
 ```bash
-python3 .cursor/skills/image-search/scripts/extract_search_candidates.py < /path/to/saved-search.html
+python3 .opencode/skills/image-search/scripts/extract_search_candidates.py < /path/to/saved-search.html
 ```
 
 Collect up to **20 candidates** per search. If output is still empty, re-run `state` on the search page, then inspect `browser.html` (or saved HTML) and adjust `_is_likely_material_detail` in `extract_search_candidates.py` — keep this skill and the script in sync.
@@ -300,8 +300,8 @@ Report downloaded images:
 After a successful run, record downloaded `detail_url` values (arguments **or** stdin, one URL per line):
 
 ```bash
-python3 .cursor/skills/image-search/scripts/save_seen.py "https://www.pakutaso.com/....html" "https://..."
-# or: printf '%s\n' "url1" "url2" | python3 .cursor/skills/image-search/scripts/save_seen.py
+python3 .opencode/skills/image-search/scripts/save_seen.py "https://www.pakutaso.com/....html" "https://..."
+# or: printf '%s\n' "url1" "url2" | python3 .opencode/skills/image-search/scripts/save_seen.py
 ```
 
 This prevents re-downloading the same image in future runs.

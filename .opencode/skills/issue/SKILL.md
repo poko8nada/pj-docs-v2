@@ -7,7 +7,7 @@ description: Manages GitHub Issues using gh CLI — creation, decomposition, upd
 
 ## Preparation
 
-- Reload `.cursor/rules/project-meta.mdc` and incorporate it into the context for this skill execution.
+- Reload `.opencode/rules/project-meta.mdc` and incorporate it into the context for this skill execution.
 - Understand the overall project context, current architecture, and existing code style before proposing or creating issues.
 
 ## Principle

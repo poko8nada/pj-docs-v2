@@ -9,7 +9,7 @@ Fill in the implementation of a code skeleton provided by the user.
 
 ## Preparation
 
-- Reload `.cursor/rules/project-meta.mdc` and incorporate it into the signal for this skill execution.
+- Reload `.opencode/rules/project-meta.mdc` and incorporate it into the signal for this skill execution.
 - Gain a comprehensive understanding of the project, not just the scope that was requested.
 
 ## Steps
