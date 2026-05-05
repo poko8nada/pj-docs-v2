@@ -16,15 +16,41 @@ Infer from the user's words before asking:
 
 | User says                                       | Level |
 | ----------------------------------------------- | ----- |
-| "整えて" "fix spacing" "clean up"               | Lv1   |
-| "かっこよくして" "redesign" "make it look good" | Lv2   |
-| "印象に残る" "memorable" "wow factor"           | Lv3   |
+| "fix spacing" "clean up" "tidy this up"         | Lv1   |
+| "redesign" "make it look good" "refresh the UI" | Lv2   |
+| "memorable" "wow factor" "something impressive" | Lv3   |
 
 If ambiguous, ask once:
 
 > - **Lv1** — Structure and hierarchy only. No color or font changes.
 > - **Lv2** — Full visual redesign. I'll ask a few questions first.
 > - **Lv3** — Lv2 + atmosphere, depth, signature interaction.
+
+---
+
+## Step 0.5: Design System Generation (ui-ux-pro-max)
+
+**Run for Lv2 / Lv3 only. Skip for Lv1.**
+
+Check if `.cursor/skills/ui-ux-pro-max/` exists. If it does, run:
+
+```bash
+python3 .cursor/skills/ui-ux-pro-max/scripts/search.py \
+  "[product category / project description]" --design-system -p "[project name]"
+```
+
+Extract the following from the output and use as **input for Lv2/Lv3**:
+
+| Output field             | Where it feeds in                         |
+| ------------------------ | ----------------------------------------- |
+| `STYLE`                  | Starting point for Lv2 "Design direction" |
+| `COLORS`                 | Initial palette for Lv2 "Color"           |
+| `TYPOGRAPHY`             | Font pairing for Lv2 "Typography"         |
+| `KEY EFFECTS`            | Animation character for Lv3 "Interaction" |
+| `AVOID (Anti-patterns)`  | Hard constraints across all levels        |
+| `PRE-DELIVERY CHECKLIST` | Append to self-evaluation before shipping |
+
+If the script does not exist or errors out, **skip and proceed to Step 1**.
 
 ---
 
@@ -51,21 +77,21 @@ Do not skip this. Local fixes without global diagnosis produce local improvement
 
 ### Think in 3 phases
 
-**Phase 1 — Macro (全体構図)**
+**Phase 1 — Macro**
 Before touching elements, assess the whole canvas:
 
 - Is the visual center where it should be?
 - Does the negative space feel intentional or leftover?
 - Can you trace a clear visual path from most to least important?
 
-**Phase 2 — Hierarchy (ジャンプ率)**
+**Phase 2 — Hierarchy**
 Apply CRAP. The most common failure is insufficient contrast — sizes that are too close, weights that don't commit.
 
 - **Be bold. If you think the size difference is enough, make it bigger.**
 - H1 vs body, primary CTA vs secondary action — the gap should be uncomfortable before it's right.
 - Proximity should make groupings feel obvious without labels.
 
-**Phase 3 — Micro (要素間の関係)**
+**Phase 3 — Micro**
 
 - Every element aligns to something — not just locally, but within the whole grid.
 - Consistent spacing units (4px / 8px base). Repetition builds trust.
@@ -95,6 +121,8 @@ Lv1 rules apply in full. Lv2 adds: typography, color, spatial composition, and i
 
 ### Design direction
 
+**If Step 0.5 produced output, use it as the starting point. Otherwise, decide independently using the rules below.**
+
 Commit to a specific aesthetic before writing code. Not "modern and clean" — pick an extreme:
 brutally minimal / maximalist / retro-futuristic / luxury / brutalist / organic / utilitarian / editorial
 
@@ -105,6 +133,18 @@ brutally minimal / maximalist / retro-futuristic / luxury / brutalist / organic 
 ### Interaction states (Lv2)
 
 Hover, focus, and active states carry personality. A luxury UI transitions slowly; a brutalist UI snaps. Design states intentionally — don't use browser defaults.
+
+### Pre-delivery checklist (Lv2)
+
+Use the checklist from Step 0.5 if available. Otherwise, verify at minimum:
+
+- [ ] All clickable elements have `cursor-pointer`
+- [ ] Hover states use smooth transitions (150–300ms)
+- [ ] Text contrast ratio meets 4.5:1 minimum
+- [ ] `prefers-reduced-motion` respected
+- [ ] Responsive breakpoints tested (375 / 768 / 1024 / 1440px)
+- [ ] Icons are SVG (Heroicons / Lucide) — no emojis as icons
+- [ ] Focus states visible for keyboard navigation
 
 ---
 
@@ -120,6 +160,8 @@ Lv2 must be complete first. Then ask: _what is the single most memorable thing t
 - Depth through shadow, z-axis layering, or parallax.
 
 ### Interaction (Lv3)
+
+**Reference `KEY EFFECTS` from Step 0.5 to set the animation character.**
 
 Motion should feel inevitable for this UI, not generic:
 
@@ -142,3 +184,4 @@ One element that could not exist in any other context. Specific to this UI's pur
 - Never produce a layout that could belong to any other project.
 - Never be conservative with contrast. If in doubt, push harder.
 - Vary light/dark and aesthetic direction across generations.
+- Treat Anti-patterns from Step 0.5 as hard constraints, not suggestions.
