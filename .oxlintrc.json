@@ -12,6 +12,7 @@
     "unicorn/no-array-for-each": "warn",
     "import/no-duplicates": "error",
     "react/react-in-jsx-scope": "allow",
+    "react/iframe-missing-sandbox": "allow",
     "import/no-unassigned-import": [
       "warn",
       {

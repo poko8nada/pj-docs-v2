@@ -2,8 +2,8 @@ import type { Plugin } from '@opencode-ai/plugin';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const MAX_FILE_LINES = 30;
-const MAX_TREE_DEPTH = 2;
+const MAX_FILE_LINES = 40;
+const MAX_TREE_DEPTH = 3;
 
 const IGNORE_DIRS = new Set([
   'node_modules',
@@ -135,6 +135,12 @@ export const InjectContextPlugin: Plugin = async ({ worktree, $ }) => {
       if (event.type === 'session.created') {
         const sessionID = event.properties.info.id;
         // Fetch in background; store when ready
+        buildContext(worktree, $).then((ctx) => {
+          contextCache.set(sessionID, ctx);
+        });
+      }
+      if (event.type === 'session.compacted') {
+        const sessionID = event.properties.sessionID;
         buildContext(worktree, $).then((ctx) => {
           contextCache.set(sessionID, ctx);
         });
