@@ -20,3 +20,4 @@ Once both are satisfied, you MUST stop and:
 4. Act — only after explicit approval.
 
 > Exception: single-line typo or obvious bug fix — no confirmation needed.
+> BUT you MUST NOT commit the change without confirmation.
