@@ -13,6 +13,7 @@ const ALLOWED_COMMANDS = new Set([
   'echo',
   'pwd',
   'which',
+  'lsof',
   'sleep',
   'pgrep',
   'pkill',
@@ -24,7 +25,6 @@ const ALLOWED_COMMANDS = new Set([
   'bun',
   'npx',
   'pnpm',
-  'npm',
   // Build / test
   'tsc',
   'vitest',
@@ -34,6 +34,7 @@ const ALLOWED_COMMANDS = new Set([
   'touch',
   'cp',
   'mv',
+  'rm',
   // Project-specific
   'oxlint',
   'oxfmt',
@@ -42,6 +43,8 @@ const ALLOWED_COMMANDS = new Set([
   'gog',
   // python 3
   'python3',
+  // image
+  'sips',
 ]);
 
 // git subcommands that are explicitly blocked

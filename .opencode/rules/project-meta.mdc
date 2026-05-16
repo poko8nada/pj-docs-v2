@@ -5,16 +5,15 @@ alwaysApply: true
 
 # Project Guidelines
 
-## Rules about file operations
+## Tools and Scripts
 
-- There are rules for each file type in the same directory.
-- These rules matched by globs must be loaded in advance and strictly followed.
-- These must be followed, rather than relying on your own judgment.
-- Here's how to improve the quality of your work.
+- Use **pnpm** for all package management
+- We already have been ready to use scripts in `package.json`.
 
-### globs 
+## Files
 
-` **/*.tsx, **/*.test.tsx, **/*.ts, **/*.test.ts, **/*.js, **/*.test.js, **/*.md, **/*.css`
+- You can touch files in only project root dir.
+- Never outside of the project such as `/tmp/`. Always use `./tmp/` under the project root.
 
 ## Semi Issue Driven
 

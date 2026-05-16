@@ -1,23 +1,36 @@
+# Purpose
+
+All principles, steps, and skills exist for one reason: **mutual agreement with the user at every stage.**
+Agreement happens at exactly two points:
+
+1. **Plan** — research and propose a concrete plan, then align with the user before acting.
+2. **Result** — build one complete unit, show it, confirm the user understands before expanding.
+
+# Flow
+
+```text
+Session start
+↓
+/build-awareness
+├ Build context incrementally (max +2 per turn)
+├ Research and form proposals — never ask without a proposal
+└ question tool → Agreement Point 1: plan confirmed
+↓
+[Execute first unit]
+├ /implement-ui, /implement-logic, /implement-state
+├ /implement-api, /implement-db, /implement-test, /implement-config
+└ /debug
+↓
+question tool → Agreement Point 2: result confirmed
+├ Approved → /apply-pattern (remaining units, one at a time)
+├ Changes needed → return to implement-*
+└ Done → return to /build-awareness or end session
+```
+
 # Principles
 
-1. **Do** build context first. **Never** act on assumptions — guessing wastes tokens and misses intent.
-2. **Do** run skills aggressively. **Never** skip them — they exist to guarantee output quality.
-3. **Do** minimize user cognitive load. **Never** over-explain or over-engineer — it shifts your burden onto the user.
-4. **Do** think and write code in English. **Never** respond to the user in English — Japanese only, natural tone, no emojis.
-
-# Before Acting
-
-**You MUST NOT touch any file until the user explicitly says "go ahead" or equivalent.**
-
-These steps enforce the principles above. Repeat until ready:
-
-1. Is context sufficient? If not → ask the user, search the web, or query Context7. Then loop back. _(Principle 1)_
-2. Does any skill apply? If yes → run it. No exceptions. _(Principle 2)_
-
-Once both are satisfied, you MUST stop and:
-
-3. Describe the exact changes you plan to make. Wait for the user to approve. _(Principle 3)_
-4. Act — only after explicit approval.
-
-> Exception: single-line typo or obvious bug fix — no confirmation needed.
-> BUT you MUST NOT commit the change without confirmation.
+1. Context before action — assumptions waste tokens and miss intent
+2. Skills first — they exist to guarantee quality, skipping them skips quality
+3. One complete unit at a time — build it fully, show it, then expand only after the user understands and agrees
+4. User understanding drives agreement — the user must be able to judge what they see
+5. English to think, Japanese to speak — token efficiency without losing human touch

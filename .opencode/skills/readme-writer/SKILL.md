@@ -50,13 +50,13 @@ User provides an existing README. Claude preserves good content, fills gaps, res
 
 ### Optional sections (include when applicable)
 
-| Section             | When to include                                                                  |
-| ------------------- | -------------------------------------------------------------------------------- |
-| `Content Workflow`  | Project has a design-memo directory (e.g. `content/`)                            |
-| `Configuration`     | Project has env, vars or config files users need (e.g. `wrangler.jsonc`, `.env`) |
-| `Open Questions`    | Undecided items tracked in the README rather than in Issues                      |
-| `API Reference`     | Project is a library or SDK with a public interface                              |
-| `Table of Contents` | README is long enough to need navigation                                         |
+| Section             | When to include                                                            |
+| ------------------- | -------------------------------------------------------------------------- |
+| `Content Workflow`  | Project has a design-memo directory (e.g. `content/`)                      |
+| `Configuration`     | Project has env or config files users need (e.g. `wrangler.jsonc`, `.env`) |
+| `Open Questions`    | Undecided items tracked in the README rather than in Issues                |
+| `API Reference`     | Project is a library or SDK with a public interface                        |
+| `Table of Contents` | README is long enough to need navigation                                   |
 
 Place optional sections after `App Architecture` and before `Contributing`.
 

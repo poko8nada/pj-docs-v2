@@ -11,6 +11,7 @@ alwaysApply: false
 - No `tailwind.config.js` — all tokens defined in `@theme inline` in CSS only.
 - No `@apply` — use component extraction or direct utilities instead. `@apply` defeats the purpose of utility-first and creates hidden coupling.
 - Dark mode via CSS variables in `@theme`, not by duplicating color classes.
+- Tailwind has a lot of named class such as `aspect-video`. It means `aspect-[16/9]`. So, No bracket variables unless it's a custom value.
 
 ## Components
 

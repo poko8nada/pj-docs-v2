@@ -1,9 +1,11 @@
+// @ts-nocheck
 import type { Plugin } from '@opencode-ai/plugin';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execFileSync } from 'child_process';
 
-const MAX_FILE_LINES = 40;
-const MAX_TREE_DEPTH = 3;
+const MAX_CONTEXT_CHARS = 4000;
+const MAX_LINE_LENGTH = 120;
 
 const IGNORE_DIRS = new Set([
   'node_modules',
@@ -15,152 +17,155 @@ const IGNORE_DIRS = new Set([
   'coverage',
 ]);
 
-// ── file tree ────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
-function readFileHead(filePath: string, maxLines: number): string {
+function truncateLine(line: string, max = MAX_LINE_LENGTH): string {
+  return line.length > max ? line.slice(0, max) + '…' : line;
+}
+
+function sanitize(text: string): string {
+  return text
+    .replace(/\r/g, '')
+    .replace(/\t/g, ' ')
+    .split('\n')
+    .map((l) => truncateLine(l))
+    .join('\n');
+}
+
+function buildFlatTree(dir: string): string {
   try {
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.split('\n').slice(0, maxLines);
-    return lines.join('\n');
+    const entries = fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => !IGNORE_DIRS.has(e.name))
+      .toSorted((a, b) => a.name.localeCompare(b.name));
+    return entries
+      .map((entry) => (entry.isDirectory() ? `📁 ${entry.name}/` : `📄 ${entry.name}`))
+      .join('\n');
   } catch {
     return '';
   }
 }
 
-function buildTree(dir: string, depth: number, maxDepth: number): string {
-  if (depth > maxDepth) return '';
-
-  let result = '';
-  let entries: fs.Dirent[];
-
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return '';
-  }
-
-  for (const entry of entries) {
-    if (IGNORE_DIRS.has(entry.name)) continue;
-
-    const indent = '  '.repeat(depth);
-    const fullPath = path.join(dir, entry.name);
-
-    if (entry.isDirectory()) {
-      result += `${indent}📁 ${entry.name}/\n`;
-      result += buildTree(fullPath, depth + 1, maxDepth);
-    } else {
-      result += `${indent}📄 ${entry.name}\n`;
-      const head = readFileHead(fullPath, MAX_FILE_LINES);
-      if (head) {
-        const headLines = head
-          .split('\n')
-          .map((l) => `${indent}  | ${l}`)
-          .join('\n');
-        result += `${headLines}\n`;
-      }
+function readReadme(worktree: string): string {
+  for (const name of ['README.md', 'readme.md', 'README.mdx']) {
+    const file = path.join(worktree, name);
+    if (!fs.existsSync(file)) continue;
+    try {
+      return sanitize(fs.readFileSync(file, 'utf-8').slice(0, 500));
+    } catch {
+      return '';
     }
   }
-
-  return result;
+  return '';
 }
 
-// ── context builder ──────────────────────────────────────────────────────────
+function readPackageJson(worktree: string): string {
+  const file = path.join(worktree, 'package.json');
+  if (!fs.existsSync(file)) return '';
+  try {
+    const pkg = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    return sanitize(
+      JSON.stringify(
+        {
+          name: pkg.name,
+          version: pkg.version,
+          private: pkg.private,
+          scripts: pkg.scripts ? Object.keys(pkg.scripts) : [],
+          dependencies: pkg.dependencies ? Object.keys(pkg.dependencies).slice(0, 20) : [],
+          devDependencies: pkg.devDependencies ? Object.keys(pkg.devDependencies).slice(0, 20) : [],
+        },
+        null,
+        2,
+      ),
+    );
+  } catch {
+    return '';
+  }
+}
 
-async function buildContext(worktree: string, $: unknown): Promise<string> {
+function readGithubIssues(worktree: string): string {
+  try {
+    const stdout = execFileSync(
+      'gh',
+      ['issue', 'list', '--state', 'open', '--json', 'number,title,labels', '--limit', '5'],
+      { cwd: worktree, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    const issues = JSON.parse(stdout);
+    if (!Array.isArray(issues) || issues.length === 0) return '';
+    return sanitize(
+      issues
+        .map((i: unknown) => {
+          const labels =
+            i.labels?.length > 0 ? ` [${i.labels.map((l: unknown) => l.name).join(', ')}]` : '';
+          return `- #${i.number} ${i.title}${labels}`;
+        })
+        .join('\n'),
+    );
+  } catch {
+    return '';
+  }
+}
+
+function readProjectMeta(worktree: string): string {
+  const metaPath = path.join(worktree, '.opencode', 'rules', 'project-meta.mdc');
+  if (!fs.existsSync(metaPath)) return '';
+  try {
+    return sanitize(fs.readFileSync(metaPath, 'utf-8').trim());
+  } catch {
+    return '';
+  }
+}
+
+async function buildContext(worktree: string): Promise<string> {
   const sections: string[] = [];
 
-  // 1. GitHub open issues
-  try {
-    // @ts-ignore
-    const result = await $`gh issue list --state open --json number,title,body,labels --limit 10`;
-    const issues = JSON.parse(result.stdout);
-    if (issues.length > 0) {
-      const formatted = issues
-        .map(
-          (i: unknown) =>
-            // @ts-ignore
-            `### #${i.number} ${i.title}\n` +
-            // @ts-ignore
-            (i.labels?.length
-              ? // @ts-ignore
-                `Labels: ${i.labels.map((l: unknown) => l.name).join(', ')}\n`
-              : '') +
-            // @ts-ignore
-            (i.body ? `${i.body.slice(0, 500)}\n` : ''),
-        )
-        .join('\n---\n');
-      sections.push(`## Open GitHub Issues\n\n${formatted}`);
-    }
-  } catch {
-    // gh cli not available or not a gh repo — skip silently
-  }
+  const meta = readProjectMeta(worktree);
+  if (meta) sections.push(['## Project Guidelines', '', meta].join('\n'));
 
-  // 2. project-meta rule
-  const projectMetaPath = path.join(worktree, '.opencode', 'rules', 'project-meta.mdc');
-  if (fs.existsSync(projectMetaPath)) {
-    const content = fs.readFileSync(projectMetaPath, 'utf-8').trim();
-    if (content) sections.push(`## Project Meta\n\n${content}`);
-  }
+  const issues = readGithubIssues(worktree);
+  if (issues) sections.push(['## Open GitHub Issues', '', '```text', issues, '```'].join('\n'));
 
-  // 4. README
-  const readmeCandidates = ['README.md', 'readme.md', 'README.mdx'];
-  for (const name of readmeCandidates) {
-    const readmePath = path.join(worktree, name);
-    if (fs.existsSync(readmePath)) {
-      const content = fs.readFileSync(readmePath, 'utf-8').slice(0, 3000);
-      sections.push(`## README\n\n${content}`);
-      break;
-    }
-  }
+  const readme = readReadme(worktree);
+  if (readme) sections.push(['## README', '', '```text', readme, '```'].join('\n'));
 
-  // 5. Project file tree with file heads
-  const tree = buildTree(worktree, 0, MAX_TREE_DEPTH);
-  if (tree) {
-    sections.push(
-      `## Project Structure (depth: ${MAX_TREE_DEPTH}, first ${MAX_FILE_LINES} lines per file)\n\n${tree}`,
-    );
-  }
+  const pkg = readPackageJson(worktree);
+  if (pkg) sections.push(['## package.json', '', '```json', pkg, '```'].join('\n'));
 
-  return sections.join('\n\n---\n\n');
+  const tree = buildFlatTree(worktree);
+  if (tree) sections.push(['## Project Structure', '', '```text', tree, '```'].join('\n'));
+
+  return sections.join('\n\n---\n\n').slice(0, MAX_CONTEXT_CHARS);
 }
 
-// ── plugin ───────────────────────────────────────────────────────────────────
+// ── plugin ────────────────────────────────────────────────────────────────────
 
-export const InjectContextPlugin: Plugin = async ({ worktree, $ }) => {
-  // sessionID → context string
-  const contextCache = new Map<string, string>();
+export const InjectContextPlugin: Plugin = async ({ worktree }) => {
+  const contextCache = new Map<string, Promise<string>>();
 
   return {
     event: async ({ event }) => {
       if (event.type === 'session.created') {
-        const sessionID = event.properties.info.id;
-        // Fetch in background; store when ready
-        buildContext(worktree, $).then((ctx) => {
-          contextCache.set(sessionID, ctx);
-        });
+        const info = event.properties.info;
+        if (info.parentID) return;
+        contextCache.set(info.id, buildContext(worktree));
       }
       if (event.type === 'session.compacted') {
-        const sessionID = event.properties.sessionID;
-        buildContext(worktree, $).then((ctx) => {
-          contextCache.set(sessionID, ctx);
-        });
+        const { sessionID } = event.properties;
+        contextCache.set(sessionID, buildContext(worktree));
       }
     },
 
     'experimental.chat.system.transform': async (input, output) => {
-      const sessionID = input.sessionID;
+      const { sessionID } = input;
       if (!sessionID) return;
 
-      const ctx = contextCache.get(sessionID);
-      if (!ctx) return;
+      const ctxPromise = contextCache.get(sessionID);
+      if (!ctxPromise) return;
 
-      output.system.push(
-        `
-# Project Context (injected by opencode plugin)
+      const ctx = await ctxPromise;
+      if (!ctx?.trim()) return;
 
-${ctx}
-      `.trim(),
-      );
+      output.system.push(['# Project Context', '', ctx].join('\n'));
     },
   };
 };
