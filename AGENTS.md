@@ -18,11 +18,11 @@ Session start
 ↓
 [Execute first unit]
 ├ /implement-ui, /implement-logic, /implement-state
-├ /implement-api, /implement-db, /implement-test, /implement-config
+├/implement-api, /implement-db, /implement-test, /implement-config
 └ /debug
 ↓
 question tool → Agreement Point 2: result confirmed
-├ Approved → /apply-pattern (remaining units, one at a time)
+├ Approved → `/apply-pattern [remaining targets]`(remaining units, one at a time)
 ├ Changes needed → return to implement-*
 └ Done → return to /build-awareness or end session
 ```

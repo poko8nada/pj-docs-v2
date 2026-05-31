@@ -1,98 +1,190 @@
 ---
 name: image-search
-description: Search and download Japanese stock photos from PAKUTASO using browser-use. Use when asked to run /image-search, find Japanese free images, or download photos to ./assets. Claude evaluates image quality before downloading.
+description: Search and download Japanese stock photos from pro.foto.ne.jp (.foto project) using `cmux browser *`. Use when asked to run /image-search, find Japanese free images, or download photos to ./assets. Claude evaluates image quality before downloading.
 ---
 
 # Image Search Skill
 
-Browser-use version of `image-search`.
+cmux-browser version of `image-search`. Source: **pro.foto.ne.jp** (.foto project family).
 
 ## Authority
 
-- The fundamental browser behavior rules for this skill come from the base `browser-use` skill under `~/.opencode/skills/browser-use/SKILL.md`.
-- This skill must follow those base rules first, then apply the pakutaso-specific rules below.
+- The fundamental browser behavior rules for this skill come from the base `cmux-browser` skill.
+- This skill must follow those base rules first, then apply the foto-project-specific rules below.
 - If there is any conflict, prefer the stricter / lower-memory rule.
 
 ## Prerequisites
-
-1. Confirm browser-use is available:
-
-```bash
-browser-use doctor
-```
-
-2. Ensure output directory exists (create if missing):
 
 ```bash
 mkdir -p ./assets
 ```
 
-3. Start from a clean browser-use slate:
+## Why pro.foto.ne.jp
 
-```bash
-browser-use close --all
-browser-use sessions
+- No registration required. Commercial use OK. No attribution required.
+- Images are served directly from `pro.foto.ne.jp` — no external CDN, no bot protection.
+- `curl` downloads work out of the box (200 OK, no cookies needed).
+- Sister sites with the same URL structure: `model.foto.ne.jp` (people), `food.foto.ne.jp` (food).
+
+## URL Structure
+
+```
+# Category listing (search)
+https://pro.foto.ne.jp/free/products_list.php/cPath/{cPath}
+
+# Detail page
+https://pro.foto.ne.jp/free/product_info.php/products_id/{id}
+
+# Full-size image (direct, no auth)
+https://pro.foto.ne.jp/free/img/images_big/{filename}.jpg
+
+# Download endpoint (direct, no auth)
+https://pro.foto.ne.jp/free/download_img.php/id/{id}
 ```
 
-## Core Browser-use Rules
+### Category structure (two-level navigation)
 
-1. **One session for the entire run**
-   - Use a single named session `pakutaso` throughout.
-   - Do not create one session per keyword or per image.
-   - Do not create a new session to "start fresh" mid-run — reuse the same one.
+The site uses two-level categories. Start from the top-level page (`f_{n}.html`), then drill into subcategories. **Top-level cPaths alone (e.g. `21_25`) return 404** — always use a subcategory cPath.
 
-2. **Do not spam `open` — this eats memory**
-   - `open` spawns a new window inside the session and keeps the old one alive.
-   - Use `open` only to start the search page, and then for each shortlisted detail page.
-   - Do **not** `open` every candidate's detail page. Run Phase 2 (AI judgment) first using thumbnails only, then `open` only the selected images.
-   - Use `back` to return from a detail page instead of `open`-ing the search page again.
-   - If you notice memory pressure or many windows accumulating, run `browser-use close --all` immediately and restart the session.
+#### Top-level pages → subcategories
 
-3. **`state` indices are ephemeral**
-   - After every `open`, `back`, `click`, or any page change, always re-run `browser-use state`.
-   - Never trust an old index after the page has changed.
+**`/f_25.html` — 風景・自然・景色 (Nature / Scenery)**
 
-4. **Ad handling is mandatory on every page transition**
-   - After every `open` or `back`, check for ad overlays before doing anything else.
-   - See **Ad Handling** section below.
+| cPath      | Subcategory      |
+| ---------- | ---------------- |
+| `21_25_33` | 海・海岸・砂浜   |
+| `21_25_34` | 空・雲           |
+| `21_25_35` | 夕日・朝日・夜空 |
+| `21_25_36` | 河川・湖・池     |
+| `21_25_37` | 大地・山・丘     |
+| `21_25_38` | 雪・氷           |
+| `21_25_39` | 水・水面・水中   |
+| `21_25_40` | 花火             |
 
-5. **Close and verify at the end**
+**`/f_26.html` — 植物・樹木・花 (Plants / Trees / Flowers)**
 
-```bash
-browser-use close --all
-browser-use sessions
-```
+| cPath       | Subcategory        |
+| ----------- | ------------------ |
+| `21_26_51`  | 樹木・森林         |
+| `21_26_52`  | 枝・葉             |
+| `21_26_53`  | 桜・さくら         |
+| `21_26_129` | 梅・桃             |
+| `21_26_128` | 紅葉・黄葉         |
+| `21_26_56`  | 草花・自然花       |
+| `21_26_57`  | 花束・切花・ブーケ |
+| `21_26_54`  | 花のある風景       |
+| `21_26_58`  | その他植物イメージ |
 
-6. **Clean up leftover subprocesses**
+**`/f_27.html` — 建物・街・建築 (Buildings / Architecture)**
 
-```bash
-pgrep -f "browser-use-user-data-dir" || true
-pkill -f "browser-use-user-data-dir" 2>/dev/null || true
-```
+| cPath       | Subcategory            |
+| ----------- | ---------------------- |
+| `21_27_59`  | ビル・高層建造物       |
+| `21_27_60`  | 夜景・イルミネーション |
+| `21_27_61`  | 空撮・眺望・展望       |
+| `21_27_62`  | 住宅・民家             |
+| `21_27_64`  | 室内・インテリア       |
+| `21_27_126` | 神社・寺・教会・学校   |
+| `21_27_130` | 公園・庭園・遊園地     |
+| `21_27_65`  | 橋・橋梁               |
+| `21_27_66`  | その他建造物イメージ   |
+
+**`/f_28.html` — 人物・動物 (People / Animals)**
+
+| cPath      | Subcategory        |
+| ---------- | ------------------ |
+| `21_28_67` | 赤ちゃん・子供     |
+| `21_28_68` | 男性               |
+| `21_28_69` | 女性               |
+| `21_28_70` | 犬・イヌ           |
+| `21_28_71` | 猫・ネコ           |
+| `21_28_72` | 魚・魚群           |
+| `21_28_73` | マンタ・エイ       |
+| `21_28_75` | サンゴ・珊瑚礁     |
+| `21_28_76` | 亀・カメ           |
+| `21_28_77` | 馬・サラブレッド   |
+| `21_28_78` | 鳥・鳥類           |
+| `21_28_79` | 虫・昆虫類         |
+| `21_28_80` | その他人物イメージ |
+| `21_28_81` | その他動物イメージ |
+
+For people-heavy searches, `model.foto.ne.jp` has finer category breakdowns.
+
+**`/f_29.html` — 交通・乗り物 (Vehicles / Transport)**
+
+| cPath      | Subcategory          |
+| ---------- | -------------------- |
+| `21_29_82` | 道路・トンネル・標識 |
+| `21_29_83` | 車・自動車           |
+| `21_29_84` | 電車・汽車・線路     |
+| `21_29_85` | バイク・二輪車       |
+| `21_29_86` | 船舶・ヨット         |
+| `21_29_87` | 飛行機・航空機       |
+
+**`/f_30.html` — 食べ物・飲み物・料理 (Food / Drinks)**
+
+| cPath      | Subcategory        |
+| ---------- | ------------------ |
+| `21_30_89` | 果物・野菜         |
+| `21_30_90` | ドリンク・飲料     |
+| `21_30_91` | お菓子・デザート   |
+| `21_30_92` | 和食料理           |
+| `21_30_93` | 洋食料理           |
+| `21_30_94` | 食器・キッチン用品 |
+| `21_30_95` | その他食材イメージ |
+
+**`/f_31.html` — スポーツ・レジャー (Sports / Leisure)**
+
+| cPath       | Subcategory          |
+| ----------- | -------------------- |
+| `21_31_96`  | ビーチ・リゾート     |
+| `21_31_97`  | プール・プールサイド |
+| `21_31_98`  | ゴルフ・ゴルフ場     |
+| `21_31_99`  | 野球・サッカー・球技 |
+| `21_31_100` | ウォータースポーツ   |
+| `21_31_102` | その他スポーツ       |
+
+**`/f_32.html` — オブジェクト (Objects / Miscellaneous)**
+
+| cPath       | Subcategory            |
+| ----------- | ---------------------- |
+| `21_32_103` | ビジネス・IT・デジタル |
+| `21_32_104` | バックグラウンド・背景 |
+| `21_32_105` | クリスマス             |
+| `21_32_106` | お正月・年賀           |
+| `21_32_108` | 文房具・事務用品       |
+| `21_32_110` | 照明・ランプ           |
+| `21_32_111` | 造形・造型             |
+| `21_32_107` | おもちゃ・ぬいぐるみ   |
+| `21_32_112` | 楽器・オーディオ       |
+| `21_32_113` | ディスプレイ           |
+| `21_32_114` | その他オブジェクト     |
+
+#### Searching with keywords
+
+If no subcategory matches the keyword exactly, pick the closest top-level page, navigate to its subcategory list, and select the best-matching subcategory cPath.
 
 ---
 
-## Ad Handling (apply after every page transition)
+## Core cmux-browser Rules
 
-After every `open` or `back`, always run `state` first:
+1. **One surface for search, one surface per detail page**
+   - Open the search page once and store it as `$SEARCH_SURFACE`.
+   - Open detail pages only when needed (filename can often be inferred from the thumbnail URL).
+
+2. **`snapshot` refs are ephemeral**
+   - Always re-run `snapshot --interactive` after any page change.
+
+3. **Apply Ad Handling after every page transition** (follow base skill procedure).
+
+---
+
+## Surface ID extraction
 
 ```bash
-browser-use --headed --session "pakutaso" state
+SEARCH_SURFACE=$(cmux --json browser open "https://..." \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['surface_ref'])")
 ```
-
-If state reveals any of the following, it is an ad overlay — dismiss it:
-
-- A close button labeled ×, ✕, close, skip, 閉じる, 後で, or similar
-- A full-screen or semi-transparent overlay obscuring the main content
-- A modal element unrelated to the photo content
-
-Dismiss it:
-
-```bash
-browser-use --headed --session "pakutaso" click <index>
-```
-
-Then re-run `state` to confirm the overlay is gone. Repeat until the main content is visible. If no overlay is present, proceed immediately without clicking.
 
 ---
 
@@ -100,8 +192,6 @@ Then re-run `state` to confirm the overlay is gone. Repeat until the main conten
 
 ```bash
 mkdir -p ./assets
-browser-use close --all
-browser-use sessions
 ```
 
 Load the seen-image list to skip already-downloaded images:
@@ -110,75 +200,84 @@ Load the seen-image list to skip already-downloaded images:
 python3 .opencode/skills/image-search/scripts/load_seen.py
 ```
 
-Outputs `---SEEN---` JSON. Store `seen_urls` in memory for Phase 3.
+Outputs `---SEEN---` JSON. Store `seen_urls` in memory for Phase 2.
 
 ---
 
 ## Phase 1: Search
 
-### URL structure
+### Step 1: Pick the subcategory cPath
 
-No form interaction is needed. Construct the search URL directly and open it:
-
-```
-https://www.pakutaso.com/search.html?search={keyword}
-```
-
-Multiple keywords use `+` (URL-encoded space):
-
-```
-https://www.pakutaso.com/search.html?search=東京+夜景
-```
-
-Open it:
+Match the search keyword to the closest subcategory from the table above. If the exact cPath is clear, skip to Step 2. If unsure, navigate to the top-level `f_{n}.html` page and extract subcategory links to find the best match:
 
 ```bash
-browser-use --headed --session "pakutaso" open "https://www.pakutaso.com/search.html?search={keyword}"
-```
-
-Apply **Ad Handling** immediately after open.
-
-### Extract candidates from search results
-
-**Working directory:** Run `browser-use` from the **project repository root** so the helper script path resolves.
-
-**Extraction strategy:** The helper walks all `<a href>` links, keeps entries that look like PAKUTASO **material detail** pages (e.g. `https://www.pakutaso.com/20200658153ibus-2.html`) with a child `<img>`, and skips nav-only URLs (`/search`, `/model`, `/news`, `/ai/`, etc.). It does not rely on per-card class names, which change over time.
-
-After the page loads cleanly, run:
-
-```bash
-browser-use --headed --session "pakutaso" python "
-import importlib.util
-import pathlib
-p = pathlib.Path('.opencode/skills/image-search/scripts/extract_search_candidates.py').resolve()
-s = importlib.util.spec_from_file_location('extract_search_candidates', p)
-m = importlib.util.module_from_spec(s)
-s.loader.exec_module(m)
-for r in m.extract_candidates_from_html(browser.html):
-    print(r['detail_url'], '|||', r['thumbnail_url'], '|||', r['title'])
+cmux browser $SEARCH_SURFACE navigate "https://pro.foto.ne.jp/f_{n}.html"
+cmux browser $SEARCH_SURFACE wait --load-state complete --timeout-ms 10000
+cmux browser $SEARCH_SURFACE get html body | python3 -c "
+import sys
+from bs4 import BeautifulSoup
+html = sys.stdin.read()
+soup = BeautifulSoup(html, 'html.parser')
+for a in soup.find_all('a', href=True):
+    href = a['href']
+    if 'cPath' in href and 'products_list' in href:
+        cpath = href.split('cPath/')[-1]
+        text = a.get_text(strip=True)
+        if text:
+            print(f'{cpath}\t{text}')
 "
 ```
 
-Helper implementation (for edits and unit checks): `.opencode/skills/image-search/scripts/extract_search_candidates.py` — optional: save the search result HTML to a file and pipe it for a quick check:
+### Step 2: Open the subcategory listing
+
+Use the subcategory `cPath` (never a top-level cPath like `21_25` alone — those return 404):
 
 ```bash
-python3 .opencode/skills/image-search/scripts/extract_search_candidates.py < /path/to/saved-search.html
+SEARCH_SURFACE=$(cmux --json browser open \
+  "https://pro.foto.ne.jp/free/products_list.php/cPath/{sub_cPath}" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['surface_ref'])")
+cmux browser $SEARCH_SURFACE wait --load-state complete --timeout-ms 10000
 ```
 
-Collect up to **20 candidates** per search. If output is still empty, re-run `state` on the search page, then inspect `browser.html` (or saved HTML) and adjust `_is_likely_material_detail` in `extract_search_candidates.py` — keep this skill and the script in sync.
+### Step 3: Extract candidates
+
+Get the page HTML and parse product links:
+
+```bash
+cmux browser $SEARCH_SURFACE get html body | python3 -c "
+import sys, re
+from bs4 import BeautifulSoup
+html = sys.stdin.read()
+soup = BeautifulSoup(html, 'html.parser')
+for a in soup.select('a[href*=\"product_info.php\"]'):
+    href = a.get('href', '')
+    img = a.find('img')
+    if not href or not img:
+        continue
+    m = re.search(r'products_id/(\d+)', href)
+    if not m:
+        continue
+    pid = m.group(1)
+    title = img.get('alt', '') or a.get_text(strip=True)
+    src = img.get('src', '')
+    print(pid, '|||', src, '|||', title)
+"
+```
+
+Collect up to **20 candidates** per search.
 
 ### Phase 1 output
 
 ```
 ---CANDIDATES---
-[{"detail_url": "...", "thumbnail_url": "...", "title": "..."}, ...]
+[{"products_id": "300467", "thumbnail_url": "https://pro.foto.ne.jp/free/img/...", "title": "..."}, ...]
 ```
 
 ---
 
 ## Phase 2: AI Quality Judgment
 
-Claude evaluates each candidate using the thumbnail URL and title **without opening the detail page**.
+Evaluate each candidate using the thumbnail URL and title only — **no need to open detail pages**.
 
 Evaluation criteria:
 
@@ -186,18 +285,18 @@ Evaluation criteria:
 - **Composition**: Is the framing natural and well-balanced?
 - **Exposure**: Not too dark, not blown out.
 - **Sharpness**: No obvious blur or motion artifacts.
-- **Naturalness**: For people photos, are expressions and poses natural and not stiff?
-- **Usability**: Is it suitable for web or print use (not a watermarked or cropped preview)?
+- **Naturalness**: For people photos, are expressions and poses natural?
+- **Usability**: Suitable for web or print use?
 
 Select the **top 3 images** by default, or the number specified by the user.
 
-Exclude any `detail_url` already present in `---SEEN---`.
+Exclude any `products_id` whose detail URL is already in `---SEEN---`.
 
-Output:
+### Phase 2 output
 
 ```
 ---SELECTED---
-[{"detail_url": "...", "thumbnail_url": "...", "title": "..."}, ...]
+[{"products_id": "300467", "thumbnail_url": "...", "title": "..."}, ...]
 ```
 
 ---
@@ -206,90 +305,80 @@ Output:
 
 For each image in `---SELECTED---`:
 
-### 3-1. Open detail page
+### 3-1. Resolve the filename
+
+**Primary method: infer from thumbnail URL.** The thumbnail path pattern is:
+`img/images_thumb/{filename-base}.jpg` → full-size is `img/images_big/{filename-base}.jpg`.
+
+Example: thumbnail `img/images_thumb/kis0148-009.jpg` yields filename `kis0148-009.jpg`.
+
+**Fallback: open the detail page.** The `og:image` meta tag is sometimes missing or stale across page transitions in WKWebView. If the thumbnail URL does not clearly contain the filename, open the detail page and look for the first `<img>` tag with `images_big` in its `src`:
 
 ```bash
-browser-use --headed --session "pakutaso" open "{detail_url}"
-```
+DETAIL_SURFACE=$(cmux --json browser open \
+  "https://pro.foto.ne.jp/free/product_info.php/products_id/{products_id}" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['surface_ref'])")
 
-Apply **Ad Handling** immediately after open.
-
-### 3-2. Extract L-size download URL
-
-The download button has a fixed class `-downloadL`. Extract its `href` with:
-
-```bash
-browser-use --headed --session "pakutaso" python "
+cmux browser $DETAIL_SURFACE wait --load-state complete --timeout-ms 10000
+cmux browser $DETAIL_SURFACE get html body | python3 -c "
+import sys
 from bs4 import BeautifulSoup
-soup = BeautifulSoup(browser.html, 'html.parser')
-a = soup.select_one('a.-downloadL')
-if a:
-    print(a['href'])
-else:
-    print('NOT_FOUND')
+html = sys.stdin.read()
+soup = BeautifulSoup(html, 'html.parser')
+for img in soup.find_all('img'):
+    src = img.get('src', '')
+    if 'images_big' in src:
+        print(src.split('/')[-1])
+        break
 "
 ```
 
-Expected URL format:
-
-```
-https://user0514.cdnw.net/shared/img/thumb/{filename}.jpg?&download=1
-```
-
-If `NOT_FOUND`, log a warning and skip this image.
-
-### 3-3. Download via curl
-
-Extract the filename from the URL (the part before `?`):
+### 3-2. Download with curl
 
 ```bash
-# Example URL: https://user0514.cdnw.net/shared/img/thumb/sorasanPAR55748.jpg?&download=1
-# Filename: sorasanPAR55748.jpg
-
-curl -L -o "./assets/{filename}" "{download_url}"
+# Direct image URL — no cookies, no session required
+curl -L -o "./assets/{filename}" \
+  "https://pro.foto.ne.jp/free/img/images_big/{filename}"
 ```
 
-Verify the file was saved:
+Alternatively, use the download endpoint:
 
 ```bash
-ls -lh ./assets/{filename}
+curl -L -o "./assets/{filename}" \
+  "https://pro.foto.ne.jp/free/download_img.php/id/{products_id}"
 ```
 
-### 3-4. Return to search results
+Verify the file:
 
 ```bash
-browser-use --headed --session "pakutaso" back
+ls -lh "./assets/{filename}"
 ```
 
-Apply **Ad Handling** after `back`.
+### 3-3. Check orientation (if needed)
+
+pro.foto images mix portrait and landscape within the same subcategory. There is no way to filter by orientation before downloading — the thumbnail URL suffix (e.g. `-009`) does not reliably indicate orientation.
+
+Use `sips` to check dimensions after download:
+
+```bash
+sips -g pixelWidth -g pixelHeight "./assets/{filename}"
+```
+
+If the image is the wrong orientation, discard it and try the next candidate. Keep the original selection list expanded to account for orientation filtering.
 
 ---
 
 ## Phase 4: Cleanup
 
-```bash
-browser-use close --all
-browser-use sessions
-```
-
-Clean up orphaned processes:
-
-```bash
-pgrep -f "browser-use-user-data-dir" || true
-pkill -f "browser-use-user-data-dir" 2>/dev/null || true
-```
-
-Re-verify: `browser-use sessions` → `No active sessions`, and `pgrep -f "browser-use-user-data-dir"` → no matches.
+pro.foto.ne.jp serves images directly with no external CDN, so no process cleanup is needed.
 
 ---
 
 ## Output format
 
-Report downloaded images:
-
 ```
 - ![{title}](./assets/{filename})
-  - {detail_url}
+  - https://pro.foto.ne.jp/free/product_info.php/products_id/{products_id}
   - {one-line description of what is in the photo}
 ```
 
@@ -297,41 +386,47 @@ Report downloaded images:
 
 ## Seen-image tracking
 
-After a successful run, record downloaded `detail_url` values (arguments **or** stdin, one URL per line):
+After a successful run, record downloaded images:
 
 ```bash
-python3 .opencode/skills/image-search/scripts/save_seen.py "https://www.pakutaso.com/....html" "https://..."
-# or: printf '%s\n' "url1" "url2" | python3 .opencode/skills/image-search/scripts/save_seen.py
+python3 .opencode/skills/image-search/scripts/save_seen.py \
+  "https://pro.foto.ne.jp/free/product_info.php/products_id/{products_id}"
 ```
-
-This prevents re-downloading the same image in future runs.
 
 ---
 
 ## Troubleshooting
 
-**Ad overlay blocks interaction**
+**No candidates extracted**
 
-- Re-run `state` after every page change.
-- Look for any element with ×, ✕, 閉じる, skip, 後で in its text or aria-label.
-- If the overlay cannot be identified from `state`, use `python(browser.html)` to inspect the DOM.
+- The `cPath` may be incorrect. Get the category page HTML with `cmux browser $SEARCH_SURFACE get html body` and identify the correct `cPath` from the navigation links.
+- Top-level cPaths like `21_25` or `21_26` alone return 404. Always use a full subcategory cPath (e.g. `21_25_37`).
 
-**`-downloadL` not found**
+**Pagination returns the same results**
 
-- The page may not have finished loading. Wait briefly and re-run the python extraction.
-- Re-run `state` to check if the download section is visible.
+- The `/page/N` parameter is unreliable — the site often returns the same 20 products regardless of the page number. To get different results, change the sort order:
+  - `{cPath}` / `sort/0d` — default (recommended order)
+  - `{cPath}/sort/1d` — new arrivals first
+  - `{cPath}/sort/1a` — oldest first (useful for discovering different images)
 
-**No candidates**
+**Keyword search not available on pro.foto**
 
-- Confirm you ran `browser-use` from the **repo root** (the `extract_search_candidates` import path is relative to cwd).
-- If a layout change yields zero rows, save the HTML, inspect `a[href]`, and tighten `_is_likely_material_detail` in `extract_search_candidates.py` (e.g. stricter or looser path rules).
+- `products_list.php?keyword=...` returns 404. Only category/subcategory browsing is supported on pro.foto.ne.jp.
+- The search form on the page redirects to `stock.foto` (paid stock marketplace), not pro.foto.
 
-**curl download is empty or corrupted**
+**curl fails (non-200)**
 
-- Check the URL with `curl -I "{download_url}"` to confirm it returns 200.
-- If it returns 302, add `-L` to follow redirects (already included by default).
+- Run `curl -I "https://pro.foto.ne.jp/free/img/images_big/{filename}"` to inspect headers.
+- If the filename is wrong, re-open the detail page and look for `<img src="...images_big/...">` as described in Phase 3-1.
 
-**Many Python / Chrome processes left after the run**
+**Filename not found**
 
-- Run `pkill -f "browser-use-user-data-dir"` to clean up temp Chrome instances.
-- Then check `pgrep -fl browser-use` and terminate obvious zombie processes.
+- The `og:image` meta tag on detail pages is often missing in WKWebView. Use the thumbnail URL inference method first (Phase 3-1 primary method).
+
+**Page shows wrong content after navigate**
+
+- WKWebView may serve cached content. Always verify the URL with `cmux browser $SURFACE get url` after navigation. If content is stale, try adding a query parameter or navigating through the top-level page.
+
+**Image is wrong orientation**
+
+- The site mixes portrait and landscape within the same subcategory. Select more candidates than needed in Phase 2, then filter by orientation in Phase 3-3 using `sips`.

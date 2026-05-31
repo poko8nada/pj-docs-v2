@@ -22,7 +22,7 @@ Create a “To-Do” list below to use the to-do tool.
 
 - [ ] Browser: structure and behavior work as intended via `browser-use`
   - NOTE:
-    - If `localhost:5153` has already be runnning, direclty access by `browser-use`, not to run `pnpm run dev` again.
+    - If `localhost:XXXX` has already be runnning, direclty access by `browser-use`, not to run script again.
     - If not, run `pnpm run dev` then access by `browser-use`.
 - [ ] Semantically accurate and accessible
 - [ ] Visually correct and responsive
@@ -39,12 +39,12 @@ Use the `question` tool. Start the message with `[Context: zero / partial / suff
 
 **This is Agreement Point 2.**
 
-- Approved → `/apply-pattern`
+- Approved → `/apply-pattern [remaining targets]`
 - Changes needed → return to Step 2
 - Done → return to `/build-awareness`
 
 ### Step 5 — Expand or stop
 
-- Approved → `/apply-pattern`
+- Approved → `/apply-pattern [remaining targets]`
 - Changes needed → return to Step 2
 - Done → return to `/build-awareness`

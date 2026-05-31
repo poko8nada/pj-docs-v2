@@ -1,6 +1,8 @@
+//@ts-nocheck
 import type { Plugin } from '@opencode-ai/plugin';
 import * as fs from 'fs';
 import * as path from 'path';
+import { appendFileSync } from 'fs';
 
 // ── rule mapping ─────────────────────────────────────────────────────────────
 
@@ -40,92 +42,95 @@ function loadRule(rulesDir: string, ruleName: string): string | null {
 
 // ── plugin ───────────────────────────────────────────────────────────────────
 
-const MAX_LOOPS = 1;
-
-export const RuleInjectPlugin: Plugin = async ({ worktree, client }) => {
+export const RuleInjectPlugin: Plugin = async ({ worktree }) => {
   const rulesDir = path.join(worktree, '.opencode', 'rules');
 
-  // sessionID → { editedFiles, loopCount }
-  const state = new Map<string, { editedFiles: Set<string>; loopCount: number }>();
+  const state = new Map<string, { editedFiles: Set<string> }>();
 
   const getState = (sessionID: string) => {
     if (!state.has(sessionID)) {
-      state.set(sessionID, { editedFiles: new Set(), loopCount: 0 });
+      state.set(sessionID, { editedFiles: new Set() });
     }
     return state.get(sessionID)!;
   };
 
   return {
     event: async ({ event }) => {
-      // track edited files per session
       if (event.type === 'file.edited') {
-        // file.edited doesn't carry sessionID in properties,
-        // so we buffer across all active sessions
         for (const s of state.values()) {
           s.editedFiles.add(event.properties.file);
         }
       }
 
       if (event.type === 'session.created') {
-        const sessionID = event.properties.info.id;
-        getState(sessionID);
+        getState(event.properties.info.id);
+      }
+    },
+
+    'tool.execute.after': async (input) => {
+      if (!['write', 'edit', 'apply_patch'].includes(input.tool)) return;
+      const filePath = (input as unkown).args?.filePath ?? (input as unkown).args?.path ?? '';
+      if (!filePath) return;
+      for (const s of state.values()) {
+        s.editedFiles.add(filePath);
+      }
+    },
+
+    'tool.execute.before': async (input, output) => {
+      appendFileSync(
+        path.join(worktree, 'rule_inject.log'),
+        `[${new Date().toISOString()}] tool: ${input.tool}, command: ${JSON.stringify(output.args)}\n`,
+      );
+
+      if (input.tool !== 'bash') return;
+
+      const command: string = output.args?.command ?? '';
+      if (!/\bgit commit\b/.test(command)) return;
+
+      const sessionID = (input as unknown).sessionID;
+      if (!sessionID) return;
+
+      const s = getState(sessionID);
+      if (s.editedFiles.size === 0) return;
+
+      const ruleNames = getRulesForFiles([...s.editedFiles]);
+      if (ruleNames.size === 0) {
+        s.editedFiles.clear();
+        return;
       }
 
-      if (event.type === 'session.idle') {
-        const sessionID = event.properties.sessionID;
-        const s = getState(sessionID);
-
-        if (s.editedFiles.size === 0) return;
-        if (s.loopCount >= MAX_LOOPS) {
-          // reset for next task
-          s.editedFiles.clear();
-          s.loopCount = 0;
-          return;
+      const loadedRules: string[] = [];
+      for (const ruleName of ruleNames) {
+        const content = loadRule(rulesDir, ruleName);
+        if (content) {
+          loadedRules.push(`### ${ruleName}\n\n${content}`);
         }
+      }
 
-        const ruleNames = getRulesForFiles([...s.editedFiles]);
-        if (ruleNames.size === 0) return;
+      if (loadedRules.length === 0) {
+        s.editedFiles.clear();
+        return;
+      }
 
-        const loadedRules: string[] = [];
-        for (const ruleName of ruleNames) {
-          const content = loadRule(rulesDir, ruleName);
-          if (content) {
-            loadedRules.push(`### ${ruleName}\n\n${content}`);
-          }
-        }
+      const editedFiles = [...s.editedFiles];
+      s.editedFiles.clear();
 
-        if (loadedRules.length === 0) return;
+      throw new Error(
+        `
+[rule-inject] Commit blocked. Review required.
 
-        s.loopCount++;
+Edited files:
+${editedFiles.map((f) => `- \`${f}\``).join('\n')}
 
-        const loopNote =
-          s.loopCount < MAX_LOOPS
-            ? `(Review pass ${s.loopCount}/${MAX_LOOPS})`
-            : `(Final review pass ${s.loopCount}/${MAX_LOOPS} — no further passes will run)`;
-
-        const prompt = `
-## Rule Review ${loopNote}
-
-You have just edited the following files:
-${[...s.editedFiles].map((f) => `- \`${f}\``).join('\n')}
-
-Please review your changes against the rules below and fix any violations.
-
+Rules to verify:
 ${loadedRules.join('\n\n---\n\n')}
-        `.trim();
 
-        if (s.loopCount >= MAX_LOOPS) {
-          s.editedFiles.clear();
-          s.loopCount = 0;
-        }
-
-        await client.session.prompt({
-          path: { id: sessionID },
-          body: {
-            parts: [{ type: 'text', text: prompt }],
-          },
-        });
-      }
+Instructions:
+1. Review your changes against the rules above.
+2. Fix any violations.
+3. Run git commit again.
+      `.trim(),
+      );
     },
   };
 };

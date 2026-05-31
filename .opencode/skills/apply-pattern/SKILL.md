@@ -1,6 +1,6 @@
 ---
 name: apply-pattern
-description: Use after the user has approved a complete unit. Apply the same approach to all remaining units comprehensively, in parallel, and efficiently. Confirm with the user once at the end.
+description: Use this after Agreement Point 2 has been fulfilled and the user has approved a complete unit. Using the `task` tool, delegate the same task—using the same approach—to the `apply` subagent for all remaining units in a comprehensive, parallel, and efficient manner.
 compatibility: opencode
 ---
 
@@ -8,26 +8,22 @@ compatibility: opencode
 
 Follow these steps in order. Never skip or combine steps.
 
-### Step 1 — Define remaining scope
+### Step 1 — Confirm remaining scope
 
-List all remaining units that follow the same pattern as the approved unit.
-Use the `question` tool to confirm the list with the user before proceeding.
+List all remaining targets that follow the same pattern as the approved unit.
+Use the `question` tool to confirm the list with the user. Start with `[Context: zero / partial / sufficient / ready]`.
 
-### Step 2 — Apply all remaining units
+Wait for explicit approval before proceeding.
 
-Apply the approved pattern to all remaining units comprehensively, in parallel, and efficiently.
-This is the execution phase — do not stop between units to ask for confirmation.
-Do not omit any unit. Do not apply partially.
+### Step 2 — Delegate to apply subagent
 
-### Step 3 — Verify all
+Invoke the `apply` subagent using the Task tool with:
 
-Create a “To-Do” list below to use the to-do tool.  
-Run checks across all applied units:
+- The approved unit as the reference pattern
+- The confirmed list of remaining targets
+- Any constraints or edge cases identified in Step 1
 
-- [ ] TypeScript: zero errors
-- [ ] Lint: zero errors
-- [ ] Build: passes
-- [ ] Result matches the approved pattern
+### Step 3 — Review result
 
 Fix any failures before proceeding.
 

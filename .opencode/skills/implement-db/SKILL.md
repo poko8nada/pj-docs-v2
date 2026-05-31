@@ -42,12 +42,12 @@ Use the `question` tool. Start the message with `[Context: zero / partial / suff
 
 **This is Agreement Point 2.**
 
-- Approved → `/apply-pattern`
+- Approved → `/apply-pattern [remaining targets]`
 - Changes needed → return to Step 2
 - Done → return to `/build-awareness`
 
 ### Step 5 — Expand or stop
 
-- Approved → `/apply-pattern`
+- Approved → `/apply-pattern [remaining targets]`
 - Changes needed → return to Step 2
 - Done → return to `/build-awareness`

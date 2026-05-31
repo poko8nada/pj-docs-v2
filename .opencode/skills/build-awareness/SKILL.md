@@ -93,6 +93,6 @@ Report the result. Use the `question` tool. Start the message with `[Context: ze
 
 **This is Agreement Point 2.**
 
-- Approved → `/apply-pattern`
+- Approved → `/apply-pattern [remaining targets]`
 - Changes needed → return to Step 4
 - Done → return to Step 1
