@@ -15,7 +15,7 @@ description: >
 
 1. **Always check Google Maps first (mandatory, do not skip)**
    - Google Maps is the most important data source, no exceptions.
-   - Open Google Maps in a real browser using `browser-use --headed` with a profile.
+   - Open Google Maps using `cmux browser` commands.
    - Substituting web_search or web_fetch for Google Maps is prohibited.
    - Only use supplementary channels after confirming Maps data is insufficient.
 
@@ -29,25 +29,13 @@ description: >
 
 ---
 
-## Prerequisites
+## Surface ID extraction
 
-1. Confirm browser-use is available:
-
-```bash
-browser-use doctor
-```
-
-2. List available profiles (to inherit Google account login state):
+All `cmux --json browser open` calls return a JSON object. Extract the surface ID with:
 
 ```bash
-browser-use profile list
-```
-
-3. Clear any leftover sessions from previous runs:
-
-```bash
-browser-use close --all
-browser-use sessions
+SURFACE=$(cmux --json browser open "https://..." \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['surface_ref'])")
 ```
 
 ---
@@ -66,17 +54,24 @@ Determine the survey target. Obtain the following from the user or command argum
 
 ## Phase 1: Google Maps Research (mandatory, do not skip)
 
-### Step 1: Open Google Maps in headed mode
+### Step 1: Open Google Maps
 
 ```bash
-browser-use --headed --profile "<profile>" --session "gmaps" open "https://www.google.com/maps/search/{client_name}+{area}"
-browser-use --headed --profile "<profile>" --session "gmaps" state
+GMAPS_SURFACE=$(cmux --json browser open \
+  "https://www.google.com/maps/search/{client_name}+{area}" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['surface_ref'])")
+cmux browser $GMAPS_SURFACE snapshot --interactive
 ```
 
 ### Step 2: Navigate to the client's place page
 
-- Identify the client's listing from search results and open the detail panel.
-- **Always re-run `browser-use state` after any page transition.** Never reuse stale indices.
+- Identify the client's listing from search results and click to open the detail panel.
+- **Always re-run `snapshot --interactive` after any click or page transition.** Never reuse stale refs.
+
+```bash
+cmux browser $GMAPS_SURFACE click e<N>
+cmux browser $GMAPS_SURFACE snapshot --interactive
+```
 
 ### Step 3: Collect the following data (all required)
 
@@ -94,10 +89,17 @@ browser-use --headed --profile "<profile>" --session "gmaps" state
 
 ### Step 4: Extract reviews
 
-Expand the reviews panel and extract text using `python(browser.html)`:
+Expand the reviews panel, then get the page text:
 
 ```bash
-browser-use --headed --profile "<profile>" --session "gmaps" python "from bs4 import BeautifulSoup; soup = BeautifulSoup(browser.html, 'html.parser'); text = '\n'.join(line.strip() for line in soup.get_text('\n').splitlines() if line.strip()); print(text[:5000])"
+cmux browser $GMAPS_SURFACE get html body | python3 -c "
+from bs4 import BeautifulSoup
+import sys
+html = sys.stdin.read()
+soup = BeautifulSoup(html, 'html.parser')
+text = '\n'.join(line.strip() for line in soup.get_text('\n').splitlines() if line.strip())
+print(text[:5000])
+"
 ```
 
 - Only use supplementary channels (Phase 2) if fewer than 5 reviews are available or extraction fails.
@@ -120,11 +122,19 @@ If an official website URL was found in Phase 1, analyze it before moving on.
 web_fetch <official_website_url>
 ```
 
-If the site is JavaScript-heavy and web_fetch returns thin content, open it in browser-use:
+If the site is JavaScript-heavy and web_fetch returns thin content, open it with cmux browser:
 
 ```bash
-browser-use --headed --profile "<profile>" --session "client-site" open "<official_website_url>"
-browser-use --headed --profile "<profile>" --session "client-site" python "from bs4 import BeautifulSoup; soup = BeautifulSoup(browser.html, 'html.parser'); print(soup.get_text('\n')[:4000])"
+CLIENT_SITE_SURFACE=$(cmux --json browser open "<official_website_url>" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['surface_ref'])")
+
+cmux browser $CLIENT_SITE_SURFACE get html body | python3 -c "
+from bs4 import BeautifulSoup
+import sys
+html = sys.stdin.read()
+soup = BeautifulSoup(html, 'html.parser')
+print(soup.get_text('\n')[:4000])
+"
 ```
 
 ### Step 2: Collect the following
@@ -182,8 +192,10 @@ Use supplementary channels only for fields that could not be obtained from Googl
 Find up to **3 competitors** in the same industry.
 
 ```bash
-browser-use --headed --profile "<profile>" --session "gmaps-comp" open "https://www.google.com/maps/search/{industry}+{area}"
-browser-use --headed --profile "<profile>" --session "gmaps-comp" state
+GMAPS_COMP_SURFACE=$(cmux --json browser open \
+  "https://www.google.com/maps/search/{industry}+{area}" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['surface_ref'])")
+cmux browser $GMAPS_COMP_SURFACE snapshot --interactive
 ```
 
 ### Step 2: Selection criteria
@@ -210,7 +222,7 @@ For each competitor that has an official site, fetch and analyze it using the sa
 web_fetch <competitor_url>
 ```
 
-Open in browser-use if web_fetch returns thin content. For each site, record:
+Open with cmux browser if web_fetch returns thin content. For each site, record:
 
 | Field                  | What to look for                             |
 | ---------------------- | -------------------------------------------- |
@@ -409,23 +421,9 @@ updated: YYYY-MM-DD
 
 ---
 
-## Phase 6: Cleanup (mandatory, do not skip)
+## Phase 6: Cleanup
 
-```bash
-browser-use close --all
-browser-use sessions
-```
-
-Confirm the session list shows `No active sessions`.
-
-Clean up leftover subprocesses:
-
-```bash
-pgrep -f "browser-use-user-data-dir" || true
-pkill -f "browser-use-user-data-dir" 2>/dev/null || true
-```
-
-Re-verify: `browser-use sessions` → `No active sessions`, and `pgrep -f "browser-use-user-data-dir"` → no matches.
+cmux uses the system browser — no process cleanup required. Surfaces remain open and can be closed manually if desired.
 
 ---
 
@@ -435,10 +433,10 @@ Re-verify: `browser-use sessions` → `No active sessions`, and `pgrep -f "brows
 → Try alternate spellings (katakana ↔ hiragana, trade name vs. legal name). If still not found, ask the user.
 
 **Reviews panel won't open or HTML extraction fails**
-→ Re-run `browser-use state` to get fresh indices. Maps pages change frequently — stale indices become invalid quickly.
+→ Re-run `cmux browser $GMAPS_SURFACE snapshot --interactive` to get fresh refs. Maps pages change frequently — stale refs become invalid quickly.
 
 **Business hours hidden behind a "See hours" button**
-→ Click the button to expand, then re-run `state` / `python(browser.html)` to extract.
+→ Find and click the expand button ref from the snapshot, then re-run `snapshot --interactive` and `get html body` to extract.
 
 **Competitor search returns too many unrelated listings**
 → Narrow the search query (e.g. "café Tenjin" → "specialty coffee Tenjin"), or visually identify relevant listings by trade area on the map.

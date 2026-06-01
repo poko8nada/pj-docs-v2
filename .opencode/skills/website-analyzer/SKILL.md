@@ -2,7 +2,7 @@
 name: website-analyzer
 description: >
   Analyze any website's technical stack, site structure (IA), CMS, frontend framework,
-  and key features using browser-use CLI. Use when the user provides a URL and asks to
+  and key features using cmux browser commands. Use when the user provides a URL and asks to
   investigate technology, architecture, CMS, or overall structure.
   Trigger phrases: "analyze this website", "investigate tech stack",
   "what tech does this site use", "site structure analysis", "reverse engineer website".
@@ -12,7 +12,7 @@ description: >
 # Website-analyzer
 
 You are an expert web architecture analyst specializing in reverse-engineering websites
-using the **browser-use CLI** (Playwright-based browser automation).
+using **cmux browser** commands (WKWebView-based browser automation).
 
 Your goal is to produce an **evidence-based investigation report** covering:
 
@@ -26,10 +26,10 @@ Always output results as a saved Markdown document.
 
 ## Critical Rules
 
-1. **Use browser-use CLI — not web_fetch alone**
-   - browser-use is the primary tool (executes JS, follows redirects, inspects DOM/network).
+1. **Use cmux browser — not web_fetch alone**
+   - cmux browser is the primary tool (executes JS, follows redirects, inspects DOM).
    - `web_fetch` may be used as a quick supplement for static pages or `robots.txt`.
-   - Never skip browser-use to save time.
+   - Never skip cmux browser to save time.
 
 2. **Complete all phases in order**
    - Phase 0 → 1 → 2 → 3 → 4 → 5. Do not skip or reorder.
@@ -45,24 +45,24 @@ Always output results as a saved Markdown document.
 
 ## Prerequisites
 
-Confirm browser-use is available:
+Ensure the output directory exists:
 
 ```bash
-browser-use doctor
+mkdir -p content/screens
 ```
 
-List available profiles:
+---
+
+## Surface ID extraction
+
+All `cmux --json browser open` calls return a JSON object. Extract the surface ID with:
 
 ```bash
-browser-use profile list
+SURFACE=$(cmux --json browser open "https://..." \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['surface_ref'])")
 ```
 
-Clear leftover sessions:
-
-```bash
-browser-use close --all
-browser-use sessions
-```
+Use `$SURFACE` (or `$PAGE_SURFACE` for sub-pages) in all subsequent commands for that tab.
 
 ---
 
@@ -82,24 +82,27 @@ If focus is not specified, perform a **full investigation** (all phases).
 ### Step 1: Open the target URL
 
 ```bash
-browser-use --headed --profile "<profile>" --session "inv" open "<target_url>"
-browser-use --headed --profile "<profile>" --session "inv" state
+SURFACE=$(cmux --json browser open "<target_url>" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['surface_ref'])")
+cmux browser $SURFACE snapshot --interactive
 ```
 
 ### Step 2: Capture page state
 
-Take a full-page screenshot:
+Take a screenshot:
 
 ```bash
-browser-use --headed --profile "<profile>" --session "inv" screenshot --full-page --out content/screens/inv_home.png
+cmux browser $SURFACE screenshot --out content/screens/inv_home.png
 ```
 
-Extract raw HTML and visible text:
+Extract raw HTML and inspect it:
 
 ```bash
-browser-use --headed --profile "<profile>" --session "inv" python "
+cmux browser $SURFACE get html body | python3 -c "
 from bs4 import BeautifulSoup
-soup = BeautifulSoup(browser.html, 'html.parser')
+import sys
+html = sys.stdin.read()
+soup = BeautifulSoup(html, 'html.parser')
 print(soup.prettify()[:6000])
 "
 ```
@@ -141,9 +144,11 @@ Look for the following patterns in the extracted HTML and page source:
 ### Step 2: Analyze scripts and build artifacts
 
 ```bash
-browser-use --headed --profile "<profile>" --session "inv" python "
+cmux browser $SURFACE get html body | python3 -c "
 from bs4 import BeautifulSoup
-soup = BeautifulSoup(browser.html, 'html.parser')
+import sys
+html = sys.stdin.read()
+soup = BeautifulSoup(html, 'html.parser')
 scripts = [s.get('src','') for s in soup.find_all('script') if s.get('src')]
 print('\n'.join(scripts))
 "
@@ -154,10 +159,9 @@ Note: bundle filenames, chunk patterns, CDN origins, and version hints.
 ### Step 3: Check for API / backend signatures
 
 ```bash
-browser-use --headed --profile "<profile>" --session "inv" python "
-# Look for API endpoints in page source (JSON-LD, inline data, fetch calls)
-import re
-html = browser.html
+cmux browser $SURFACE get html body | python3 -c "
+import re, sys
+html = sys.stdin.read()
 patterns = [
   r'\"apiUrl\":\s*\"([^\"]+)\"',
   r'/api/[a-z\-/]+',
@@ -190,9 +194,11 @@ Record each finding with **confidence level** (High / Medium / Low) and the spec
 ### Step 1: Extract main navigation
 
 ```bash
-browser-use --headed --profile "<profile>" --session "inv" python "
+cmux browser $SURFACE get html body | python3 -c "
 from bs4 import BeautifulSoup
-soup = BeautifulSoup(browser.html, 'html.parser')
+import sys
+html = sys.stdin.read()
+soup = BeautifulSoup(html, 'html.parser')
 nav = soup.find('nav') or soup.find(attrs={'role':'navigation'})
 if nav:
     links = [(a.get_text(strip=True), a.get('href','')) for a in nav.find_all('a')]
@@ -205,12 +211,13 @@ else:
 
 ### Step 2: Map page hierarchy
 
-Visit key internal pages discovered from navigation. For each page:
+Visit key internal pages discovered from navigation. For each page, open as a new surface:
 
 ```bash
-browser-use --headed --profile "<profile>" --session "inv" open "<internal_url>"
-browser-use --headed --profile "<profile>" --session "inv" state
-browser-use --headed --profile "<profile>" --session "inv" screenshot --out content/screens/inv_<pagename>.png
+PAGE_SURFACE=$(cmux --json browser open "<internal_url>" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['surface_ref'])")
+cmux browser $PAGE_SURFACE snapshot --interactive
+cmux browser $PAGE_SURFACE screenshot --out content/screens/inv_<pagename>.png
 ```
 
 Build a hierarchy table:
@@ -232,10 +239,11 @@ Build a hierarchy table:
 ### Step 4: Inspect semantic HTML & structured data
 
 ```bash
-browser-use --headed --profile "<profile>" --session "inv" python "
-from bs4 import BeautifulSoup, Tag
-import json, re
-soup = BeautifulSoup(browser.html, 'html.parser')
+cmux browser $SURFACE get html body | python3 -c "
+from bs4 import BeautifulSoup
+import json, sys
+html = sys.stdin.read()
+soup = BeautifulSoup(html, 'html.parser')
 
 # Semantic structure
 tags = ['header','nav','main','article','section','aside','footer']
@@ -266,77 +274,69 @@ Record semantic HTML quality and schema types found (e.g. `Organization`, `Produ
 - Lazy loading images (`loading="lazy"`, Intersection Observer)
 - Core Web Vitals hints (LCP images, CLS-prone layouts)
 
-### UX & interaction patterns
+### UX patterns to note
 
-From screenshot and DOM inspection, note:
+- Navigation type (mega-menu, hamburger, sidebar, breadcrumb)
+- Key CTA placement and copy
+- Forms and interactions (search, filters, modals)
+- Cookie consent / GDPR banners
 
-- Navigation type (hamburger, mega-menu, sidebar, sticky header)
-- Key CTAs (buttons, forms, chat widgets)
-- Modal / drawer usage
-- Animation frameworks (GSAP, Framer Motion, AOS)
+### Third-party integration detection
 
-### Third-party integrations
+#### Global services
 
-Look for known script patterns:
+| Category    | Service          | Signal                                           |
+| ----------- | ---------------- | ------------------------------------------------ |
+| Analytics   | Google Analytics | `gtag`, `ga.js`, `analytics.js`                  |
+| Analytics   | Google Tag Manager | `gtm.js`, `GTM-` id                             |
+| Analytics   | Hotjar           | `hotjar.com`, `hj()`                             |
+| Analytics   | Microsoft Clarity | `clarity.ms`                                    |
+| Analytics   | Amplitude        | `amplitude.com`                                  |
+| Analytics   | FullStory        | `fullstory.com`                                  |
+| Marketing   | HubSpot          | `hs-scripts.com`, `hubspot`                      |
+| Marketing   | Marketo          | `munchkin.marketo.net`                           |
+| Marketing   | Pardot           | `pardot.com`                                     |
+| Chat        | Intercom         | `intercom.io`, `widget.intercom.io`              |
+| Chat        | Zendesk          | `zendesk.com`, `zdassets.com`                    |
+| Payment     | Stripe           | `js.stripe.com`                                  |
+| Error       | Sentry           | `sentry.io`                                      |
+| Search      | Algolia          | `algolianet.com`                                 |
 
-**Analytics & Tag Management**
+#### Japanese-specific services
 
-| Service                | Signal                               |
-| ---------------------- | ------------------------------------ |
-| Google Analytics / GA4 | `gtag.js`, `G-XXXXXXXX`              |
-| Google Tag Manager     | `gtm.js`, `GTM-XXXXXX`               |
-| Yahoo! Japan Tag       | `s.yimg.jp`, `analytics.yahoo.co.jp` |
-| Ptengine               | `ptengine.jp`                        |
-| Hotjar                 | `hotjar.com`                         |
-| Microsoft Clarity      | `clarity.ms`                         |
-| Amplitude              | `amplitude.com`                      |
-| FullStory              | `fullstory.com`                      |
+**Analytics / MA**
 
-**Marketing Automation & CRM**
+| Service        | Signal                                       |
+| -------------- | -------------------------------------------- |
+| Yahoo! Analytics | `yimg.jp/es/analytics`, `analytics.yahoo.co.jp` |
+| Ptengine       | `ptengine.com`                               |
+| KARTE          | `karte.io`                                   |
+| Repro          | `repro.io`                                   |
+| Satori         | `satori.marketing`                           |
+| R-toaster      | `rtoaster.com`                               |
+| Kaizen Platform | `kaizenplatform.net`                        |
 
-| Service             | Signal                 |
-| ------------------- | ---------------------- |
-| HubSpot             | `hs-scripts.com`       |
-| Marketo             | `munchkin.marketo.net` |
-| Pardot (Salesforce) | `pi.pardot.com`        |
-| Karte (Plaid)       | `karte.io`, `plaid.io` |
-| Repro               | `repro.io`             |
-| Satori              | `satori.marketing`     |
-| b->dash / Rtoaster  | `rtoaster.jp`          |
-| Kaizen Platform     | `kaizenplatform.net`   |
+**Chat / Support**
 
-**Chat & Support**
+| Service     | Signal              |
+| ----------- | ------------------- |
+| ChatPlus    | `chatplus.jp`       |
+| Tayori      | `tayori.com`        |
+| LINE        | `liff.line.me`, `tr.line.me`, `access.line.me` |
 
-| Service          | Signal                           |
-| ---------------- | -------------------------------- |
-| Intercom         | `intercom.io`                    |
-| Zendesk          | `zendesk.com`                    |
-| Chat Plus        | `chatplus.jp`                    |
-| Tayori           | `tayori.com`                     |
-| LINE Chat (LIFF) | `liff.line.me`, `access.line.me` |
+**Payment / EC**
 
-**LINE Ecosystem**
-
-| Service        | Signal                        |
-| -------------- | ----------------------------- |
-| LINE Tag (Ads) | `tr.line.me`                  |
-| LIFF App       | `liff.line.me/`, `liff.init(` |
-| LINE Login     | `access.line.me/oauth2/`      |
-
-**EC & Payment**
-
-| Service       | Signal                             |
-| ------------- | ---------------------------------- |
-| Stripe        | `js.stripe.com`                    |
-| PAY.JP        | `pay.jp`                           |
-| GMO Payment   | `mul-pay.com`                      |
-| SB Payment    | `sbpayment.jp`                     |
-| Komoju        | `komoju.com`                       |
-| EC-CUBE       | `eccube`, generator meta `EC-CUBE` |
-| BASE          | `thebase.in`, `base.ec`            |
-| STORES        | `stores.jp`                        |
-| Makeshop      | `makeshop.jp`                      |
-| Color Me Shop | `shop-pro.jp`, `colormeapp.com`    |
+| Service       | Signal                                   |
+| ------------- | ---------------------------------------- |
+| PAY.JP        | `pay.jp`                                 |
+| GMO PG        | `mul-pay.com`                            |
+| SB Payment    | `sbpayment.jp`                           |
+| KOMOJU        | `komoju.com`                             |
+| EC-CUBE       | `eccube`                                 |
+| BASE          | `thebase.in`                             |
+| STORES        | `stores.jp`                              |
+| MakeShop      | `makeshop.jp`                            |
+| Color Me Shop | `shop-pro.jp`, `colormeapp.com`          |
 
 **Reservation**
 
@@ -379,10 +379,14 @@ Look for known script patterns:
 | Xserver              | `xsrv.jp`                       |
 | Jimdo                | `jimdostatic.com`               |
 
+Run a bulk keyword scan against all script sources:
+
 ```bash
-browser-use --headed --profile "<profile>" --session "inv" python "
+cmux browser $SURFACE get html body | python3 -c "
 from bs4 import BeautifulSoup
-soup = BeautifulSoup(browser.html, 'html.parser')
+import sys
+html = sys.stdin.read()
+soup = BeautifulSoup(html, 'html.parser')
 srcs = [s.get('src','') for s in soup.find_all('script') if s.get('src')]
 keywords = [
   # Analytics
@@ -575,34 +579,20 @@ Key signals found during investigation:
 
 ## Phase 6: Cleanup
 
-```bash
-browser-use close --all
-browser-use sessions
-```
-
-Confirm: `No active sessions`.
-
-Clean up leftover subprocesses:
-
-```bash
-pgrep -f "browser-use-user-data-dir" || true
-pkill -f "browser-use-user-data-dir" 2>/dev/null || true
-```
-
-Re-verify: `browser-use sessions` → `No active sessions`.
+cmux uses the system browser — no process cleanup required. Surfaces (tabs) remain open and can be closed manually if desired.
 
 ---
 
 ## Troubleshooting
 
 **Page is blank or JS not executed**
-→ Ensure browser-use is used (not web_fetch alone). Check `browser-use state` for load status.
+→ Ensure cmux browser is used (not web_fetch alone). Re-run `cmux browser $SURFACE snapshot --interactive` to check load status.
 
 **`<nav>` not found**
 → Inspect `<header>` and `<ul>` elements manually. Some sites use `role="navigation"` on a `<div>`.
 
 **Script sources return relative paths only**
-→ Combine with the base URL from `browser-use state` to resolve full paths.
+→ Get the current URL with `cmux browser $SURFACE get url` and prepend it to resolve full paths.
 
 **robots.txt disallows key sections**
 → Limit crawl to homepage and one or two pages only. Note the restriction in Limitations.
