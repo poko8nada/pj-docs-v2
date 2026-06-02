@@ -2,7 +2,6 @@
 import type { Plugin } from '@opencode-ai/plugin';
 import * as fs from 'fs';
 import * as path from 'path';
-import { appendFileSync } from 'fs';
 
 // ── rule mapping ─────────────────────────────────────────────────────────────
 
@@ -77,11 +76,6 @@ export const RuleInjectPlugin: Plugin = async ({ worktree }) => {
     },
 
     'tool.execute.before': async (input, output) => {
-      appendFileSync(
-        path.join(worktree, 'rule_inject.log'),
-        `[${new Date().toISOString()}] tool: ${input.tool}, command: ${JSON.stringify(output.args)}\n`,
-      );
-
       if (input.tool !== 'bash') return;
 
       const command: string = output.args?.command ?? '';

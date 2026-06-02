@@ -1,18 +1,21 @@
 import type { Plugin } from '@opencode-ai/plugin';
-import * as path from 'path';
 
 export const RestrictRootPlugin: Plugin = async ({ worktree }) => {
-  const root = path.resolve(worktree);
+  const root = Bun.resolveSync(worktree, '/'); // realpathの代わり
 
   const isOutside = (filePath: string) => {
-    const resolved = path.resolve(filePath);
-    return !resolved.startsWith(root + path.sep) && resolved !== root;
+    const resolved = filePath.startsWith('/') ? filePath : `${root}/${filePath}`;
+    // 正規化（../ などを解決）
+    const normalized = new URL(resolved, 'file://').pathname;
+    return !normalized.startsWith(root + '/') && normalized !== root;
   };
 
   return {
     'tool.execute.before': async (input, output) => {
-      // read / write / edit 系のツールを対象にする
-      const fileArg = output.args?.filePath ?? output.args?.path ?? output.args?.file ?? null;
+      if (input.tool === 'apply_patch') return;
+
+      const fileArg: string | undefined =
+        output.args?.filePath ?? output.args?.path ?? output.args?.file ?? undefined;
 
       if (fileArg && isOutside(fileArg)) {
         throw new Error(
