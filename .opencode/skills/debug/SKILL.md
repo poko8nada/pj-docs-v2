@@ -1,12 +1,14 @@
 ---
 name: debug
-description: Use when something is broken, behaving unexpectedly, or the cause is unknown. Prevents blind fixes by enforcing hypothesis-driven debugging.
+description: Trigger when the user reports a bug, when tests fail unexpectedly, or when behavior doesn't match expectations. Hypothesis-driven — never guess, verify first.
 compatibility: opencode
 ---
 
-## Steps
+# Skill: debug
 
-Follow these steps in order. Never skip or combine steps.
+Find and fix the root cause. Never guess — form a hypothesis, verify it, then fix.
+
+## Steps
 
 ### Step 1 — Describe the problem
 
@@ -16,7 +18,7 @@ Do not attempt a fix yet.
 ### Step 2 — Form a hypothesis
 
 Research the codebase, logs, and web before forming a hypothesis.
-Use the `question` tool. Start with `[Context: zero / partial / sufficient / ready]`:「[仮説の説明]。この方向で調査してよいですか？」
+Use the `question` tool:「[仮説の説明]。この方向で調査してよいですか？」
 
 ### Step 3 — Verify the hypothesis
 
@@ -48,15 +50,11 @@ Apply the minimal fix that resolves the confirmed cause. Nothing more.
 - [ ] The original problem is resolved
 - [ ] No new issues introduced
 
-### Step 7 — Propose and align
+### Step 7 — Confirm
 
-Before asking the user, summarize what was built and why it meets the agreed unit definition.
-Use the `question` tool. Start the message with `[Context: zero / partial / sufficient / ready]`:
+List what was fixed and why. Make it clear what the user should check.
 
-「[結果の要約]。この結果を確認してください。次に進んでよいですか？」
+「[修正内容の要約]。この結果を確認してください。次に進んでよいですか？」
 
-**This is Agreement Point 2.**
-
-- Approved → `/apply-pattern [remaining targets]`
+- Approved → the agent proposes the next step based on the discussion
 - Changes needed → return to Step 2
-- Done → return to `/build-awareness`

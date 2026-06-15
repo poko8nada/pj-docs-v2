@@ -1,38 +1,69 @@
 ---
 name: issue
-description: Manages GitHub Issues using gh CLI — creation, decomposition, update, and close. Load when asked to create a new issue, break down a large task into issues, update issue status, or close an issue after a PR is merged. The user ultimately decides whether to create an issue. The agent handles all gh CLI operations.
+description: Trigger when the work is substantial enough to track — same condition as creating a new branch in /setup. Manages GitHub Issues as the plan for substantial work. The user ultimately decides whether to create an issue. The agent handles all gh CLI operations.
 ---
 
 # Issue Management
 
-## Preparation
+Issues serve as the plan for substantial work. Use this skill when the work is big enough to warrant a new branch in /setup.
 
-- Reload `.opencode/rules/project-meta.mdc` and incorporate it into the context for this skill execution.
-- Understand the overall project context, current architecture, and existing code style before proposing or creating issues.
-- Verify project scope is enabled: `gh auth status`. If the `project` scope is missing, run `gh auth refresh -s project` before proceeding.
+## When to use
+
+- The work spans multiple units
+- The work spans multiple sessions
+- The work is substantial enough to track and reference later
+- The user explicitly asks for an issue
+
+**Skip for:**
+
+- Typo fixes and one-liners
+- Single-unit, session-bound work
+- Quick changes that don't need tracking
 
 ## Principles
 
 - The user decides whether to create an issue. The agent handles creation, updates, and closing via gh CLI.
-- Prioritize meaningful scope over strict "1 issue = 1 PR". One issue should represent a coherent piece of work that feels natural to complete in one (or a small number of) PR(s).
-- Avoid over-decomposition. If a task is too large to finish comfortably in one PR, propose a reasonable breakdown first and ask for user approval before creating multiple issues.
-- Issues serve as session-to-session memory and future reference. Always reference the issue number in commits and PR descriptions (e.g., `Closes #123` or `#123`).
+- The issue is the plan — it captures Goal, Gate, Scope, and Risks & Gaps.
+- Avoid over-decomposition. If a task is too large, propose a reasonable breakdown first and ask for user approval.
+- Issues serve as session-to-session memory. Always reference the issue number in commits and PR descriptions.
 
-## Granularity Guide
+## Format
 
-**Good scope (recommended for most cases)**
+When creating or suggesting a new issue, use this template. Write content in natural Japanese.
 
-- Add or improve a specific feature / component with related changes and tests
-- Fix a specific bug (including reproduction steps and verification)
-- Refactor a specific module or area without changing behavior
-- Update documentation or configuration for one clear purpose
+```markdown
+## Goal
 
-**Too large — propose decomposition first**
+<What to achieve in 1 sentence.>
 
-- "Implement full authentication" → break into login flow, session management, token handling, error cases, etc.
-- "Redesign the entire dashboard" → break into UI components, data fetching, state management, responsiveness, etc.
+## Gate
 
-When the requested task is clearly large, list the proposed decomposed issues for user confirmation before creating them.
+<What "done" looks like. Verifiable.>
+
+## Scope
+
+- **Single:** <description, or "N/A" if pattern>
+- **Pattern:** <remaining targets to apply the same approach, or "N/A" if single>
+
+## Risks & Gaps
+
+- [r1] <known risk or open question>
+- [r2] ...
+
+## Plan
+
+- **First unit:** <the single unit to build end-to-end first>
+- **Related files:** <list of relevant file paths>
+- **Existing patterns:** <components or implementations to reference>
+- **Technical constraints:** <any constraints or prerequisites>
+
+## Acceptance Criteria
+
+- [ ] Works as expected
+- [ ] Related tests pass (if applicable)
+- [ ] Edge cases and error handling considered
+- [ ] User has reviewed and confirmed
+```
 
 ## Commands
 
@@ -46,8 +77,7 @@ gh project item-add 1 --owner <username> --url $ISSUE_URL
 ```
 
 - Always capture the URL at creation time with `--json url -q .url`.
-- Always add to Project #1 immediately after creation — no confirmation needed.
-- Retrieve `--owner` from `project-meta.mdc`.
+- Always add to Project #1 immediately after creation.
 
 ### Other operations
 
@@ -60,38 +90,4 @@ gh issue close <number>
 
 # View issue
 gh issue view <number>
-```
-
-## Format
-
-Use the following Markdown template when creating or suggesting a new issue. Write the content in **natural Japanese**.
-
-```markdown
-## 背景・目的 (why)
-
-<Briefly describe the reason and context for this change in 1–3 sentences.>
-
-## やること (what)
-
-<List the specific tasks in bullet points. Include relevant files and considerations. Summarize the scope so it fits naturally within a single PR.>
-
-## 実行条件 (plan)
-
-- **First unit:** [The single unit to build end-to-end first — fully working and verifiable by the user]
-- **Apply pattern:** [List of remaining targets to apply the same approach after first unit is approved]
-- **Skills:** [implement-ui / implement-logic / implement-state / implement-api / implement-db / implement-test / implement-config / debug]
-- **Related files:** [List of relevant file paths]
-- **Existing patterns:** [Components or implementations to reference]
-- **Technical constraints:** [Any constraints or prerequisites]
-
-## 受け入れ条件 (Acceptance Criteria)
-
-- [ ] Works as expected
-- [ ] Related tests pass (if applicable)
-- [ ] Edge cases and error handling considered
-- [ ] User has reviewed and confirmed
-
-## Notes
-
-<Design decisions, items to review later, related issues, or anything to keep in mind. Leave blank if nothing to note.>
 ```

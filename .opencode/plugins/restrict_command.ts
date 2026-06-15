@@ -51,12 +51,7 @@ const ALLOWED_COMMANDS = new Set([
 ]);
 
 // git subcommands that are explicitly blocked
-const BLOCKED_GIT_SUBCOMMANDS = new Set([
-  'push', // covers --force too; allow only explicit safe push if needed
-  'reset',
-  'clean',
-  'rebase',
-]);
+const BLOCKED_GIT_SUBCOMMANDS = new Set(['reset', 'clean', 'rebase']);
 
 // Flags that make otherwise-allowed git commands dangerous
 const DANGEROUS_GIT_FLAGS = ['--force', '-f', '--hard', '--mirror'];

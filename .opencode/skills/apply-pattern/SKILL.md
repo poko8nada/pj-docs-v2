@@ -1,17 +1,19 @@
 ---
 name: apply-pattern
-description: Use this after Agreement Point 2 has been fulfilled and the user has approved a complete unit. Using the `task` tool, delegate the same task—using the same approach—to the `apply` subagent for all remaining units in a comprehensive, parallel, and efficient manner.
+description: Trigger after a unit is approved and remaining targets need the same pattern. Delegates to the apply subagent for parallel execution.
 compatibility: opencode
 ---
 
-## Steps
+# Skill: apply-pattern
 
-Follow these steps in order. Never skip or combine steps.
+Apply an approved pattern to all remaining targets. Delegates to the apply subagent for comprehensive, parallel execution.
+
+## Steps
 
 ### Step 1 — Confirm remaining scope
 
 List all remaining targets that follow the same pattern as the approved unit.
-Use the `question` tool to confirm the list with the user. Start with `[Context: zero / partial / sufficient / ready]`.
+Use the `question` tool to confirm the list with the user.
 
 Wait for explicit approval before proceeding.
 
@@ -27,9 +29,9 @@ Invoke the `apply` subagent using the Task tool with:
 
 Fix any failures before proceeding.
 
-### Step 4 — Confirm once
+### Step 4 — Confirm
 
-Use the `question` tool:「全ユニットへの適用が完了しました。確認してください。」
+「全ユニットへの適用が完了しました。確認してください。」
 
 - Changes needed → fix and return to Step 3
-- Done → return to `/build-awareness`
+- Done → the agent proposes the next step based on the discussion

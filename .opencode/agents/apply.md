@@ -1,5 +1,5 @@
 ---
-description: Applies an approved pattern to all remaining targets comprehensively, in parallel, and efficiently. Use after Agreement Point 2 is reached.
+description: Applies an approved pattern to all remaining targets comprehensively, in parallel, and efficiently. Use after the user approves pattern scope in the /implement Confirm step.
 mode: subagent
 hidden: true
 model: opencode-go/mimo-v2.5
