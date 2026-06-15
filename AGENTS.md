@@ -12,13 +12,13 @@ Agreement happens at exactly two points:
 Session start
 ↓
 /build-awareness
-├ Build context incrementally (max +2 per turn)
+├ Build context incrementally (max +2 level per turn)
 ├ Research and form proposals — never ask without a proposal
 └ question tool → Agreement Point 1: plan confirmed
 ↓
 [Execute first unit]
 ├ /implement-ui, /implement-logic, /implement-state
-├/implement-api, /implement-db, /implement-test, /implement-config
+├ /implement-api, /implement-db, /implement-test, /implement-config
 └ /debug
 ↓
 question tool → Agreement Point 2: result confirmed

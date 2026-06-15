@@ -2,7 +2,7 @@
 description: Applies an approved pattern to all remaining targets comprehensively, in parallel, and efficiently. Use after Agreement Point 2 is reached.
 mode: subagent
 hidden: true
-model: opencode-go/deepseek-v4-flash
+model: opencode-go/mimo-v2.5
 reasoningEffort: xhigh
 permission:
   edit: allow
