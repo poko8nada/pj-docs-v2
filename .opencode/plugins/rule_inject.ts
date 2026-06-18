@@ -102,7 +102,8 @@ ${loadedRules.join('\n\n---\n\n')}
 Instructions:
 1. Review your changes against the rules above.
 2. Fix any violations.
-3. Run git commit again — the second attempt will pass.
+3. Tell the user what you fixed, or not if you didn't find any.
+4. Run git commit again — the second attempt will pass.
       `.trim(),
       );
     },
