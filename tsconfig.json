@@ -3,16 +3,10 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["app/*"]
-    },
+    "outDir": "dist",
     "strict": true,
     "skipLibCheck": true,
-    "lib": ["ESNext", "DOM"],
-    "types": ["vite/client"],
-    "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx"
+    "lib": ["ESNext"]
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": ["**/*.ts"]
 }
