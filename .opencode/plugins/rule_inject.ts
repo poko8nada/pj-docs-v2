@@ -91,7 +91,7 @@ export const RuleInjectPlugin: Plugin = async ({ worktree }) => {
 
       throw new Error(
         `
-[rule-inject] Commit blocked. Review required.
+[rule-inject] Staging and commit require rule review.
 
 Edited files:
 ${touched.map((f) => `- \`${f}\``).join('\n')}
@@ -102,8 +102,12 @@ ${loadedRules.join('\n\n---\n\n')}
 Instructions:
 1. Review your changes against the rules above.
 2. Fix any violations.
-3. Tell the user what you fixed, or not if you didn't find any.
-4. Run git commit again — the second attempt will pass.
+3. Tell the user what you fixed, or that you found no violations.
+4. Re-run the original bash command as-is. The first attempt was blocked
+   before any chained \`git add\` could execute, so re-running the same
+   command applies staging + commit together. The second attempt passes
+   because the rule-inject plugin clears its tracking state on the first
+   block.
       `.trim(),
       );
     },

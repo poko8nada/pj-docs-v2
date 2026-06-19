@@ -1,6 +1,6 @@
 ---
 name: readme-writer
-description: Generate or improve a README.md for any project. Use this skill when the user asks to write, create, generate, or improve a README. Also trigger when the user says things like "add a README", "my README needs work", "help me document my project", or when starting a new project that lacks documentation. The output is a polished README with shields.io badges, a Concept & Goals section near the top, and standard user-facing sections.
+description: Trigger proactively whenever README.md is created, edited, restructured, or aligned with project reality — use even if not explicitly asked. Reach for this skill any time README work is on the table (e.g., 'improve the readme', 'document the project', starter cleanup, template-looking README). Generates polished README with badges, Concept & Goals, Stack, App Architecture, License sections.
 ---
 
 # README Writer

@@ -1,60 +1,76 @@
 ---
 name: implement
-description: Trigger when Goal and Gate are clear, the unit is named and scoped, and no open questions block implementation. Covers UI, logic, state, API, database, and configuration — confirm what was discussed, then build, verify, and get approval.
+description: Trigger when Goal and Gate are clear, the unit is named and scoped, and no open questions block implementation. Covers UI, logic, state, API, database, and configuration — confirm what was discussed, then build, run automated checks with output shown, and get approval.
 compatibility: opencode
 ---
 
 # Skill: implement
 
-Trigger this skill when discussion has resolved what, why, scope, and uncertainties — and both the user and agent agree it's time to build.
+Trigger this skill when it's time to build a unit. The unit may
+already be discussed in chat, or it may need a quick design check
+first.
 
-## Pre-check
+## Trivial skip judgment
 
-Confirm what was discussed. Don't reopen settled questions — lock them in and get approval to build.
+Before starting, evaluate:
 
-Use the `question` tool to present:
+- Touches more than one file?
+- Introduces new error paths?
+- Calls library API in a new way?
+- Changes a public interface (route, type, export)?
 
-### What — the unit to build
+If any "yes" → non-trivial. Before building, suggest to the user:
 
-Name the files, functions, components, endpoints, tables, or settings as discussed.
+> This looks like a design change. Want to do a design check first
+> to clarify approach, error paths, and test scope? Or go straight
+> to build?
 
-| Type          | Specify                                        |
-| ------------- | ---------------------------------------------- |
-| UI            | component name, file path, behavior            |
-| Logic         | function name, file path, input/output shape   |
-| State         | state shape, transitions, file path            |
-| API           | endpoint, request/response shape, file path    |
-| Database      | table, migration, query, file path             |
-| Configuration | environment variable, build setting, file path |
+The user decides. If they want a design check, pause and let them
+trigger a planning step. If they want to build, proceed.
 
-### Approach — why this way
+If all "no" → trivial. Build directly.
 
-Restate the approach and the reason it was chosen over alternatives.
+## Confirm what was discussed
 
-### Scope — single or pattern
+When the user comes straight to build without a design check,
+recap the unit briefly and get approval. Don't reopen settled
+questions — lock them in.
 
-- **Single**: one-off, no remaining targets
-- **Pattern**: replicated to remaining targets after approval (→ `/apply-pattern`)
-
-If pattern, list the remaining targets.
-
-### Risks & Gaps — what we've accepted or left open
-
-List any acknowledged risks, tentative agreements, and gaps we've agreed to leave. Don't reopen them — acknowledge them.
-
-If the user raises a new concern during this check, pause. Research (Context7, web search, codebase) or discuss to resolve it. Then re-confirm before building.
+If something is unclear, ask. If something needs research, do it
+now (Context7, web search, codebase).
 
 ## Build
 
-Build exactly what was confirmed in the Pre-check. Not a stub — correct structure, behavior, and edge cases handled.
+Build exactly what was confirmed. Not a stub — correct structure,
+behavior, and edge cases handled.
 
-Keep the development environment operational at all times. The user should be able to verify the result at any point.
+Keep the development environment operational at all times. The
+user should be able to verify the result at any point.
 
-If scope changes during implementation, confirm with the user before expanding.
+If scope changes during implementation, confirm with the user
+before expanding.
 
 ## Verify
 
-Use the checklist for your implementation type. Fix any failures before proceeding.
+After Build, run automated checks and show output. **Do not
+proceed to Confirm without showing the user the output of these
+checks.**
+
+Run:
+
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm test:run` (if tests exist)
+
+Show the output (or last N lines) before asking for Confirm.
+
+For UI changes, also use cmux-browser to capture a snapshot and
+show it to the user. Data layer / API / type changes don't
+require browser verification.
+
+Use the checklist for your implementation type. Fix any failures
+before proceeding.
 
 ### UI
 
@@ -99,7 +115,10 @@ Use the checklist for your implementation type. Fix any failures before proceedi
 
 ## Confirm
 
-List the specific changes: which files, functions, components were created or modified. Make it clear what the user should check.
+List the specific changes: which files, functions, components
+were created or modified. Make it clear what the user should
+check. Include the output of the Verify checks (typecheck / lint
+/ format / test).
 
 「[変更したファイル・関数・コンポーネントの一覧]。この結果を確認してください。次に進んでよいですか？」
 

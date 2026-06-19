@@ -22,3 +22,12 @@ alwaysApply: false
 
 - Derive, don't duplicate — if state B can be computed from state A, never store B separately.
 - Isolate side effects from pure logic — pure functions first, side effects at the edges.
+
+## Framework exceptions
+
+`No default exports` rule has these framework-mandated exceptions:
+
+- `app/routes/**` — HonoX file-system routing
+- `app/islands/**` — HonoX island entries
+- `app/server.ts`, `app/client.ts` — honox/server, honox/client entry points
+

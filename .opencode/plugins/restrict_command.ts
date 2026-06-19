@@ -20,6 +20,8 @@ const ALLOWED_COMMANDS = new Set([
   'pkill',
   'curl',
   'sort',
+  'mktemp',
+  'date',
   // Git (subcommands checked separately)
   'git',
   // Runtime / package managers
@@ -50,8 +52,10 @@ const ALLOWED_COMMANDS = new Set([
   'sips',
 ]);
 
-// git subcommands that are explicitly blocked
-const BLOCKED_GIT_SUBCOMMANDS = new Set(['reset', 'clean', 'rebase']);
+// git subcommands that are explicitly blocked. Empty for now — dangerous
+// subcommands (reset / clean / rebase) are governed by the global `bash`
+// permission (`ask` in `~/.config/opencode/opencode.json`).
+const BLOCKED_GIT_SUBCOMMANDS: Set<string> = new Set();
 
 // Flags that make otherwise-allowed git commands dangerous
 const DANGEROUS_GIT_FLAGS = ['--force', '-f', '--hard', '--mirror'];

@@ -45,3 +45,7 @@ Show the current state of agreement. Keep it short.
 ## Hand off
 
 When Goal and Gate are agreed and Risks & Gaps are addressed, the agent proposes the next step based on the discussion.
+
+Before the user gives final agreement, **re-display the agreed Goal and Gate** so the user can verify them. Then ask the user to confirm.
+
+After the user explicitly agrees, run `echo "setup-ack"` in a bash command to signal the harness that the gate has been passed. Until this signal is sent, the harness will block any file edits. The harness also resets this signal after every `git commit`, so run `echo "setup-ack"` again for each new Goal.
