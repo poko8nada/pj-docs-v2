@@ -3,20 +3,25 @@ pre-commit:
   commands:
     format:
       glob: '*.{js,jsx,ts,tsx}'
-      run: pnpm oxfmt {staged_files}
+      run: pnpm format:check {staged_files}
       stage_fixed: true
-      fail_text: 'Format failed. Run: pnpm oxfmt . to fix.'
+      fail_text: 'Format failed. Run: pnpm format:check to fix.'
 
     lint:
       glob: '*.{js,jsx,ts,tsx}'
-      run: pnpm oxlint {staged_files}
-      fail_text: 'Lint failed. Run: pnpm oxlint . for details. Fix the code, not the config.'
+      run: pnpm lint {staged_files}
+      fail_text: 'Lint failed. Run: pnpm lint:fix for details. Fix the code, not the config.'
+
+    typecheck:
+      glob: '*.{js,jsx,ts,tsx}'
+      run: pnpm typecheck:staged {staged_files}
+      fail_text: 'Type check failed. Run: pnpm typecheck:staged for details.'
 
 pre-push:
   commands:
     typecheck:
-      run: pnpm tsc --noEmit
-      fail_text: 'Type check failed. Run: pnpm tsc --noEmit for details.'
+      run: pnpm typecheck
+      fail_text: 'Type check failed. Run: pnpm typecheck for details.'
     # test:
     #   run: pnpm test:run
     #   fail_text: 'Tests failed. Fix all failing tests before pushing.'

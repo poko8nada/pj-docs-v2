@@ -31,6 +31,7 @@ const ALLOWED_COMMANDS = new Set([
   'pnpm',
   // Build / test
   'tsc',
+  'tsc-files',
   'vitest',
   'jest',
   // File operations

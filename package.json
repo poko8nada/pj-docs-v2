@@ -7,11 +7,12 @@
     "clean": "rm -rf dist",
     "test": "vitest --passWithNoTests",
     "test:run": "vitest run --passWithNoTests",
-    "lint": "oxlint .",
+    "lint": "oxlint",
     "lint:fix": "oxlint --fix .",
-    "format": "oxfmt .",
-    "format:check": "oxfmt --check .",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "typecheck": "tsc --noEmit",
+    "typecheck:staged": "tsc-files",
     "prepare": "lefthook install"
   },
   "devDependencies": {
@@ -20,6 +21,7 @@
     "oxc-parser": "^0.123.0",
     "oxfmt": "^0.41.0",
     "oxlint": "^1.0.0",
+    "tsc-files": "^1.1.4",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }

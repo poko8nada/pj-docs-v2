@@ -27,11 +27,10 @@ function isMetaFile(filePath: string): boolean {
 
 export const EnforceSetupPlugin: Plugin = async () => {
   let setupAgreed = false;
-  let isFirstInteraction = true;
+  let everSetupAgreed = false;
 
   const resetState = () => {
     setupAgreed = false;
-    isFirstInteraction = true;
   };
 
   return {
@@ -65,16 +64,14 @@ export const EnforceSetupPlugin: Plugin = async () => {
 
       const args = (output?.args ?? {}) as Record<string, unknown>;
       const filePath = String(args.filePath ?? args.path ?? args.file ?? '');
-      if (isMetaFile(filePath)) return;
+      if (isMetaFile(filePath) && setupAgreed) return;
 
       if (!setupAgreed) {
-        const msg = isFirstInteraction
+        const msg = !everSetupAgreed
           ? '[enforce-setup] Setup not agreed. Run /setup with the user, get their agreement on the Orient, then run `echo "setup-ack"` in a bash command to signal the harness.'
           : '[enforce-setup] Setup no longer agreed (reset by commit, skill load, or compaction). Run /reflect to recover context, then /setup and `echo "setup-ack"` for the next Goal.';
         throw new Error(msg);
       }
-
-      isFirstInteraction = false;
     },
 
     'tool.execute.after': async (input) => {
@@ -82,7 +79,7 @@ export const EnforceSetupPlugin: Plugin = async () => {
       const command: string = (input.args as { command?: string } | undefined)?.command ?? '';
       if (/\becho\s+["']setup-ack["']/.test(command)) {
         setupAgreed = true;
-        isFirstInteraction = false;
+        everSetupAgreed = true;
       }
     },
   };

@@ -6,55 +6,53 @@ compatibility: opencode
 
 # Skill: implement
 
-Trigger this skill when it's time to build a unit. The unit may
-already be discussed in chat, or it may need a quick design check
-first.
+Trigger this skill when it's time to build a unit. The unit may already be discussed in chat, or it may need a quick design check first.
 
-## Trivial skip judgment
+## When to use
 
-Before starting, evaluate:
+Before starting, ask: **Can this work be expressed as a vertical slice?** (1 end-to-end flow with a structural pattern that can be applied to other targets?)
 
-- Touches more than one file?
-- Introduces new error paths?
-- Calls library API in a new way?
-- Changes a public interface (route, type, export)?
+If yes → trigger another design step to articulate the slice, pattern, and apply targets. Get user agreement before building.
 
-If any "yes" → non-trivial. Before building, suggest to the user:
+If no → build directly. The change is a one-off, no recurring structure to articulate.
 
-> This looks like a design change. Want to do a design check first
-> to clarify approach, error paths, and test scope? Or go straight
-> to build?
+If re-running after a design revision (the design step was re-triggered because the pattern needed adjustment), skip this gate — the vertical slice was already confirmed. Go directly to Build.
 
-The user decides. If they want a design check, pause and let them
-trigger a planning step. If they want to build, proceed.
+### Examples
 
-If all "no" → trivial. Build directly.
+**Trivial — build directly:**
+
+- Fix a typo
+- Rename a single variable
+- Change one line in an existing config file
+- Add a new query param to an existing endpoint (existing structure absorbs it)
+
+**Vertical slice — trigger design step first:**
+
+- New endpoint (route + handler + test + UI integration = 1 end-to-end flow)
+- New data source method (interface + impl + test + consumer + error UI = 1 end-to-end flow)
+- New error path handling (interface + impl + test + consumer error branch + UI = 1 end-to-end flow)
+- Cross-file refactor with a structural pattern that recurs
+
+The actual articulation of slice / pattern / apply targets happens in the design step. The When to use here is the gate.
 
 ## Confirm what was discussed
 
-When the user comes straight to build without a design check,
-recap the unit briefly and get approval. Don't reopen settled
-questions — lock them in.
+When the user comes straight to build without a design check, recap the unit briefly and get approval. Don't reopen settled questions — lock them in.
 
-If something is unclear, ask. If something needs research, do it
-now (Context7, web search, codebase).
+If something is unclear, ask. If something needs research, do it now (Context7, web search, codebase).
 
 ## Build
 
-Build exactly what was confirmed. Not a stub — correct structure,
-behavior, and edge cases handled.
+Build exactly what was confirmed. Not a stub — correct structure, behavior, and edge cases handled.
 
-Keep the development environment operational at all times. The
-user should be able to verify the result at any point.
+Keep the development environment operational at all times. The user should be able to verify the result at any point.
 
-If scope changes during implementation, confirm with the user
-before expanding.
+If scope changes during implementation, confirm with the user before expanding.
 
 ## Verify
 
-After Build, run automated checks and show output. **Do not
-proceed to Confirm without showing the user the output of these
-checks.**
+After Build, run automated checks and show output. **Do not proceed to Confirm without showing the user the output of these checks.**
 
 Run:
 
@@ -65,12 +63,9 @@ Run:
 
 Show the output (or last N lines) before asking for Confirm.
 
-For UI changes, also use cmux-browser to capture a snapshot and
-show it to the user. Data layer / API / type changes don't
-require browser verification.
+For UI changes, also use cmux-browser to capture a snapshot and show it to the user. Data layer / API / type changes don't require browser verification.
 
-Use the checklist for your implementation type. Fix any failures
-before proceeding.
+Use the checklist for your implementation type. Fix any failures before proceeding.
 
 ### UI
 
@@ -115,13 +110,13 @@ before proceeding.
 
 ## Confirm
 
-List the specific changes: which files, functions, components
-were created or modified. Make it clear what the user should
-check. Include the output of the Verify checks (typecheck / lint
-/ format / test).
+List the specific changes: which files, functions, components were created or modified. Include the output of the Verify checks (typecheck / lint / format / test).
 
-「[変更したファイル・関数・コンポーネントの一覧]。この結果を確認してください。次に進んでよいですか？」
+If the work was a vertical slice (a design step was run), validate the pattern before proceeding:
 
-- Approved + pattern scope → the agent applies the pattern to remaining targets
-- Approved + single scope → next step (user decides)
+> [Changed files / functions / components]. Did the built slice validate the pattern? Does it need adjustment (didn't fit, missing layer, wrong abstraction)?
+
+- Pattern validated → trigger pattern application to the remaining targets
+- Pattern needs adjustment → revise the pattern via the design step, then re-build
+- Approved (trivial work, no pattern) → the user decides the next step
 - Changes needed → return to Build

@@ -17,10 +17,10 @@ The agent and the user work together — both propose, both discuss, both agree.
 There is no fixed flow. The user and the agent pick the next step together. The agent proactively suggests and triggers skills based on context. Discussion runs between every step.
 
 - **Session start** → `/setup` (Goal/Gate, git cleanup, context)
-- **Design check** → `/pre-check` (optional; for non-trivial units: clarify approach, error paths, test scope, consult library docs)
-- **Implementation** → `/implement` (Build → Verify → Confirm; for non-trivial units, a design check is recommended first)
+- **Design check** → `/pre-check` (for vertical slice units: articulate Slice, Pattern, Apply targets, Risks & Gaps; get user agreement)
+- **Implementation** → `/implement` (When to use: vertical slice?; Build → Verify → Confirm; on Confirm, validate the pattern — if needs adjustment, loop back to the design check; if validated, trigger pattern application; trivial changes build directly)
 - **Tracking substantial work** → `/issue` (use the issue as the plan; same trigger as creating a new branch in /setup)
-- **After approval** → `/apply-pattern` (if pattern scope was decided in a prior design check)
+- **Pattern application** → `/apply-pattern` (after pattern is validated; subagent applies the pattern to remaining targets; reports any new candidates not in the original list)
 - **During discussion** → `/reflect` (progress review, direction check)
 - **Session end** → `/session-cleanup` (commit, push, PR, branch cleanup; use /memory for meta insights)
 
