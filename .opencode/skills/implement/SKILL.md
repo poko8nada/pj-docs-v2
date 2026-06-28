@@ -1,122 +1,73 @@
 ---
 name: implement
-description: Trigger when Goal and Gate are clear, the unit is named and scoped, and no open questions block implementation. Covers UI, logic, state, API, database, and configuration — confirm what was discussed, then build, run automated checks with output shown, and get approval.
+description: "Build the unit described in an agreed plan and produce a confirm message listing the changed files. Use when the plan has been agreed via the question tool and the user has said 'go' / '実行'."
 compatibility: opencode
 ---
 
-# Skill: implement
+# implement
 
-Trigger this skill when it's time to build a unit. The unit may already be discussed in chat, or it may need a quick design check first.
-
-## When to use
-
-Before starting, ask: **Can this work be expressed as a vertical slice?** (1 end-to-end flow with a structural pattern that can be applied to other targets?)
-
-If yes → trigger another design step to articulate the slice, pattern, and apply targets. Get user agreement before building.
-
-If no → build directly. The change is a one-off, no recurring structure to articulate.
-
-If re-running after a design revision (the design step was re-triggered because the pattern needed adjustment), skip this gate — the vertical slice was already confirmed. Go directly to Build.
-
-### Examples
-
-**Trivial — build directly:**
-
-- Fix a typo
-- Rename a single variable
-- Change one line in an existing config file
-- Add a new query param to an existing endpoint (existing structure absorbs it)
-
-**Vertical slice — trigger design step first:**
-
-- New endpoint (route + handler + test + UI integration = 1 end-to-end flow)
-- New data source method (interface + impl + test + consumer + error UI = 1 end-to-end flow)
-- New error path handling (interface + impl + test + consumer error branch + UI = 1 end-to-end flow)
-- Cross-file refactor with a structural pattern that recurs
-
-The actual articulation of slice / pattern / apply targets happens in the design step. The When to use here is the gate.
-
-## Confirm what was discussed
-
-When the user comes straight to build without a design check, recap the unit briefly and get approval. Don't reopen settled questions — lock them in.
-
-If something is unclear, ask. If something needs research, do it now (Context7, web search, codebase).
+Build the unit described in the agreed plan. The plan is the source of truth — do not reopen settled questions, do not expand scope, do not run per-file checks.
 
 ## Build
 
-Build exactly what was confirmed. Not a stub — correct structure, behavior, and edge cases handled.
+Build exactly what the plan's `fileChanges` specifies. Not a stub — correct structure, behavior, and edge cases handled.
 
 Keep the development environment operational at all times. The user should be able to verify the result at any point.
 
-If scope changes during implementation, confirm with the user before expanding.
+#### `.ts` / `.tsx` (TypeScript)
 
-## Verify
+Apply when writing or modifying TypeScript files.
 
-After Build, run automated checks and show output. **Do not proceed to Confirm without showing the user the output of these checks.**
+**Architecture**
 
-Run:
+- No `class` — use functions and ADTs. Classes obscure data flow and make logic harder to trace.
+- No default exports — named exports only. Default exports break grep-ability and refactoring tools.
+- Imports: same directory → `./`, cross-directory → `@/` aliases. Never use relative `../` across feature boundaries.
 
-- `pnpm typecheck`
-- `pnpm lint`
-- `pnpm format:check`
-- `pnpm test:run` (if tests exist)
+**Error Handling**
 
-Show the output (or last N lines) before asking for Confirm.
+- Never `throw` across module boundaries — return `Result<T, E>` instead.
+- Use `try-catch` only for external I/O (fetch, DB, file system).
+- Do NOT wrap expected absence in `Result` — use `T | undefined`. Promote to domain error only at the boundary layer.
 
-For UI changes, also use cmux-browser to capture a snapshot and show it to the user. Data layer / API / type changes don't require browser verification.
+**State**
 
-Use the checklist for your implementation type. Fix any failures before proceeding.
+- Derive, don't duplicate — if state B can be computed from state A, never store B separately.
+- Isolate side effects from pure logic — pure functions first, side effects at the edges.
 
-### UI
+**Comments**
 
-- [ ] Browser: structure and behavior work as intended
-- [ ] Semantically accurate and accessible
-- [ ] Visually correct and responsive
-- [ ] Consistent with the rest of the system
+- Add Japanese comments to functions and important processes. Keep them minimal.
 
-### Logic
+**Accessibility**
 
-- [ ] Logic produces correct output for expected inputs
-- [ ] Edge cases handled: null, empty, unexpected input
+- Interactive elements must have accessible labels (`aria-label` or visible text).
+- Semantic elements always — no `div` for buttons or links.
 
-### State
+#### `.css` and UI in `.tsx` (Tailwind v4)
 
-- [ ] State transitions work as intended
-- [ ] Edge cases handled: empty, loading, error
+- No `tailwind.config.js` — all tokens defined in `@theme inline` in CSS only.
+- No `@apply` — defeats the purpose of utility-first and creates hidden coupling.
+- No bracket variables in class names unless it's a custom value.
+- Mobile-first responsive design using Tailwind breakpoint prefixes (`sm:`, `md:`, `lg:`).
 
-### API
+#### `*.test.ts` / `*.test.tsx` (Testing)
 
-- [ ] Response shape is correct
-- [ ] Error cases are handled
-- [ ] Edge cases handled: null, empty, unexpected input
+- Never place tests in a separate top-level `__tests__` directory — breaks grep-ability.
+- Priority: critical areas get 100% coverage. Error paths are the most important.
+- Happy path is one where the program returns early from an error path and returns a result at the end.
+- All anticipated error paths should be covered by tests.
+- Each test description must include a Japanese translation in its comment — the one place where verbose comments are required.
 
-### Database
+#### `.md` / `.mdc` (Markdown authoring)
 
-- [ ] Migration runs without errors
-- [ ] Rollback runs without errors
-- [ ] Query returns expected shape
-- [ ] Destructive changes have rollback
-
-### Configuration
-
-- [ ] Configuration is applied correctly in the target environment
-- [ ] No sensitive values are hardcoded or committed
-
-### Test
-
-- [ ] Error paths are covered (most important)
-- [ ] Critical happy path is covered
-- [ ] No redundant or trivial assertions
+- Bold (`**…**`) — at most one per paragraph. Use only when emphasis is truly necessary (e.g., important warnings or terms defined only once). Indiscriminate bold clutters the text and looks unprofessional; avoiding it entirely makes text too plain.
+- Tables — small/medium width, total cell characters per row < 80. For multi-row content, use headings or nested bullet points. If a table is in the provided template, follow the template but keep it compact.
 
 ## Confirm
 
-List the specific changes: which files, functions, components were created or modified. Include the output of the Verify checks (typecheck / lint / format / test).
+List the specific changes: which files, functions, components were created or modified. Note any deviation from the plan (with the user's explicit approval).
 
-If the work was a vertical slice (a design step was run), validate the pattern before proceeding:
+Verification commands (`pnpm typecheck` / `lint` / `format` / `test:run`) run as a single batch after all changes are complete — do not run them per-file. The batched verification is the user's gate, not this skill's.
 
-> [Changed files / functions / components]. Did the built slice validate the pattern? Does it need adjustment (didn't fit, missing layer, wrong abstraction)?
-
-- Pattern validated → trigger pattern application to the remaining targets
-- Pattern needs adjustment → revise the pattern via the design step, then re-build
-- Approved (trivial work, no pattern) → the user decides the next step
-- Changes needed → return to Build
+If the work was a vertical slice, the pattern validation question goes to the plan skill (Phase 4), not here.

@@ -32,3 +32,8 @@ lerna-debug.log*
 .DS_Store
 
 .playwright-cli
+
+
+flow.md
+planning.md
+update-plan.md

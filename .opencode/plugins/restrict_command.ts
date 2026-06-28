@@ -1,78 +1,52 @@
 import type { Plugin } from '@opencode-ai/plugin';
 
-const ALLOWED_COMMANDS = new Set([
-  // Read / search
-  'ls',
-  'find',
-  'cat',
-  'head',
-  'tail',
-  'grep',
-  'rg',
-  'for',
-  'wc',
-  'echo',
-  'pwd',
-  'which',
-  'lsof',
-  'sleep',
-  'pgrep',
-  'pkill',
-  'curl',
-  'sort',
-  'mktemp',
-  'date',
-  // Git (subcommands checked separately)
-  'git',
-  // Runtime / package managers
-  'node',
-  'bun',
-  'npx',
-  'pnpm',
-  // Build / test
-  'tsc',
-  'tsc-files',
-  'vitest',
-  'jest',
-  // File operations
-  'mkdir',
-  'touch',
-  'cp',
-  'mv',
-  'rm',
-  // Project-specific
-  'oxlint',
-  'oxfmt',
-  'browser-use',
-  'cmux',
-  'gh',
-  'gog',
-  // python 3
-  'python3',
-  // image
-  'sips',
-]);
-
-// git subcommands that are explicitly blocked. Empty for now — dangerous
-// subcommands (reset / clean / rebase) are governed by the global `bash`
-// permission (`ask` in `~/.config/opencode/opencode.json`).
-const BLOCKED_GIT_SUBCOMMANDS: Set<string> = new Set();
-
-// Flags that make otherwise-allowed git commands dangerous
+// 危険な git フラグ
 const DANGEROUS_GIT_FLAGS = ['--force', '-f', '--hard', '--mirror'];
 
+// バイパス検出パターン (plugin 回避を試みる構文)
+const BYPASS_PATTERNS = [
+  { pattern: /`[^`]+`/, name: 'backtick command substitution' },
+  { pattern: /<\([^)]+\)/, name: 'process substitution' },
+  { pattern: /<{3}\s/, name: 'here string' },
+];
+
+// Markdown body を受け取るコマンドのホワイトリスト
+// これらのコマンドでは backtick (Markdown の inline code) を許可する
+// 他のバイパス (process substitution, here string) は引き続きブロック
+// process substitution / here string は Markdown 用途がないため、whitelist しても安全
+const COMMANDS_WITH_MARKDOWN_BODY = [
+  'gh issue create',
+  'gh issue edit',
+  'gh issue comment',
+  'gh pr create',
+  'gh pr edit',
+  'gh pr comment',
+  'gh release create',
+  'gh release edit',
+  'git commit',
+];
+
+const isMarkdownBodyCommand = (command: string): boolean => {
+  const trimmed = command.trimStart();
+  return COMMANDS_WITH_MARKDOWN_BODY.some((cmd) => trimmed.startsWith(cmd));
+};
+
+// parseCommands: bash コマンドをトークンに分割
+// heredoc, 引用符, コマンド置換, 変数代入に対応
 const parseCommands = (raw: string): string[][] => {
+  // heredoc を除去
+  const command = raw.replace(/<<-?\s*["']?(\w+)["']?[\s\S]*?\n\s*\1/g, '');
+
   const segments: string[] = [];
   let current = '';
   let inSingle = false;
   let inDouble = false;
-  let parenDepth = 0; // コマンド置換のネスト対応
+  let parenDepth = 0;
 
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    const next = raw[i + 1];
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    const next = command[i + 1];
 
-    // クォート処理
     if (ch === "'" && !inDouble) {
       inSingle = !inSingle;
       current += ch;
@@ -85,7 +59,6 @@ const parseCommands = (raw: string): string[][] => {
     }
 
     if (!inSingle && !inDouble) {
-      // コマンド置換の深さ管理
       if (ch === '$' && next === '(') {
         parenDepth++;
         current += ch;
@@ -96,8 +69,6 @@ const parseCommands = (raw: string): string[][] => {
         current += ch;
         continue;
       }
-
-      // コマンド区切り
       if (ch === '&' && next === '&') {
         segments.push(current.trim());
         current = '';
@@ -132,37 +103,61 @@ const parseCommands = (raw: string): string[][] => {
     .map((segment) => {
       // 変数代入 + コマンド置換のパターン (VAR=...)
       if (/^[A-Z_][A-Z0-9_]*=/.test(segment)) {
-        // $(...) の中身を抽出（改善版）
-        const cmdSubMatch = segment.match(/\$\(([\s\S]+?)\)$/); // 最後まで取る
+        const cmdSubMatch = segment.match(/\$\(([\s\S]+?)\)$/);
         if (cmdSubMatch) {
           const innerCmd = cmdSubMatch[1].trim();
           return innerCmd.split(/\s+/).map((t) => t.replace(/^['"]|['"]$/g, ''));
         }
-        // 単純な値代入は無視
         return [];
       }
-
-      // 通常のコマンド
       return segment.split(/\s+/).map((t) => t.replace(/^['"]|['"]$/g, ''));
     })
     .filter((tokens) => tokens.length > 0);
 };
 
-const validateGit = (tokens: string[]) => {
-  const subcommand = tokens[1];
-  if (!subcommand) return; // bare `git` — let it through
-
-  if (BLOCKED_GIT_SUBCOMMANDS.has(subcommand)) {
-    throw new Error(`[restrict-commands] git ${subcommand} is not allowed.`);
+// バイパス検出: plugin 回避を試みる構文をチェック
+// allowBackticks: true の場合、backtick のみスキップ (Markdown body 想定)
+// process substitution / here string は引き続き検出
+const checkBypass = (
+  raw: string,
+  allowBackticks: boolean,
+): { detected: boolean; name: string } | null => {
+  for (const { pattern, name } of BYPASS_PATTERNS) {
+    if (allowBackticks && name === 'backtick command substitution') continue;
+    if (pattern.test(raw)) {
+      return { detected: true, name };
+    }
   }
+  return null;
+};
+
+// git 危険フラグ検出
+const validateGit = (tokens: string[]): string | null => {
+  const subcommand = tokens[1];
+  if (!subcommand) return null;
 
   const hasFlag = tokens.some((t) => DANGEROUS_GIT_FLAGS.includes(t));
   if (hasFlag) {
-    throw new Error(
-      `[restrict-commands] Dangerous git flag detected in: git ${tokens.slice(1).join(' ')}`,
-    );
+    return `git ${tokens.slice(1).join(' ')} contains a dangerous flag (${DANGEROUS_GIT_FLAGS.filter((f) => tokens.includes(f)).join(', ')}).`;
   }
+  return null;
 };
+
+// エラーメッセージ生成: explain + コマンド明記
+const blockMessage = (reason: string, command: string, alternatives: string): string =>
+  [
+    `[restrict-commands] BLOCKED: ${reason}`,
+    '',
+    `Command: ${command}`,
+    '',
+    `Alternatives: ${alternatives}`,
+    '',
+    'Please explain to the user:',
+    '- What you tried to do',
+    '- Why this command was needed',
+    '- What alternative you suggest',
+    'The user will decide.',
+  ].join('\n');
 
 export const RestrictCommandsPlugin: Plugin = async () => {
   return {
@@ -172,21 +167,37 @@ export const RestrictCommandsPlugin: Plugin = async () => {
       const command: string = output.args?.command ?? '';
       if (!command) return;
 
-      const commandSets = parseCommands(command);
+      // バイパス検出
+      // Markdown body 系のコマンドでは backtick を許可 (process substitution / here string は引き続きブロック)
+      const bypass = checkBypass(command, isMarkdownBodyCommand(command));
+      if (bypass) {
+        throw new Error(
+          blockMessage(
+            `Bypass pattern detected: ${bypass.name}`,
+            command,
+            'Use standard command syntax without backticks, process substitution, or here strings. ' +
+              'For Markdown content, use --body-file to pass content from a file.',
+          ),
+        );
+      }
 
+      // コマンド解析 + 危険フラグ検出
+      const commandSets = parseCommands(command);
       for (const tokens of commandSets) {
         const bin = tokens[0];
         if (!bin) continue;
 
-        if (!ALLOWED_COMMANDS.has(bin)) {
-          throw new Error(
-            `[restrict-commands] "${bin}" is not in the allowed command list. ` +
-              `Allowed: ${[...ALLOWED_COMMANDS].join(', ')}`,
-          );
-        }
-
         if (bin === 'git') {
-          validateGit(tokens);
+          const error = validateGit(tokens);
+          if (error) {
+            throw new Error(
+              blockMessage(
+                error,
+                command,
+                'Remove the dangerous flag or use a safer alternative. Example: use `git push` instead of `git push --force`.',
+              ),
+            );
+          }
         }
       }
     },

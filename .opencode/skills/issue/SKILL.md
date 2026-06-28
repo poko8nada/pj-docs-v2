@@ -1,93 +1,182 @@
 ---
 name: issue
-description: Trigger when the work is substantial enough to track — same condition as creating a new branch in /setup. Manages GitHub Issues as the plan for substantial work. The user ultimately decides whether to create an issue. The agent handles all gh CLI operations.
+description: "Manage substantial work using Spec + Task issues. One Spec holds the product design, Task issues are carved out per work unit and closed after completion. Use when the work spans multiple sessions or units, or when the user asks to create an issue. Skip for single-unit, session-bound work."
 ---
 
-# Issue Management
+# issue
 
-Issues serve as the plan for substantial work. Use this skill when the work is big enough to warrant a new branch in /setup.
-
-## When to use
-
-- The work spans multiple units
-- The work spans multiple sessions
-- The work is substantial enough to track and reference later
-- The user explicitly asks for an issue
-
-**Skip for:**
-
-- Typo fixes and one-liners
-- Single-unit, session-bound work
-- Quick changes that don't need tracking
+Manage issues using a Spec + Task base. One Spec holds the product design for a feature area. Task issues are carved out per work unit and closed after completion.
 
 ## Principles
 
 - The user decides whether to create an issue. The agent handles creation, updates, and closing via gh CLI.
-- The issue is the plan — it captures Goal, Gate, Scope, and Risks & Gaps.
-- Avoid over-decomposition. If a task is too large, propose a reasonable breakdown first and ask for user approval.
+- **Spec** — The product design for one feature area. Holds the abstract Goal, Scope, Architecture, and decisions. Rarely changes; only updated when Goal / Scope / Architecture shifts.
+- **Task issue** — One work unit carved out from the Spec. Created just-in-time, closed after completion. Disposable.
+- **Comments** — The living work log. Every Spec update, Task creation, and Task close requires a comment with the reason or summary.
+- Do not write detailed task checklists in the Spec body. They get stale. Use comments instead.
 - Issues serve as session-to-session memory. Always reference the issue number in commits and PR descriptions.
+- **Update Spec body** — Only when Goal / Scope / Architecture changes. After updating, record the change and its reason in a comment. Do not update Spec body on Task completion.
 
-## Format
+## Comment rules (required)
 
-When creating or suggesting a new issue, use this template. Write content in natural Japanese.
+Every lifecycle event must produce a comment. The comment is the work log.
+
+| Event        | Target | Comment format                           |
+| ------------ | ------ | ---------------------------------------- |
+| Spec created | -      | (no comment — creation body is enough)   |
+| Spec updated | Spec   | `## 更新: <what changed>\n<why>`         |
+| Task created | Spec   | `## Task 切り出し: <Task title>\n<what>` |
+| Task updated | Task   | `## 進捗: <Task title>\n<current state>` |
+| Task closed  | Spec   | `## 完了: <Task title>\n<what was done>` |
+
+`gh` CLI examples:
+
+```bash
+# Spec update
+gh issue comment <spec_number> --body "## 更新: <what changed>\n<why>"
+
+# Task creation (comment on Spec)
+gh issue comment <spec_number> --body "## Task 切り出し: <Task title>\n<what>"
+
+# Task progress (comment on Task)
+gh issue comment <task_number> --body "## 進捗: <Task title>\n<current state>"
+
+# Task close (comment on Spec)
+gh issue comment <spec_number> --body "## 完了: <Task title>\n<what was done>"
+gh issue close <task_number>
+```
+
+## Spec template
+
+Use this template for the Spec body.
+
+```markdown
+## What is this product?
+
+<どんなプロダクトか 1 文で>
+
+## Features
+
+- 機能 1
+- 機能 2
+
+## Non-goals
+
+- 対象外 1
+- 対象外 2
+
+## Stack
+
+| Area | Choice | Reason |
+| ---- | ------ | ------ |
+| ...  | ...    | ...    |
+
+## Roadmap
+
+- **v1**: ...
+- **v2**: ...
+
+## Open Questions
+
+- [ ] 未解決事項 1
+- [ ] 未解決事項 2
+```
+
+## Task template
+
+Carve out a Task issue when starting work. The Task mirrors the structure used in the `plan` skill so the agent can plan and execute consistently.
 
 ```markdown
 ## Goal
 
-<What to achieve in 1 sentence.>
+<このユニットで何をやるか>
 
 ## Gate
 
-<What "done" looks like. Verifiable.>
+<完了条件。検証可能に>
 
-## Scope
+## What
 
-- **Single:** <description, or "N/A" if pattern>
-- **Pattern:** <remaining targets to apply the same approach, or "N/A" if single>
+<何を実装するか>
 
-## Risks & Gaps
+## How
 
-- [r1] <known risk or open question>
-- [r2] ...
+<どうやって実装するか>
 
-## Plan
+## Order
 
-- **First unit:** <the single unit to build end-to-end first>
-- **Related files:** <list of relevant file paths>
-- **Existing patterns:** <components or implementations to reference>
-- **Technical constraints:** <any constraints or prerequisites>
+<どの順に実装するか — 垂直スライスで叩き台から>
 
-## Acceptance Criteria
+## Verify
 
-- [ ] Works as expected
-- [ ] Related tests pass (if applicable)
-- [ ] Edge cases and error handling considered
-- [ ] User has reviewed and confirmed
+<どう検証するか — test pass + ユーザーがアプリ動かして確認>
 ```
+
+## Title convention
+
+- Spec: `[Spec] <product / feature area name>` (one per project)
+- Task: `[Task] <what this unit achieves>`
+
+## Workflow
+
+### 1. Create Spec
+
+Create a Spec when starting a new product or feature area.
+
+```bash
+ISSUE_URL=$(gh issue create --title "[Spec] ..." --body "...")
+gh project item-add 1 --owner <username> --url $ISSUE_URL
+```
+
+### 2. Carve out Task issue
+
+When starting work, create a Task issue and comment on the Spec.
+
+```bash
+ISSUE_URL=$(gh issue create --title "[Task] ..." --body "...")
+gh project item-add 1 --owner <username> --url $ISSUE_URL
+gh issue comment <spec_number> --body "## Task 切り出し: <Task title>\n<what>"
+```
+
+### 3. Update Task progress
+
+During work, comment progress on the Task itself.
+
+```bash
+gh issue comment <task_number> --body "## 進捗: <Task title>\n<current state>"
+```
+
+### 4. Complete work
+
+Close the Task and record the result in the Spec.
+
+```bash
+gh issue close <task_number>
+gh issue comment <spec_number> --body "## 完了: <Task title>\n<what was done>"
+```
+
+### 5. Repeat
+
+Repeat steps 2-4. The Spec comments become a natural work log.
 
 ## Commands
 
 Use `gh` CLI for all operations.
 
-### Creating an issue and adding to Project
-
 ```bash
-ISSUE_URL=$(gh issue create --title "..." --body "..." --json url -q .url)
+# Spec / Task 作成
+ISSUE_URL=$(gh issue create --title "..." --body "...")
 gh project item-add 1 --owner <username> --url $ISSUE_URL
-```
 
-- Always capture the URL at creation time with `--json url -q .url`.
-- Always add to Project #1 immediately after creation.
+# Issue にコメント
+gh issue comment <number> --body "..."
 
-### Other operations
-
-```bash
-# Update issue
-gh issue edit <number> --title "..." --body "..."
-
-# Close issue
+# Task issue を close
 gh issue close <number>
 
-# View issue
+# Issue 一覧
+gh issue list --state open --limit 10
+
+# Issue 確認
 gh issue view <number>
 ```

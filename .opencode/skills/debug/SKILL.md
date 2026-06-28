@@ -4,7 +4,7 @@ description: Trigger when the user reports a bug, when tests fail unexpectedly, 
 compatibility: opencode
 ---
 
-# Skill: debug
+# debug
 
 Find and fix the root cause. Never guess — form a hypothesis, verify it, then fix.
 

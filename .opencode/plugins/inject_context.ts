@@ -8,16 +8,6 @@ import { execFileSync } from 'child_process';
 const MAX_CONTEXT_CHARS = 4000;
 const MAX_LINE_LENGTH = 120;
 
-const IGNORE_DIRS = new Set([
-  'node_modules',
-  '.git',
-  '.opencode',
-  'dist',
-  'build',
-  '.next',
-  'coverage',
-]);
-
 // グローバル opencode 配下の memory Layer 2 を直接参照
 // $XDG_CONFIG_HOME を優先、未設定なら ~/.config にフォールバック
 const LAYER_2_PATH = path.join(
@@ -53,28 +43,7 @@ function readIfExists(filePath: string, max = 500): string {
   }
 }
 
-function fileSize(filePath: string): number {
-  if (!fs.existsSync(filePath)) return 0;
-  try {
-    return fs.readFileSync(filePath, 'utf-8').length;
-  } catch {
-    return 0;
-  }
-}
-
-function buildFlatTree(dir: string): string {
-  try {
-    const entries = fs
-      .readdirSync(dir, { withFileTypes: true })
-      .filter((e) => !IGNORE_DIRS.has(e.name))
-      .toSorted((a, b) => a.name.localeCompare(b.name));
-    return entries
-      .map((entry) => (entry.isDirectory() ? `📁 ${entry.name}/` : `📄 ${entry.name}`))
-      .join('\n');
-  } catch {
-    return '';
-  }
-}
+// ── GitHub issues ─────────────────────────────────────────────────────────────
 
 function readGithubIssues(worktree: string): string {
   try {
@@ -99,60 +68,47 @@ function readGithubIssues(worktree: string): string {
   }
 }
 
-function hasGithubIssues(worktree: string): boolean {
+function readSpecIssue(worktree: string): { title: string; body: string } | null {
   try {
     const stdout = execFileSync(
       'gh',
-      ['issue', 'list', '--state', 'open', '--json', 'number', '--limit', '1'],
+      ['issue', 'list', '--state', 'open', '--json', 'number,title,body', '--limit', '10'],
       { cwd: worktree, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
     );
     const issues = JSON.parse(stdout);
-    return Array.isArray(issues) && issues.length > 0;
+    if (!Array.isArray(issues)) return null;
+
+    // Find issue with [Spec] prefix in title
+    const spec = issues.find(
+      (i: unknown) => typeof i.title === 'string' && i.title.startsWith('[Spec]'),
+    );
+    if (!spec) return null;
+
+    return {
+      title: spec.title,
+      body: sanitize(spec.body || ''),
+    };
   } catch {
-    return false;
+    return '';
   }
 }
 
-// ── inject status ─────────────────────────────────────────────────────────────
-
-type InjectStatus = {
-  agents: { ok: boolean; size: number };
-  layer2: { ok: boolean; size: number };
-  issues: { ok: boolean; count: number };
-  readme: { ok: boolean; size: number };
-  tree: { ok: boolean; size: number };
-};
-
-function buildInjectStatus(worktree: string): InjectStatus {
-  const agentsPath = path.join(worktree, 'AGENTS.md');
-  const layer2Path = LAYER_2_PATH;
-  const readmePath = path.join(worktree, 'README.md');
-
-  return {
-    agents: { ok: fileSize(agentsPath) > 0, size: fileSize(agentsPath) },
-    layer2: { ok: fileSize(layer2Path) > 0, size: fileSize(layer2Path) },
-    issues: { ok: hasGithubIssues(worktree), count: hasGithubIssues(worktree) ? 1 : 0 },
-    readme: { ok: fileSize(readmePath) > 0, size: fileSize(readmePath) },
-    tree: { ok: buildFlatTree(worktree).length > 0, size: buildFlatTree(worktree).length },
-  };
-}
-
-function formatStatusField(s: { ok: boolean; size?: number; count?: number }): string {
-  return s.ok ? `✓ ${s.size ?? s.count} chars` : '✗ not found';
-}
-
-function formatInjectStatus(status: InjectStatus): string {
-  return [
-    '[Inject Status]',
-    `- AGENTS.md: ${formatStatusField(status.agents)}`,
-    `- Memory Layer 2: ${formatStatusField(status.layer2)}`,
-    `- GitHub Issues: ${status.issues.ok ? `✓ ${status.issues.count}+` : '✗ none'}`,
-    `- README.md: ${formatStatusField(status.readme)}`,
-    `- Project Tree: ${formatStatusField(status.tree)}`,
-  ].join('\n');
-}
-
 // ── context builders ──────────────────────────────────────────────────────────
+
+const LEVEL_DESCRIPTIONS = [
+  '## Execution Gate Levels',
+  '',
+  '| Level | Name    | Research             | Plan     | Trigger  |',
+  '|-------|---------|----------------------|----------|----------|',
+  '| LV1   | Light   | 0                    | -        | required |',
+  '| LV2   | Default | 1 call               | required | required |',
+  '| LV3   | Plan    | 2 calls + discussion | required | required |',
+  '',
+  '- **Default**: Session starts at **LV2**. Do not assume LV1.',
+  '- **Authority**: Level changes (`l<N>` / `LV<N>` / trigger words) are user-only. Agents cannot change levels.',
+  '  - Correct flow: `setup` skill → research → plan → ask user for `GO` → reload triggers needed for implementation/updates',
+  '  - User trigger words. Execute: `GO` (start), `DONE` (complete), `STATE` (show state)',
+].join('\n');
 
 function buildAgentsContext(worktree: string): string {
   return readIfExists(path.join(worktree, 'AGENTS.md'), 4000);
@@ -162,17 +118,27 @@ function buildLayer2Context(_worktree: string): string {
   return readIfExists(LAYER_2_PATH, 2000);
 }
 
+function buildSpecContext(worktree: string): string {
+  const spec = readSpecIssue(worktree);
+  if (spec) {
+    return ['## Spec', '', `### ${spec.title}`, '', spec.body].join('\n');
+  }
+
+  // No Spec found — suggest checking for project documents
+  return [
+    '## No Spec Found',
+    '',
+    'No Spec issue exists yet. Check if there are planning documents in the project',
+    '(e.g., README.md, docs/). If so, review them and consider creating a Spec',
+    'issue to track the product design.',
+  ].join('\n');
+}
+
 function buildProjectContext(worktree: string): string {
   const sections: string[] = [];
 
   const issues = readGithubIssues(worktree);
   if (issues) sections.push(['## Open GitHub Issues', '', '```text', issues, '```'].join('\n'));
-
-  const readme = readIfExists(path.join(worktree, 'README.md'), 500);
-  if (readme) sections.push(['## README', '', '```text', readme, '```'].join('\n'));
-
-  const tree = buildFlatTree(worktree);
-  if (tree) sections.push(['## Project Structure', '', '```text', tree, '```'].join('\n'));
 
   return sections.join('\n\n---\n\n');
 }
@@ -189,23 +155,26 @@ async function buildContext(worktree: string): Promise<string> {
   if (layer2)
     sections.push(['# Memory Principles (Layer 2)', '', '```text', layer2, '```'].join('\n'));
 
-  // 3. Project Context — current state
+  // 3. Spec — product design
+  const spec = buildSpecContext(worktree);
+  if (spec) sections.push(['# Product Design', '', spec].join('\n'));
+
+  // 4. Project Context — current state
   const project = buildProjectContext(worktree);
   if (project) sections.push(['# Project Context', '', project].join('\n'));
+
+  // 5. Execution Gate Levels — level descriptions
+  sections.push(LEVEL_DESCRIPTIONS);
 
   return sections.join('\n\n---\n\n').slice(0, MAX_CONTEXT_CHARS);
 }
 
 // ── plugin ────────────────────────────────────────────────────────────────────
 
+// chat.message hook は廃止。inject status の user-visible 表示は不安定 (opencode #885 / #23440)。
+// system.transform 経由での LLM 注入のみ残す (agent は context を受け取るが、user chat には出ない)。
 export const InjectContextPlugin: Plugin = async ({ worktree }) => {
   const contextCache = new Map<string, Promise<string>>();
-  // Sessions that should receive a one-time Inject Status display.
-  const pendingStatus = new Set<string>();
-
-  const enqueueStatus = (sessionID: string) => {
-    if (sessionID) pendingStatus.add(sessionID);
-  };
 
   return {
     event: async ({ event }) => {
@@ -213,12 +182,10 @@ export const InjectContextPlugin: Plugin = async ({ worktree }) => {
         const info = event.properties.info;
         if (info.parentID) return; // skip subagent
         contextCache.set(info.id, buildContext(worktree));
-        enqueueStatus(info.id);
       }
       if (event.type === 'session.compacted') {
         const { sessionID } = event.properties;
         contextCache.set(sessionID, buildContext(worktree));
-        enqueueStatus(sessionID);
       }
     },
 
@@ -233,30 +200,6 @@ export const InjectContextPlugin: Plugin = async ({ worktree }) => {
       if (!ctx?.trim()) return;
 
       output.system.push(ctx);
-    },
-
-    'chat.message': async (input, output) => {
-      const sessionID = input.sessionID;
-      if (!sessionID) return;
-      if (!pendingStatus.has(sessionID)) return;
-      pendingStatus.delete(sessionID);
-
-      const status = buildInjectStatus(worktree);
-      const text = formatInjectStatus(status);
-
-      const firstPart = output.parts.find((p) => p.type === 'text');
-      if (!firstPart || firstPart.type !== 'text') return;
-
-      const messageID = output.message.id;
-      if (!messageID) return;
-
-      output.parts.unshift({
-        type: 'text',
-        id: `prt_${crypto.randomUUID()}`,
-        sessionID,
-        messageID,
-        text,
-      });
     },
   };
 };

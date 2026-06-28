@@ -3,7 +3,7 @@ name: image-search
 description: Search and download Japanese stock photos from pro.foto.ne.jp (.foto project) using `cmux browser *`. Use when asked to run /image-search, find Japanese free images, or download photos to ./assets. Claude evaluates image quality before downloading.
 ---
 
-# Image Search Skill
+# image-search
 
 cmux-browser version of `image-search`. Source: **pro.foto.ne.jp** (.foto project family).
 
