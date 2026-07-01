@@ -15,7 +15,7 @@ interface SetupData {
   issue: SetupIssue;
 }
 
-interface ResearchData {
+interface TechFeasibilityData {
   topics: string[];
 }
 
@@ -27,32 +27,32 @@ interface SessionState {
   level: 0 | 1 | 2 | 3;
   // スキル発火フラグ
   setupSkillTriggered: boolean;
-  researchSkillTriggered: boolean;
+  techFeasibilitySkillTriggered: boolean;
   planSkillTriggered: boolean;
   // ツール検証フラグ
   setupToolVerified: boolean;
   setupData: SetupData | null;
-  researchToolVerified: boolean;
-  researchData: ResearchData | null;
+  techFeasibilityToolVerified: boolean;
+  techFeasibilityData: TechFeasibilityData | null;
   planToolVerified: boolean;
   planData: PlanData | null;
-  // リサーチツール呼び出し回数
-  researchToolCount: number;
+  // tech-feasibility ツール呼び出し回数
+  techFeasibilityToolCount: number;
   // 調査ツール (websearch / webfetch / context7_query-docs) の累積呼び出し回数
-  researchInvestigationCount: number;
-  // 1 shot 目で commit された topic 数 (research tool の topics.length)
-  researchTopicCount: number;
+  techFeasibilityInvestigationCount: number;
+  // 1 shot 目で commit された topic 数 (tech-feasibility tool の topics.length)
+  techFeasibilityTopicCount: number;
   // 2 shot 目で commit された追加 topic 数 (LV3 のみ)
-  researchAdditionalTopicCount: number;
+  techFeasibilityAdditionalTopicCount: number;
   // 実行スキル
   executionSkillsLoaded: string[];
   // ユーザートリガー
   userTriggered: boolean;
   // チャット出力追跡：各ツール呼び出し後にアシスタントメッセージが必要
   setupOutputShown: boolean;
-  researchOutputShown: boolean;
+  techFeasibilityOutputShown: boolean;
   planOutputShown: boolean;
-  pendingOutputTool: 'setup' | 'research' | 'plan' | null;
+  pendingOutputTool: 'setup' | 'tech-feasibility' | 'plan' | null;
   // force-review: 直前の block で記録した staged diff hash。consecutive 同じ hash なら 1 回限り許可
   pendingStagedHash: string | null;
   // 直近の trigger 状況 (agent が任意時点で把握できるよう system.transform に注入)
@@ -63,22 +63,22 @@ function defaultState(): SessionState {
   return {
     level: 2,
     setupSkillTriggered: false,
-    researchSkillTriggered: false,
+    techFeasibilitySkillTriggered: false,
     planSkillTriggered: false,
     setupToolVerified: false,
     setupData: null,
-    researchToolVerified: false,
-    researchData: null,
+    techFeasibilityToolVerified: false,
+    techFeasibilityData: null,
     planToolVerified: false,
     planData: null,
-    researchToolCount: 0,
-    researchInvestigationCount: 0,
-    researchTopicCount: 0,
-    researchAdditionalTopicCount: 0,
+    techFeasibilityToolCount: 0,
+    techFeasibilityInvestigationCount: 0,
+    techFeasibilityTopicCount: 0,
+    techFeasibilityAdditionalTopicCount: 0,
     executionSkillsLoaded: [],
     userTriggered: false,
     setupOutputShown: false,
-    researchOutputShown: false,
+    techFeasibilityOutputShown: false,
     planOutputShown: false,
     pendingOutputTool: null,
     pendingStagedHash: null,
@@ -137,7 +137,7 @@ const ALLOW_TOOLS = new Set([
   'todowrite',
   // our custom tools
   'setup',
-  'research',
+  'tech-feasibility',
   'plan',
 ]);
 
@@ -153,7 +153,7 @@ function isAllowedTool(toolName: string): boolean {
 
 // リサーチ調査ツール: 公式 (context7) / 実践・反例 (websearch) / 補助 (webfetch)
 // スキルの Step 3 (Investigation) で使用。これら 1 回 = 1 investigation。
-// research ツール (gate 検証用) とは別物。混同しないこと。
+// tech-feasibility ツール (gate 検証用) とは別物。混同しないこと。
 const RESEARCH_INVESTIGATION_TOOLS = new Set([
   'websearch', // built-in: 実践・反例 source の発見
   'webfetch', // built-in: 公式 URL の取得 (context7 で取得できない時)
@@ -221,7 +221,7 @@ const DONE_TRIGGERS = /^\s*(DONE)\s*$/;
 // STATE display trigger
 const STATE_TRIGGER = /^\s*(STATE)\s*$/;
 
-// research required tool count per level
+// tech-feasibility required tool count per level
 // LV2: 1 call (single shot)
 // LV3: 2 calls (2-shot + user discussion between shots)
 function requiredResearch(level: 0 | 1 | 2 | 3): number {
@@ -240,7 +240,7 @@ function levelName(level: 0 | 1 | 2 | 3): string {
 
 // md ファイル (.opencode 配下以外) は gate バイパス
 // docs/, README.md, 任意の *.md など user/project content は
-// セットアップ/リサーチ/プラン/GO/execution skill を要求せず自由に作成更新可
+// セットアップ/tech-feasibility/プラン/GO/execution skill を要求せず自由に作成更新可
 // .opencode/ 配下の md は system なので通常 gate 適用
 function isFreeMarkdownPath(filePath: string): boolean {
   if (!filePath.endsWith('.md')) return false;
@@ -252,15 +252,15 @@ function isFreeMarkdownPath(filePath: string): boolean {
 // user-visible state とは別物: agent 向け (英語、lastEvent 含む、next action 提案)
 function formatStateForAgent(state: SessionState): string {
   const req = requiredResearch(state.level);
-  const totalTopics = state.researchTopicCount + state.researchAdditionalTopicCount;
+  const totalTopics = state.techFeasibilityTopicCount + state.techFeasibilityAdditionalTopicCount;
   const lines = ['## Execution Gate State', `- Level: ${state.level} (${levelName(state.level)})`];
   if (state.lastEvent) {
     lines.push(`- Last event: ${state.lastEvent}`);
   }
   lines.push(
     `- Setup: skill ${state.setupSkillTriggered ? '✓' : '✗'} | tool ${state.setupToolVerified ? '✓' : '✗'} | chat ${state.setupOutputShown ? '✓' : '✗'}`,
-    `- Research: skill ${state.researchSkillTriggered ? '✓' : '✗'} | tool ${state.researchToolCount}/${req} ${state.researchToolVerified ? '✓' : '✗'} | chat ${state.researchOutputShown ? '✓' : '✗'}`,
-    `- Investigation: ${state.researchInvestigationCount}/${totalTopics} (websearch/webfetch/context7 calls vs committed topics)`,
+    `- Tech-feasibility: skill ${state.techFeasibilitySkillTriggered ? '✓' : '✗'} | tool ${state.techFeasibilityToolCount}/${req} ${state.techFeasibilityToolVerified ? '✓' : '✗'} | chat ${state.techFeasibilityOutputShown ? '✓' : '✗'}`,
+    `- Investigation: ${state.techFeasibilityInvestigationCount}/${totalTopics} (websearch/webfetch/context7 calls vs committed topics)`,
     `- Plan: skill ${state.planSkillTriggered ? '✓' : '✗'} | tool ${state.planToolVerified ? '✓' : '✗'} | chat ${state.planOutputShown ? '✓' : '✗'}`,
     `- Trigger: ${state.userTriggered ? '✓' : '✗'}`,
     `- Execution skills: ${state.executionSkillsLoaded.length > 0 ? '✓' : '✗'}`,
@@ -331,10 +331,10 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
         state.setupSkillTriggered = true;
         state.setupToolVerified = true;
         state.setupOutputShown = true;
-        state.researchSkillTriggered = true;
-        state.researchToolVerified = true;
-        state.researchToolCount = req;
-        state.researchOutputShown = true;
+        state.techFeasibilitySkillTriggered = true;
+        state.techFeasibilityToolVerified = true;
+        state.techFeasibilityToolCount = req;
+        state.techFeasibilityOutputShown = true;
         state.planSkillTriggered = true;
         state.planToolVerified = true;
         state.planOutputShown = true;
@@ -346,12 +346,12 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
       // status 表示ユーティリティ
       const formatStatus = (s: SessionState) => {
         const req = requiredResearch(s.level);
-        const totalTopics = s.researchTopicCount + s.researchAdditionalTopicCount;
+        const totalTopics = s.techFeasibilityTopicCount + s.techFeasibilityAdditionalTopicCount;
         return [
           `Level: ${s.level}`,
           `Setup: skill ${s.setupSkillTriggered ? '✓' : '✗'} | tool ${s.setupToolVerified ? '✓' : '✗'} | chat ${s.setupOutputShown ? '✓' : '✗'}`,
-          `Research: skill ${s.researchSkillTriggered ? '✓' : '✗'} | tool ${s.researchToolCount}/${req} ${s.researchToolVerified ? '✓' : '✗'} | chat ${s.researchOutputShown ? '✓' : '✗'}`,
-          `Investigation: ${s.researchInvestigationCount}/${totalTopics} (websearch/webfetch/context7 calls vs committed topics)`,
+          `Tech-feasibility: skill ${s.techFeasibilitySkillTriggered ? '✓' : '✗'} | tool ${s.techFeasibilityToolCount}/${req} ${s.techFeasibilityToolVerified ? '✓' : '✗'} | chat ${s.techFeasibilityOutputShown ? '✓' : '✗'}`,
+          `Investigation: ${s.techFeasibilityInvestigationCount}/${totalTopics} (websearch/webfetch/context7 calls vs committed topics)`,
           `Plan: skill ${s.planSkillTriggered ? '✓' : '✗'} | tool ${s.planToolVerified ? '✓' : '✗'} | chat ${s.planOutputShown ? '✓' : '✗'}`,
           `Trigger: ${s.userTriggered ? '✓' : '✗'}`,
           `Execution skills: ${s.executionSkillsLoaded.length > 0 ? '✓' : '✗'}`,
@@ -413,7 +413,7 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
         resetState(input.sessionID);
         const s = getState(input.sessionID);
         s.level = 1;
-        s.lastEvent = 'level change to LV1 (Light) — research/plan not required';
+        s.lastEvent = 'level change to LV1 (Light) — tech-feasibility/plan not required';
         injectStatus(s);
         return;
       }
@@ -421,7 +421,7 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
         resetState(input.sessionID);
         const s = getState(input.sessionID);
         s.level = 2;
-        s.lastEvent = 'level change to LV2 (Default) — research 1 + plan required';
+        s.lastEvent = 'level change to LV2 (Default) — tech-feasibility 1 + plan required';
         injectStatus(s);
         return;
       }
@@ -429,7 +429,7 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
         resetState(input.sessionID);
         const s = getState(input.sessionID);
         s.level = 3;
-        s.lastEvent = 'level change to LV3 (Plan) — research 2 shots + discussion + plan';
+        s.lastEvent = 'level change to LV3 (Plan) — tech-feasibility 2 shots + discussion + plan';
         injectStatus(s);
         return;
       }
@@ -463,8 +463,8 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
 
         if (name === 'setup') {
           state.setupSkillTriggered = true;
-        } else if (name === 'research') {
-          state.researchSkillTriggered = true;
+        } else if (name === 'tech-feasibility') {
+          state.techFeasibilitySkillTriggered = true;
         } else if (name === 'plan') {
           state.planSkillTriggered = true;
         } else if (EXECUTION_SKILLS.includes(name)) {
@@ -475,14 +475,14 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
         return;
       }
 
-      // リサーチツール呼び出しをカウント
-      if (input.tool === 'research') {
-        state.researchToolCount++;
+      // tech-feasibility ツール呼び出しをカウント
+      if (input.tool === 'tech-feasibility') {
+        state.techFeasibilityToolCount++;
       }
 
       // 調査ツール (websearch / webfetch / context7_query-docs) 呼び出しをカウント
       if (isInvestigationTool(input.tool)) {
-        state.researchInvestigationCount++;
+        state.techFeasibilityInvestigationCount++;
       }
 
       // カスタムツールの戻り値を検証
@@ -502,20 +502,20 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
           }
         }
 
-        if (input.tool === 'research' && result.type === 'research') {
+        if (input.tool === 'tech-feasibility' && result.type === 'tech-feasibility') {
           if (Array.isArray(result.topics) && result.topics.length > 0) {
-            state.researchToolVerified = true;
-            state.researchData = {
+            state.techFeasibilityToolVerified = true;
+            state.techFeasibilityData = {
               topics: result.topics,
             };
-            // 1 回目の call: researchTopicCount を記録 / 2 回目: additional を記録
-            // researchToolCount は既に上のブロックで increment 済み
-            if (state.researchToolCount === 1) {
-              state.researchTopicCount = result.topics.length;
-            } else if (state.researchToolCount === 2) {
-              state.researchAdditionalTopicCount = result.topics.length;
+            // 1 回目の call: techFeasibilityTopicCount を記録 / 2 回目: additional を記録
+            // techFeasibilityToolCount は既に上のブロックで increment 済み
+            if (state.techFeasibilityToolCount === 1) {
+              state.techFeasibilityTopicCount = result.topics.length;
+            } else if (state.techFeasibilityToolCount === 2) {
+              state.techFeasibilityAdditionalTopicCount = result.topics.length;
             }
-            state.pendingOutputTool = 'research';
+            state.pendingOutputTool = 'tech-feasibility';
           }
         }
 
@@ -540,8 +540,8 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
       if (state.pendingOutputTool) {
         if (state.pendingOutputTool === 'setup') {
           state.setupOutputShown = true;
-        } else if (state.pendingOutputTool === 'research') {
-          state.researchOutputShown = true;
+        } else if (state.pendingOutputTool === 'tech-feasibility') {
+          state.techFeasibilityOutputShown = true;
         } else if (state.pendingOutputTool === 'plan') {
           state.planOutputShown = true;
         }
@@ -567,7 +567,7 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
           );
         }
         // md ファイル (.opencode 配下以外) は gate バイパス
-        // ドキュメント作成・更新を自由化 (setup/research/plan/GO/execution skill 不要)
+        // ドキュメント作成・更新を自由化 (setup/tech-feasibility/plan/GO/execution skill 不要)
         if (isFreeMarkdownPath(filePath)) {
           return;
         }
@@ -626,30 +626,33 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
         );
       }
 
-      // 条件2: research スキル + ツール回数 + ツール検証 + チャット出力 (LV2/LV3のみ)
+      // 条件2: tech-feasibility スキル + ツール回数 + ツール検証 + チャット出力 (LV2/LV3のみ)
       if (state.level >= 2) {
         const req = requiredResearch(state.level);
-        if (!state.researchSkillTriggered) {
-          missing.push('- ✗ research skill not triggered (fire `research` skill)');
-        } else if (state.researchToolCount < req) {
-          const remaining = req - state.researchToolCount;
+        if (!state.techFeasibilitySkillTriggered) {
+          missing.push('- ✗ tech-feasibility skill not triggered (fire `tech-feasibility` skill)');
+        } else if (state.techFeasibilityToolCount < req) {
+          const remaining = req - state.techFeasibilityToolCount;
           missing.push(
-            `- ✗ research tool count: ${state.researchToolCount}/${req} (call \`research\` tool ${remaining} more time${remaining === 1 ? '' : 's'})`,
+            `- ✗ tech-feasibility tool count: ${state.techFeasibilityToolCount}/${req} (call \`tech-feasibility\` tool ${remaining} more time${remaining === 1 ? '' : 's'})`,
           );
-        } else if (!state.researchToolVerified) {
-          missing.push('- ✗ research tool not verified (call `research` tool with findings)');
-        } else if (!state.researchOutputShown) {
+        } else if (!state.techFeasibilityToolVerified) {
           missing.push(
-            '- ✗ research result not shown in chat (write the result to chat after the tool call)',
+            '- ✗ tech-feasibility tool not verified (call `tech-feasibility` tool with findings)',
+          );
+        } else if (!state.techFeasibilityOutputShown) {
+          missing.push(
+            '- ✗ tech-feasibility result not shown in chat (write the result to chat after the tool call)',
           );
         } else {
           // サブ条件: 調査 (websearch/webfetch/context7) を実際に実行したか
           // topic 1 件 = 最低 1 investigation。3 sources 推奨は MD レベルで担保。
-          const totalTopics = state.researchTopicCount + state.researchAdditionalTopicCount;
-          if (state.researchInvestigationCount < totalTopics) {
-            const remaining = totalTopics - state.researchInvestigationCount;
+          const totalTopics =
+            state.techFeasibilityTopicCount + state.techFeasibilityAdditionalTopicCount;
+          if (state.techFeasibilityInvestigationCount < totalTopics) {
+            const remaining = totalTopics - state.techFeasibilityInvestigationCount;
             missing.push(
-              `- ✗ research investigation: ${state.researchInvestigationCount}/${totalTopics} topics researched (call websearch/webfetch/context7_query-docs ${remaining} more time${remaining === 1 ? '' : 's'})`,
+              `- ✗ tech-feasibility investigation: ${state.techFeasibilityInvestigationCount}/${totalTopics} topics researched (call websearch/webfetch/context7_query-docs ${remaining} more time${remaining === 1 ? '' : 's'})`,
             );
           }
         }
