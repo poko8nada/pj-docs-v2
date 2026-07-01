@@ -95,19 +95,28 @@ function readSpecIssue(worktree: string): { title: string; body: string } | null
 
 // ── context builders ──────────────────────────────────────────────────────────
 
-const LEVEL_DESCRIPTIONS = [
-  '## Execution Gate Levels',
+const FLOW_DESCRIPTIONS = [
+  '## Session Flow',
   '',
-  '| Level | Name    | Research             | Plan     | Trigger  |',
-  '|-------|---------|----------------------|----------|----------|',
-  '| LV1   | Light   | 0                    | -        | required |',
-  '| LV2   | Default | 1 call               | required | required |',
-  '| LV3   | Plan    | 2 calls + discussion | required | required |',
+  '**Every session starts in Open Discussion.** Execution tools are blocked. No goal or type is set yet.',
+  'When the user decides to act, transition to **set up**.',
+  'Through discussion with the user, both the`goal`(what to achieve) and the`type`(how to structure the work) are agreed upon together — neither is assumed unilaterally.',
   '',
-  '- **Default**: Session starts at **LV2**. Do not assume LV1.',
-  '- **Authority**: Level changes (`l<N>` / `LV<N>` / trigger words) are user-only. Agents cannot change levels.',
-  '  - Correct flow: `setup` skill → research → plan → ask user for `GO` → reload triggers needed for implementation/updates',
-  '  - User trigger words. Execute: `GO` (start), `DONE` (complete), `STATE` (show state)',
+  '### Session types',
+  '',
+  '| Type         | Issue required | Skill chain                                   | Use case            |',
+  '|--------------|----------------|-----------------------------------------------|---------------------|',
+  '| build        | yes            | tech-feasibility -> plan -> implement         | Code implementation |',
+  '| design-align | yes            | tech-feasibility -> design-align -> implement | Design alignment    |',
+  '| issue-ops    | yes (target)   | issue -> implement                            | Issue management    |',
+  '| light        | no             | implement                                     | Trivial changes     |',
+  '',
+  'Each type defines a fixed skill chain. The agent loads the next skill only when the previous one has completed; do not skip ahead or skip the chain.',
+  '',
+  '### Session control',
+  '',
+  'The user controls session flow with trigger words (`GO`, `DONE`, `STATE`). These are **user-side inputs**.',
+  "The agent waits for the user's trigger",
 ].join('\n');
 
 function buildAgentsContext(worktree: string): string {
@@ -163,8 +172,8 @@ async function buildContext(worktree: string): Promise<string> {
   const project = buildProjectContext(worktree);
   if (project) sections.push(['# Project Context', '', project].join('\n'));
 
-  // 5. Execution Gate Levels — level descriptions
-  sections.push(LEVEL_DESCRIPTIONS);
+  // 5. Flow descriptions — new model (Open Discussion + types)
+  sections.push(FLOW_DESCRIPTIONS);
 
   return sections.join('\n\n---\n\n').slice(0, MAX_CONTEXT_CHARS);
 }

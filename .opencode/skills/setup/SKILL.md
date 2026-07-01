@@ -1,22 +1,34 @@
 ---
 name: setup
-description: "Prepare a session by aligning Goal and Gate with the user through discussion, then call the setup tool. The skill must be triggered first. Trigger at session start, when the user switches topic, or when context is unclear."
+description: "Transitions the session from Open Discussion to a defined work plan. Use when the user decides to act, switches session topic, or context becomes unclear. Discusses Goal and Type with the user and commits via the setup tool."
 compatibility: opencode
 ---
 
 # setup
 
-Prepare the session. Align Goal and Gate with the user through discussion, then commit the result via the `setup` custom tool.
+Transitions the session from Open Discussion to a defined work plan. Discusses Goal and Type with the user and commits the result via the `setup` custom tool.
 
-## Three concepts
+## Two concepts
 
-These three concepts drive the entire session and reappear throughout the skill:
+These two concepts drive the entire session and reappear throughout the skill:
 
 - **Goal = the desired end state.** A clear statement of "what we want to be" — outcome-focused, one sentence, not how.
-- **Gate = the evaluation function.** A clear statement of "what defines done" — observable, binary, verifiable.
-- **Discussion = Goal + Gate + research materials.** A single conversation that produces all three at once. Splitting them into separate rounds wastes time and loses context.
+- **Type = the workflow category.** Determines the skill chain and how the gate validates the work. Agreed together with the Goal.
 
 The rest of this skill is a structured form of that one discussion.
+
+## Session types
+
+The four session types, each with its own skill chain:
+
+| Type           | Use for                        | Skill chain                                   |
+| -------------- | ------------------------------ | --------------------------------------------- |
+| `build`        | Code implementation            | tech-feasibility -> plan -> implement         |
+| `design-align` | Design alignment (UI)          | tech-feasibility -> design-align -> implement |
+| `issue-ops`    | Issue management               | issue -> implement                            |
+| `light`        | Trivial changes (typo, 1-file) | implement                                     |
+
+Type is agreed with the user during Goal Setting, alongside the Goal. The agent does not choose the type unilaterally.
 
 ## Order requirement
 
@@ -24,12 +36,11 @@ You must trigger this skill BEFORE calling the `setup` tool. The execution gate 
 
 ## Load context
 
-Before defining the Goal and Gate, check:
+Before defining the Goal and Type, check:
 
 - Is the working tree clean? If not, stash or commit as needed.
 - Are there uncommitted changes? If so, ask the user what to do with them.
 - Is the branch correct? If not, confirm with the user before switching.
-- Check if issue context has been injected.
 
 ## Tool usage policy
 
@@ -51,31 +62,22 @@ The user picks one, edits it, or proposes a new option in chat. The selected Goa
 
 ## Step 2: Discussion
 
-Discussion is the heart of the session. It produces three things simultaneously: a finalized Goal, a Gate, and the research materials needed to make both concrete.
+Discussion is the heart of the session. It produces two things simultaneously: a finalized Goal and a Type. Through the discussion, the user and agent agree on the type together.
 
 Use the `todowrite` tool to publish a checklist of discussion points at the start of Step 2. The user reads the checklist to follow along and confirm or correct each point before the agent moves on.
 
 The checklist (initial):
 
-- [ ] Identify related issue (`gh issue list` then `gh issue view <number> --comments` if one exists)
-- [ ] Decide issue status: reference existing / declare intent to create / none
 - [ ] Clarify topic details (scope, edge cases, what is in / out)
-- [ ] Define Gate criteria (observable, binary, verifiable)
-- [ ] Determine research scope (what to investigate before plan)
-- [ ] Enumerate relevant execution skills (see below)
-
-### Enumerate relevant execution skills
-
-Surface the execution skills that may fire later in this session, excluding `setup`, `research`, and `plan` (those are the flow skills, not execution skills):
+- [ ] Agree on session type (build / design-align / issue-ops / light)
+- [ ] Confirm Goal scope and wording
 
 ## Step 3: Per-item agreement (one `question` per item)
 
 After the discussion is complete, confirm each item separately. Use the `question` tool exactly once per item, in this fixed order:
 
 1. **Goal** — "Use Goal: [final Goal, 1 sentence]?"
-2. **Gate** — "Use Gate: [final Gate, verifiable]?"
-3. **Issue** — "Use Issue: [reference #N: <url> | create | none]?"
-4. **Skills** — "Use Skills: [comma-separated list of execution skills]?"
+2. **Type** — "Use Type: [build | design-align | issue-ops | light]?"
 
 Each question has two options:
 
@@ -84,61 +86,27 @@ Each question has two options:
 
 If the user types "abort" or "cancel" in any response, stop the setup entirely.
 
-The Goal and Gate must be:
-
-- **Goal**: one sentence, outcome-focused
-- **Gate**: observable, one sentence, binary (pass / fail)
-
-Example Gate options:
-
-- "`pnpm typecheck && pnpm lint && pnpm test:run` all pass with the new recognizer wired in"
-- "Local dev server shows correct output, Function works on browser stable"
-- "Issue is closed and the change is deployed to the preview URL"
-
-After all 4 items are confirmed, proceed to call the setup tool. No additional `question` call is needed — the per-item confirmations are the final agreement.
-
 ## Call the setup tool
 
-After all 4 items are confirmed, call the `setup` tool with the agreed values. Field names must match the markdown block in the "Show result in chat" section so the agent has a single source of truth:
+After both items are confirmed, call the `setup` tool with the agreed values. Field names must match the markdown block in the "Show result in chat" section so the agent has a single source of truth:
 
 ```json
 {
-  "topic": "[agreed topic]",
   "goal": "[agreed Goal]",
-  "gate": "[agreed Gate]",
-  "issue": {
-    "action": "reference",
-    "number": 2,
-    "url": "https://github.com/..."
-  },
-  "skills": ["implement", "readme"]
+  "type": "[build | design-align | issue-ops | light]"
 }
 ```
 
-- `skills` carries the execution skills the user agreed to in Step 2. Omit (or set to `null`) if the user picked none.
-- For the `"create"` and `"none"` issue cases, set `issue` to `null` (or omit it).
+- `type` carries the session type agreed in Step 3. Required.
 - The execution gate verifies the tool's return value. Both the skill trigger AND the verified tool return are required to pass the gate.
 
 ## Show result in chat (REQUIRED)
 
-After calling the `setup` tool, render its return value in chat. The tool returns JSON with fields `{topic, goal, gate, issue, skills, timestamp}` — use `result.*` directly. Do not re-type the values from memory; the tool output is the single source of truth. The execution gate verifies that an assistant message follows the tool call.
+After calling the `setup` tool, render its return value in chat. The tool returns JSON with fields `{goal, sessionType, timestamp}` — use `result.*` directly. Do not re-type the values from memory; the tool output is the single source of truth. The execution gate verifies that an assistant message follows the tool call.
 
 ```markdown
-# [{result.topic}]
-
 **Goal:** {result.goal}
-**Gate:** {result.gate}
-**Issue:** {render result.issue as one of: `reference #N: <url>` | `create` | `none`}
-**Skill:** {render result.skills as a comma-separated list, or `none` if null/empty}
+**Type:** {result.sessionType}
 ```
 
 If you skip this step, the gate will block all subsequent actions.
-
-## Hand off
-
-After the setup is complete, choose the next step based on the work's complexity:
-
-- **Trivial work (typo, single-line, 1-file change)** — Proceed directly to implementation with the `/implement` skill. The user can also say "l1" (or "LV1") to force this path.
-- **Non-trivial work (multi-file, structural change)** — Continue with `/research` and `/plan` skills. The user can say "l2" (or "LV2") for 1 research shot or "l3" (or "LV3") for 3 research shots.
-
-Default to non-trivial unless the change is genuinely one-off. The `research` and `plan` skills are cheap to invoke and prevent rework.
