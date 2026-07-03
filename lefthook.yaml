@@ -1,33 +1,31 @@
-prepare-commit-msg:
-  commands:
-    cleanup-uo-done:
+pre-commit:
+  jobs:
+    - name: cleanup-uo
       run: |
         files=$(grep -rEln 'UO\[[0-9]+\]\[done\]' . --exclude-dir={node_modules,.git,dist})
         if [ -n "$files" ]; then
           echo "$files" | xargs sed -E -i '' '/UO\[[0-9]+\]\[done\]/d'
           echo "$files" | xargs sed -E -i '' '/^$/N;/^\n$/d'
           echo "☑︎ Removed [done] UO comments from: $files"
-          ts_files=$(echo "$files" | grep -E '\.(ts|tsx|js|jsx)$' || true)
-          [ -n "$ts_files" ] && echo "$ts_files" | xargs pnpm format
           git add $files
         fi
-
-pre-commit:
-  parallel: true
-  commands:
-    format:
-      glob: '*.{js,jsx,ts,tsx}'
-      run: pnpm format {staged_files}
-      stage_fixed: true
-      fail_text: 'Format auto-fixed. Re-stage and re-commit if needed (stage_fixed usually handles this).'
-    lint:
-      glob: '*.{js,jsx,ts,tsx}'
-      run: pnpm lint {staged_files}
-      fail_text: 'Lint failed. Run: pnpm lint:fix for details. Fix the code, not the config.'
-    typecheck:
-      glob: '*.{js,jsx,ts,tsx}'
-      run: pnpm typecheck:staged {staged_files}
-      fail_text: 'Type check failed. Run: pnpm typecheck:staged for details.'
+    - name: checks
+      group:
+        parallel: true
+        jobs:
+          - name: format
+            glob: '*.{js,jsx,ts,tsx}'
+            run: pnpm format {staged_files}
+            stage_fixed: true
+            fail_text: 'Format auto-fixed. Re-stage and re-commit if needed (stage_fixed usually handles this).'
+          - name: lint
+            glob: '*.{js,jsx,ts,tsx}'
+            run: pnpm lint {staged_files}
+            fail_text: 'Lint failed. Run: pnpm lint:fix for details. Fix the code, not the config.'
+          - name: typecheck
+            glob: '*.{js,jsx,ts,tsx}'
+            run: pnpm typecheck:staged {staged_files}
+            fail_text: 'Type check failed. Run: pnpm typecheck:staged for details.'
 
 pre-push:
   commands:

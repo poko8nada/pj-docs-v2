@@ -1,4 +1,3 @@
-// UO[2][done]: 優先度1が終了後、リファクタリングできるか確認したい。直接的なものでなくても、コメント整理や変数の場所順番、などでも良い。
 import type { Plugin } from '@opencode-ai/plugin';
 
 // phase → load の対応
