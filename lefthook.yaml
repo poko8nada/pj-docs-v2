@@ -2,11 +2,13 @@ prepare-commit-msg:
   commands:
     cleanup-uo-done:
       run: |
-        files=$(grep -rln 'UO\[[0-9]+\]\[done\]' . --exclude-dir={node_modules,.git,dist})
+        files=$(grep -rEln 'UO\[[0-9]+\]\[done\]' . --exclude-dir={node_modules,.git,dist})
         if [ -n "$files" ]; then
           echo "$files" | xargs sed -E -i '' '/UO\[[0-9]+\]\[done\]/d'
           echo "$files" | xargs sed -E -i '' '/^$/N;/^\n$/d'
           echo "☑︎ Removed [done] UO comments from: $files"
+          ts_files=$(echo "$files" | grep -E '\.(ts|tsx|js|jsx)$' || true)
+          [ -n "$ts_files" ] && echo "$ts_files" | xargs pnpm format
           git add $files
         fi
 
@@ -31,9 +33,9 @@ pre-push:
   commands:
     check-uo:
       run: |
-        if grep -rn 'UO\[[0-9]+\]:' . --exclude-dir={node_modules,.git,dist} > /dev/null 2>&1; then
+        if grep -rEn 'UO\[[0-9]+\]:' . --exclude-dir={node_modules,.git,dist} > /dev/null 2>&1; then
           echo "× UO comments found:"
-          grep -rn 'UO\[[0-9]+\]:' . --exclude-dir={node_modules,.git,dist}
+          grep -rEn 'UO\[[0-9]+\]:' . --exclude-dir={node_modules,.git,dist}
           exit 1
         fi
       fail_text: 'All UO comments must be resolved before pushing.'
