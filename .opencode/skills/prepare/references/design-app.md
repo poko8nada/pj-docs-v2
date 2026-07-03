@@ -1,10 +1,6 @@
----
-name: app-design-align
-description: "Load when visual and design alignment is needed before or during building. Trigger on: what should this look like, mockup this, I want it to feel like X, let's figure out what components we need, color/atmosphere discussions, or when the agent senses the user wants to see something and discuss before committing to a full build. Do NOT use for backend work or work already past the design phase."
-compatibility: opencode
----
+# design-app
 
-# app-design-align
+**These are the rules and protocol one should be aware of before beginning implementaion on the session.**
 
 Build a realistic default screen using production-ready components to align on design direction and clarify what needs to be built. The screen is the discussion tool. The real deliverable is the spec that comes out of the conversation.
 
@@ -244,8 +240,6 @@ Generated from app-design-align session.
 ## Step 6 — Hand off
 
 `prototype/` stays in the repo as an alignment snapshot for the duration of the early build phase.
-
-**When to delete `prototype/`** — once the main screens are working in the product and can be reviewed directly in the browser, delete `prototype/` entirely. It has served its purpose. The product is now the source of truth, not `spec.md` and not the default screen. Do not maintain or update `prototype/` after this point.
 
 **If a significant design change comes up during the build** — delete `prototype/` and run app-design-align again from scratch. Do not version or accumulate screens inside `prototype/`. Each run is disposable and self-contained.
 

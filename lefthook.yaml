@@ -1,12 +1,20 @@
 pre-commit:
   parallel: true
   commands:
+    cleanup-uo-done:
+      run: |
+        files=$(grep -rln "UO\[.*\]\[done\]" . --exclude-dir={node_modules,.git,dist})
+        if [ -n "$files" ]; then
+          echo "$files" | xargs sed -i '' '/UO\[.*\]\[done\]/d'
+          echo "☑︎ Removed [done] UO comments from: $files"
+          git add $files
+        fi
+      stage_fixed: true
     format:
       glob: '*.{js,jsx,ts,tsx}'
       run: pnpm format {staged_files}
       stage_fixed: true
       fail_text: 'Format auto-fixed. Re-stage and re-commit if needed (stage_fixed usually handles this).'
-
     lint:
       glob: '*.{js,jsx,ts,tsx}'
       run: pnpm lint {staged_files}
@@ -19,6 +27,14 @@ pre-commit:
 
 pre-push:
   commands:
+    check-uo:
+      run: |
+        if grep -rn "UO\[" . --exclude-dir={node_modules,.git,dist} > /dev/null 2>&1; then
+          echo "× UO comments found:"
+          grep -rn "UO\[" . --exclude-dir={node_modules,.git,dist}
+          exit 1
+        fi
+      fail_text: 'All UO comments must be resolved before pushing.'
     typecheck:
       run: pnpm typecheck
       fail_text: 'Type check failed. Run: pnpm typecheck for details.'

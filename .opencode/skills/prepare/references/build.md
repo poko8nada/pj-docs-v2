@@ -1,18 +1,8 @@
----
-name: plan
-description: "Write an implementation plan grounded in the actual codebase. Re-investigates the project to compare research claims against existing code, then produces what / how / order & verify / file changes / rationale. The plan is finalized only after the user agrees via the question tool."
-compatibility: opencode
----
+# build
 
-# plan
+**These are the plans required prior to implementation. Need to create specific outputs.**
 
-Build a plan that survives contact with the codebase. Research findings are necessary but not sufficient — the plan must reconcile them with what is actually in the repo, and the user must explicitly agree before the plan is locked.
-
-## Order requirement
-
-You must trigger this skill BEFORE calling the `plan` tool. The execution gate enforces this order. If you call the tool without triggering the skill, the gate will block all subsequent actions.
-
-The `setup` skill already resolved whether a GitHub issue is involved (referenced, to be created, or none). The issue number and URL are visible in the agreed Goal / chat output. This plan skill does not re-search or re-list issues — if specific issue context (comments, related issues, prior decisions) is needed, read it on demand inside Step 1.
+Plan that survives contact with the codebase. The building plan must reconcile them with what is actually in the repo, and the user must explicitly agree before the plan is locked.
 
 ## Tool usage policy
 
@@ -27,7 +17,7 @@ This skill uses a strict tool policy to keep the flow natural and the user in co
 
 This step exists because research findings can drift away from what the code actually does. A claim that is true in general can be wrong for _this_ project.
 
-For each non-trivial finding from the completed research, do the following:
+Do the following:
 
 1. **Locate the relevant code** with `read` / `glob` / `grep`. Find the actual files, functions, and call sites that the plan will touch or rely on.
 2. **Compare claim to code.** If a finding says "the library supports X", confirm that X is present in `node_modules/<lib>/` and used (or not used) in the project. If a finding says "Y is the convention", search the repo for instances of Y and Y's alternatives.
@@ -35,12 +25,6 @@ For each non-trivial finding from the completed research, do the following:
    - **Code matches claim** — plan can adopt the pattern directly.
    - **Code contradicts claim** — the plan must either (a) change the code to match, or (b) keep the code and revise the plan's assumption. State which.
    - **Code is silent** — the claim cannot be evaluated from the code alone; flag it as a risk in the rationale.
-
-If a referenced issue number exists in the agreed Goal, read its full context here only when the plan rationale needs it:
-
-```bash
-gh issue view <number> --comments
-```
 
 Do not skip this step. The `rationale` section in Step 2 must reference specific file paths and line numbers from this comparison.
 
@@ -165,8 +149,6 @@ When a slice needs a test, include the test file in the File changes table. Test
 
 List all files that will be created, modified, or deleted. Test files are already determined by the Test policy in Order — include them here without re-justifying.
 
-The file paths here must match the `fileChanges` array passed to the `plan` tool in Step 3. This is the only consistency requirement between the MD and the tool call.
-
 | Path                   | type   | detail                         |
 | ---------------------- | ------ | ------------------------------ |
 | `path/to/file.ts`      | New    | what this file does            |
@@ -187,24 +169,9 @@ This section proves the plan was not written in a vacuum. Every claim traces bac
 
 If a row in this table has no concrete evidence, the plan is not ready — return to Step 1.
 
-## Step 3: Submit and display
+## Step 3: display
 
-Call the `plan` custom tool with a minimal payload. The JSON is only for gate verification — all plan content (what, how, order, verify, rationale, details) goes in the Markdown output, not in the JSON:
-
-```json
-{
-  "type": "plan",
-  "fileChanges": [
-    { "path": "path/to/file.ts", "type": "new" },
-    { "path": "path/to/existing.ts", "type": "edit" },
-    { "path": "path/to/old.ts", "type": "delete" }
-  ]
-}
-```
-
-The execution gate verifies the tool's return value. Both the skill trigger AND the verified tool return are required to pass the gate.
-
-After the tool call, you must show the full plan in the chat as your next message. The execution gate verifies that an assistant message follows the tool call. **The Markdown is the durable record of the plan — do not duplicate the plan content in the JSON.** Format the result in Markdown:
+MUST show the full plan in the chat as your next message. The execution gate verifies the assistant message. Format the result in Markdown:
 
 ```markdown
 ### What
@@ -235,7 +202,7 @@ After the tool call, you must show the full plan in the chat as your next messag
 
 ### Rationale
 
-[Why this plan, evidence from research + Step 1 codebase comparison]
+[Why this plan, evidence from feasibility + Step 1 codebase comparison]
 ```
 
 ## Step 4: User agreement (REQUIRED)
@@ -243,7 +210,5 @@ After the tool call, you must show the full plan in the chat as your next messag
 The plan is not final until the user agrees. Use the `question` tool to surface a yes / edit / no decision on the full plan. The user may:
 
 - **yes** — the plan is locked. Proceed to the next skill.
-- **edit** — the user provides specific edits. Update the plan in chat, re-submit via the `plan` tool (Step 3) if the change is structural, then ask again.
+- **edit** — the user provides specific edits. If the change is structural, then ask again.
 - **no** — the plan is rejected. Return to Step 1 or Step 2 with the user's feedback.
-
-Do not call any execution skill (implement, debug, etc.) until the user has explicitly said yes.

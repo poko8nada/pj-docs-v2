@@ -96,27 +96,35 @@ function readSpecIssue(worktree: string): { title: string; body: string } | null
 // ── context builders ──────────────────────────────────────────────────────────
 
 const FLOW_DESCRIPTIONS = [
+  '## Project protocol',
+  '',
+  `The project is driven by design → build → refine as one loop.
+  - Design is based on the spec issue.
+  - Build is based on the design.
+  - Refine is performed based on the build.`,
+  '',
+  `Project phases and states are managed by issues. Especially, "spec" issue is a definition of a project.
+  Here is the definition of each phase.
+
+  | phase  | overview                                           |
+  | ------ | -------------------------------------------------- |
+  | design | Agree on design / project direction                |
+  | build  | Implement product                                  |
+  | refine | Refactor / polish product                          |
+  | chore  | meta / minor modify / others (harness, typo, etc.) |`,
+  '',
   '## Session Flow',
   '',
-  '**Every session starts in Open Discussion.** Execution tools are blocked. No goal or type is set yet.',
-  'When the user decides to act, transition to **set up**.',
-  'Through discussion with the user, both the`goal`(what to achieve) and the`type`(how to structure the work) are agreed upon together — neither is assumed unilaterally.',
-  '',
-  '### Session types',
-  '',
-  '| Type         | Issue required | Skill chain                                   | Use case            |',
-  '|--------------|----------------|-----------------------------------------------|---------------------|',
-  '| build        | yes            | tech-feasibility -> plan -> implement         | Code implementation |',
-  '| design-align | yes            | tech-feasibility -> design-align -> implement | Design alignment    |',
-  '| issue-ops    | yes (target)   | issue -> implement                            | Issue management    |',
-  '| light        | no             | implement                                     | Trivial changes     |',
-  '',
-  'Each type defines a fixed skill chain. The agent loads the next skill only when the previous one has completed; do not skip ahead or skip the chain.',
-  '',
-  '### Session control',
-  '',
-  'The user controls session flow with trigger words (`GO`, `DONE`, `STATE`). These are **user-side inputs**.',
-  "The agent waits for the user's trigger",
+  `Every session starts in **open-discussion.** Chat or search tool is allowed, but execution tools are blocked.
+
+  When the user decides to act during discussion, create or select an issue and move next step.
+  Basically, **SKILL FLOW** is defined. The next skill should be loaded only if the previous skill is completed. Don't skip ahead.
+
+  - design/build/refine: [feasibility, preparation, EXCUTION_SKILLS]
+  - chore: [EXCUTION_SKILLS]
+  - EXCUTION_SKILLS: [implement, debug, opinion, image-search, readme]
+
+  ONLY the user control flow with trigger words (GO, RESET, STATE). The agent waits for the user's trigger`,
 ].join('\n');
 
 function buildAgentsContext(worktree: string): string {
@@ -133,12 +141,12 @@ function buildSpecContext(worktree: string): string {
     return ['## Spec', '', `### ${spec.title}`, '', spec.body].join('\n');
   }
 
-  // No Spec found — suggest checking for project documents
+  // No spec found — suggest checking for project documents
   return [
-    '## No Spec Found',
+    '## No spec Found',
     '',
-    'No Spec issue exists yet. Check if there are planning documents in the project',
-    '(e.g., README.md, docs/). If so, review them and consider creating a Spec',
+    'No spec issue exists yet. Check if there are planning documents in the project',
+    '(e.g., README.md, docs/). If so, review them and consider creating a spec',
     'issue to track the product design.',
   ].join('\n');
 }
@@ -161,8 +169,7 @@ async function buildContext(worktree: string): Promise<string> {
 
   // 2. Layer 2 — what to know (memory principles)
   const layer2 = buildLayer2Context(worktree);
-  if (layer2)
-    sections.push(['# Memory Principles (Layer 2)', '', '```text', layer2, '```'].join('\n'));
+  if (layer2) sections.push(['# Memory Principles', '', '```text', layer2, '```'].join('\n'));
 
   // 3. Spec — product design
   const spec = buildSpecContext(worktree);
@@ -172,7 +179,7 @@ async function buildContext(worktree: string): Promise<string> {
   const project = buildProjectContext(worktree);
   if (project) sections.push(['# Project Context', '', project].join('\n'));
 
-  // 5. Flow descriptions — new model (Open Discussion + types)
+  // 5. Flow descriptions — new model (Open discussion + types)
   sections.push(FLOW_DESCRIPTIONS);
 
   return sections.join('\n\n---\n\n').slice(0, MAX_CONTEXT_CHARS);
