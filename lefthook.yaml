@@ -1,15 +1,18 @@
-pre-commit:
-  parallel: true
+prepare-commit-msg:
   commands:
     cleanup-uo-done:
       run: |
         files=$(grep -rln "UO\[.*\]\[done\]" . --exclude-dir={node_modules,.git,dist})
         if [ -n "$files" ]; then
           echo "$files" | xargs sed -i '' '/UO\[.*\]\[done\]/d'
+          echo "$files" | xargs sed -i '' '/^$/N;/^\n$/d'
           echo "☑︎ Removed [done] UO comments from: $files"
           git add $files
         fi
-      stage_fixed: true
+
+pre-commit:
+  parallel: true
+  commands:
     format:
       glob: '*.{js,jsx,ts,tsx}'
       run: pnpm format {staged_files}
@@ -19,7 +22,6 @@ pre-commit:
       glob: '*.{js,jsx,ts,tsx}'
       run: pnpm lint {staged_files}
       fail_text: 'Lint failed. Run: pnpm lint:fix for details. Fix the code, not the config.'
-
     typecheck:
       glob: '*.{js,jsx,ts,tsx}'
       run: pnpm typecheck:staged {staged_files}
@@ -42,5 +44,5 @@ pre-push:
     #   run: pnpm test:run
     #   fail_text: 'Tests failed. Fix all failing tests before pushing.'
     # build:
-    # run: pnpm run rebuild
-    # fail_text: 'Build failed. Fix all issues before pushing.'
+    #   run: pnpm run rebuild
+    #   fail_text: 'Build failed. Fix all issues before pushing.'

@@ -11,7 +11,6 @@ type Skills =
       load: {
         feasibility: boolean;
         prepare: boolean;
-        execution: boolean;
       };
     }
   | {
@@ -19,7 +18,6 @@ type Skills =
       load: {
         feasibility: boolean;
         prepare: boolean;
-        execution: boolean;
       };
     }
   | {
@@ -32,9 +30,7 @@ type Skills =
     }
   | {
       type: 'chore';
-      load: {
-        execution: boolean;
-      };
+      load: null;
     };
 
 type PhaseType = 'open_discussion' | 'design' | 'build' | 'refine' | 'chore';
@@ -42,6 +38,7 @@ type PhaseType = 'open_discussion' | 'design' | 'build' | 'refine' | 'chore';
 interface SessionState {
   phase: PhaseType;
   skills: Skills;
+  excutionSkillTriggered: boolean;
 
   userTriggered: boolean;
   pendingOutputTool: string | null;
@@ -56,6 +53,7 @@ function defaultState(): SessionState {
       type: 'open_discussion',
       load: null,
     },
+    excutionSkillTriggered: false,
     userTriggered: false,
     pendingOutputTool: null,
     pendingStagedHash: null,
@@ -81,7 +79,7 @@ function resetState(sessionID: string) {
   sessions.set(sessionID, defaultState());
 }
 
-const EXECUTION_SKILLS = ['implement', 'debug', 'opinion', 'image-search', 'readme'];
+const EXECUTION_SKILLS = ['implement', 'debug', 'image-search', 'readme'];
 
 // allowlist: tools that BYPASS the gate (read-only / workflow helpers / カスタム workflow)
 // gate が必要な tool (edit / write / patch / list / bash / todoread / MCP 由来) はここに含めない
@@ -191,14 +189,17 @@ function formatState(state: SessionState): string {
   let skillsLoad = '';
   if (load) {
     skillsLoad = Object.keys(load)
-      .map((skill) => `    - ${skill}: ${load[skill as keyof typeof load]}`)
+      .map((skill) => `- ${skill}: ${load[skill as keyof typeof load]}`)
       .join('\n');
   }
 
+  const excution = state.excutionSkillTriggered.toString();
+
   return `## Execution Gate State
-  - Phase: ${phase ?? 'none'}
+  - Phase: ${phase}
   - Skills Load:
-  ${skillsLoad || 'none'}`;
+      ${skillsLoad}
+  - ExcutionSkill Triggered: ${excution}`;
 }
 
 export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
@@ -339,7 +340,7 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
             }
           }
           if (EXECUTION_SKILLS.includes(name)) {
-            load.execution = true;
+            state.excutionSkillTriggered = true;
           }
         }
 
@@ -401,6 +402,11 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
             missing.push(`- ✗ skill ${skill} not loaded`);
           }
         }
+      }
+
+      if (!state.excutionSkillTriggered) {
+        const excutionSkills = EXECUTION_SKILLS.join(', ');
+        missing.push(`- ✗ execution skill not triggered. Choose ${excutionSkills}`);
       }
 
       if (!state.userTriggered) {

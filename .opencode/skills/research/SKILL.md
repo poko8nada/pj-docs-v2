@@ -1,6 +1,6 @@
 ---
 name: research
-description: "USE WHEN the user asks an ad-hoc lookup or comparison question during Open Discussion — 'what is X', 'research Y', 'compare A and B', 'best practice for Z', or any question needing external / current information. Output is in chat. Topics are free; pick the right tool based on the question."
+description: "USE WHEN the user asks an ad-hoc lookup or comparison question during Open Discussion — 'Xって何', 'Yを調べて', 'AとBを比較して', 'Zのベストプラクティスは', or any question needing external / current information. Output is in chat. Topics are free; pick the right tool based on the question."
 compatibility: opencode
 ---
 
