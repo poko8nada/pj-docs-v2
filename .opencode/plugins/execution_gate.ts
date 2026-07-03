@@ -1,39 +1,20 @@
+// UO[2][done]:優先度1が終了後、リファクタリングできるか確認したい。直接的なものでなくても、コメント整理や変数の場所順番、などでも良い。
 import type { Plugin } from '@opencode-ai/plugin';
-import { createHash } from 'crypto';
 
-type Skills =
-  | {
-      type: 'open_discussion';
-      load: null;
-    }
-  | {
-      type: 'design';
-      load: {
-        feasibility: boolean;
-        prepare: boolean;
-      };
-    }
-  | {
-      type: 'build';
-      load: {
-        feasibility: boolean;
-        prepare: boolean;
-      };
-    }
-  | {
-      type: 'refine';
-      load: {
-        feasibility: boolean;
-        prepare: boolean;
-        execution: boolean;
-      };
-    }
-  | {
-      type: 'chore';
-      load: null;
-    };
+// phase → load の対応
+const PHASE_LOADS = {
+  open_discussion: null,
+  design: { feasibility: false, prepare: false },
+  build: { feasibility: false, prepare: false },
+  refine: { feasibility: false, prepare: false },
+  chore: null,
+} as const;
 
-type PhaseType = 'open_discussion' | 'design' | 'build' | 'refine' | 'chore';
+type PhaseType = keyof typeof PHASE_LOADS;
+
+type Skills = {
+  [K in PhaseType]: { type: K; load: (typeof PHASE_LOADS)[K] };
+}[PhaseType];
 
 interface SessionState {
   phase: PhaseType;
@@ -42,7 +23,6 @@ interface SessionState {
 
   userTriggered: boolean;
   pendingOutputTool: string | null;
-  pendingStagedHash: string | null;
   lastEvent: string | null;
 }
 
@@ -56,7 +36,6 @@ function defaultState(): SessionState {
     excutionSkillTriggered: false,
     userTriggered: false,
     pendingOutputTool: null,
-    pendingStagedHash: null,
     lastEvent: null,
   };
 }
@@ -81,7 +60,7 @@ function resetState(sessionID: string) {
 
 const EXECUTION_SKILLS = ['implement', 'debug', 'image-search', 'readme'];
 
-// allowlist: tools that BYPASS the gate (read-only / workflow helpers / カスタム workflow)
+// allowlist: tools that BYPASS the gate (read-only / workflow helpers / MCP ツール)
 // gate が必要な tool (edit / write / patch / list / bash / todoread / MCP 由来) はここに含めない
 const ALLOW_TOOLS = new Set([
   // read-only
@@ -141,14 +120,7 @@ const GH_READONLY_STANDALONE =
 // 外部 CLI プレフィックス (gate を bypass する bash コマンド群)
 // 用途: gog (Google Workspace) / cmux (browser automation)
 // 注意: write 可能な操作も含むため、使用は user の判断に委ねる
-// gh は意図的に除外: read-only 系のみ GH_READONLY / GH_SEARCH_READONLY / GH_READONLY_STANDALONE で個別バイパス
-// working 系は tool.execute.before の working gh check で gate 必須になる
 const BASH_EXTERNAL_CLI = /^\s*(gog|cmux)(\s|$|;|\||&)/;
-
-// git commit チェーン検出 (gate ブロックではなく workflow リセット用)
-// 単一、または && / ; / | で連結された git commit を検出
-// force-review.ts 側とは別実装 (疎結合)
-const GIT_COMMIT_CHAIN = /(?:^|[&;|]\s*)git\s+commit/;
 
 // bash read-only コマンドを判定する関数
 function isBashReadOnly(command: string): boolean {
@@ -202,7 +174,7 @@ function formatState(state: SessionState): string {
   - ExcutionSkill Triggered: ${excution}`;
 }
 
-export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
+export const ExecutionGatePlugin: Plugin = async () => {
   // subagent session は gate 状態不要 (inject_context と同じ判断)
   const subagentSessions = new Set<string>();
 
@@ -232,17 +204,14 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
 
     'chat.message': async (input, output) => {
       if (!input.sessionID) return;
-      const message = output.message;
-      if (!message) return;
       const state = getState(input.sessionID);
 
       // ユーザー入力 text part を取得
-      // - inject_context が `prt_inject_` prefix で注入する part はスキップ
-      //   (文頭に inject 状況がくると trigger word 検出が機能しないため)
+      // - execution_gate 自身が injectStatus で注入する `prt_` prefix の part はスキップ
+      //   (inject のテキストが trigger word 検出を妨げるため)
       // - 空 text part もスキップ (multiline input の冒頭空対策)
       const textPart = output.parts.find(
-        (p) =>
-          p.type === 'text' && !p.id?.startsWith('prt_inject_') && (p.text ?? '').trim() !== '',
+        (p) => p.type === 'text' && !p.id?.startsWith('prt_') && (p.text ?? '').trim() !== '',
       );
       if (!textPart || textPart.type !== 'text') return;
 
@@ -280,29 +249,13 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
       }
 
       if (text.includes('[setup]')) {
+        isHarnessReleased = false;
         const phaseMatch = text.match(/\[setup\]\s+(design|build|refine|chore)/);
         const phase = (phaseMatch ? phaseMatch[1] : 'open_discussion') as PhaseType;
 
         if (phase) {
           state.phase = phase;
-
-          let load: unknown;
-          if (phase === 'chore') {
-            load = { execution: false };
-          } else {
-            // design, build, refine の場合
-            load = {
-              feasibility: false,
-              prepare: false,
-              execution: false,
-            };
-          }
-
-          state.skills = {
-            type: phase,
-            load,
-          } as Skills;
-
+          state.skills = { type: phase, load: PHASE_LOADS[phase] } as Skills;
           state.lastEvent = `phase set to ${phase}`;
         }
         return;
@@ -334,10 +287,11 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
 
         const load = state.skills.load;
         if (load) {
-          for (const skill of Object.keys(load)) {
-            if (skill === name) {
-              load[skill as keyof typeof load] = true;
-            }
+          if (name in load) {
+            state.skills = {
+              ...state.skills,
+              load: { ...load, [name]: true } as typeof load,
+            };
           }
           if (EXECUTION_SKILLS.includes(name)) {
             state.excutionSkillTriggered = true;
@@ -386,7 +340,7 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
         }
       }
 
-      // open discussionならホワイトリストで全ブロック
+      // open discussion なら全ブロック (phase チェック)
       if (state.phase === 'open_discussion') {
         throw new Error(
           '[execution-gate] Now in open discussion. Ask user to trigger "setup command"',
@@ -416,56 +370,6 @@ export const ExecutionGatePlugin: Plugin = async ({ $ }) => {
       if (missing.length > 0) {
         throw new Error(
           `[execution-gate] Cannot execute '${input.tool}'. Missing:\n${missing.join('\n')}`,
-        );
-      }
-
-      // 条件全充足後の最終チェック: git commit 検出時、code-reviewer 呼び出しを強制
-      // 同じ staged content の consecutive retry のみ 1 回限りスルー。それ以外はブロック
-      if (input.tool === 'bash' && GIT_COMMIT_CHAIN.test(bashCommand)) {
-        // ワンライナー検出: `git add` と `git commit` が同じコマンド内
-        // diff が取れないので standalone commit を強制
-        if (/\bgit\s+add\b/.test(bashCommand)) {
-          throw new Error(
-            '[force-review] git add and git commit in one command. Split into: 1. git add ...  2. git commit -m "..."',
-          );
-        }
-
-        let diffText = '';
-        try {
-          diffText = (await $`git diff --staged`.quiet()).text();
-        } catch (error) {
-          throw new Error(
-            '[force-review] Failed to read git diff. Run git add first, then retry.',
-            { cause: error },
-          );
-        }
-        if (!diffText.trim()) return; // 空 diff → commit 対象なし、git 側に任せる
-
-        const diffHash = createHash('sha256').update(diffText).digest('hex');
-
-        if (state.pendingStagedHash === diffHash) {
-          // 同じ content の consecutive retry: consume して許可
-          state.pendingStagedHash = null;
-          return;
-        }
-
-        // 新規 or 内容違い: block、hash 記録、エラー throw
-        state.pendingStagedHash = diffHash;
-
-        let files: string[] = [];
-        try {
-          const filesText = (await $`git diff --staged --name-only`.quiet()).text().trim();
-          files = filesText ? filesText.split('\n').filter(Boolean) : [];
-        } catch (error) {
-          throw new Error(
-            '[force-review] Failed to read staged files. Run git add first, then retry.',
-            { cause: error },
-          );
-        }
-
-        // 単一行で TUI overflow 防止。情報量は十分。
-        throw new Error(
-          `[force-review] ${files.join(', ')} | call code-reviewer subagent, then retry with the SAME staged content. If content changes, call subagent again.`,
         );
       }
     },
