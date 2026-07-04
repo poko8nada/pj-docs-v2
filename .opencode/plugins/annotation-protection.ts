@@ -3,10 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // UO / AN コメントの削除を防止するプラグイン
-// ツール実行前后で UO/AN コメント数をスナップショットし、減少したらエラー
-
-const UO_PATTERN = /UO\[/g;
-const AN_PATTERN = /AN\[/g;
+// ツール実行前后で注釈行をスナップショットし、欠落したらエラー
 
 // ファイル変更の可能性がないツール (アーリーリターン)
 const READONLY_TOOLS = new Set([
@@ -59,41 +56,21 @@ const isBashReadOnly = (command: string): boolean => {
   );
 };
 
-// ファイル内の UO/AN コメント数を数える
-const countComments = (filePath: string): number => {
+// ファイル内の UO/AN コメント行を抽出
+export function extractAnnotations(filePath: string): string[] {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
-    const uoCount = content.match(UO_PATTERN)?.length ?? 0;
-    const anCount = content.match(AN_PATTERN)?.length ?? 0;
-    return uoCount + anCount;
+    return content
+      .split('\n')
+      .filter((line) => /UO\[/.test(line) || /AN\[/.test(line))
+      .map((line) => line.trim());
   } catch {
-    return 0;
+    return [];
   }
-};
+}
 
-// プロジェクト内の全ファイルを走査して UO/AN コメントを含むファイルを検出
-const findAnnotatedFiles = (rootDir: string): Map<string, number> => {
-  const counts = new Map<string, number>();
-
-  const walk = (dir: string) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isDirectory()) {
-        if (IGNORE_DIRS.has(entry.name)) continue;
-        walk(path.join(dir, entry.name));
-      } else {
-        const filePath = path.join(dir, entry.name);
-        const count = countComments(filePath);
-        if (count > 0) counts.set(filePath, count);
-      }
-    }
-  };
-
-  walk(rootDir);
-  return counts;
-};
-
-// スナップショット: { ファイルパス → UO コメント数 }
-let snapshot: Map<string, number> | null = null;
+// スナップショット: { ファイルパス → 注釈行の配列 }
+let snapshot: Map<string, string[]> | null = null;
 
 export const AnnotationProtectionPlugin: Plugin = async ({ worktree }) => {
   return {
@@ -103,33 +80,43 @@ export const AnnotationProtectionPlugin: Plugin = async ({ worktree }) => {
       const filePath = (output.args as { filePath?: string } | undefined)?.filePath;
 
       if (filePath) {
-        snapshot = new Map([[filePath, countComments(filePath)]]);
+        const annotations = extractAnnotations(filePath);
+        if (annotations.length > 0) {
+          snapshot = new Map([[filePath, annotations]]);
+        }
       } else if (input.tool === 'bash') {
         const command = String((output.args as { command?: string } | undefined)?.command ?? '');
         if (isBashReadOnly(command)) return;
-        snapshot = findAnnotatedFiles(worktree);
+        // bash の場合は全ファイル走査して注釈行を収集
+        const allAnnotations = new Map<string, string[]>();
+        const walk = (dir: string) => {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.isDirectory()) {
+              if (IGNORE_DIRS.has(entry.name)) continue;
+              walk(path.join(dir, entry.name));
+            } else {
+              const fp = path.join(dir, entry.name);
+              const annotations = extractAnnotations(fp);
+              if (annotations.length > 0) allAnnotations.set(fp, annotations);
+            }
+          }
+        };
+        walk(worktree);
+        if (allAnnotations.size > 0) snapshot = allAnnotations;
       }
     },
 
-    'tool.execute.after': async (input, _output) => {
+    'tool.execute.after': async (_input, _output) => {
       if (!snapshot) return;
 
       const violations: string[] = [];
 
-      if (input.tool === 'bash') {
-        for (const [file, before] of snapshot) {
-          const after = countComments(file);
-          if (after < before) {
-            violations.push(`  - ${file}: ${before} → ${after}`);
-          }
-        }
-      } else {
-        const filePath = (input.args as { filePath?: string } | undefined)?.filePath;
-        if (filePath && snapshot.has(filePath)) {
-          const before = snapshot.get(filePath)!;
-          const after = countComments(filePath);
-          if (after < before) {
-            violations.push(`  - ${filePath}: ${before} → ${after}`);
+      for (const [file, beforeLines] of snapshot) {
+        const afterLines = extractAnnotations(file);
+        // 旧ファイルにあった各行が新ファイルにも存在するか
+        for (const line of beforeLines) {
+          if (!afterLines.includes(line)) {
+            violations.push(`  - ${file}: removed "${line}"`);
           }
         }
       }
