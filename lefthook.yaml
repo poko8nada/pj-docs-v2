@@ -9,6 +9,13 @@ pre-commit:
           echo "☑︎ Removed [done] UO comments from: $files"
           git add $files
         fi
+        an_files=$(grep -rEln 'AN\[[a-z]+\]\[[0-9]+\]\[done\]' . --exclude-dir={node_modules,.git,dist})
+        if [ -n "$an_files" ]; then
+          echo "$an_files" | xargs sed -E -i '' '/AN\[[a-z]+\]\[[0-9]+\]\[done\]/d'
+          echo "$an_files" | xargs sed -E -i '' '/^$/N;/^\n$/d'
+          echo "☑︎ Removed [done] AN comments from: $an_files"
+          git add $an_files
+        fi
     - name: checks
       group:
         parallel: true

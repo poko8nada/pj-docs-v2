@@ -2,10 +2,11 @@ import type { Plugin } from '@opencode-ai/plugin';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// UO コメントの削除を防止するプラグイン
-// ツール実行前后で UO コメント数をスナップショットし、減少したらエラー
+// UO / AN コメントの削除を防止するプラグイン
+// ツール実行前后で UO/AN コメント数をスナップショットし、減少したらエラー
 
 const UO_PATTERN = /UO\[/g;
+const AN_PATTERN = /AN\[/g;
 
 // ファイル変更の可能性がないツール (アーリーリターン)
 const READONLY_TOOLS = new Set([
@@ -58,18 +59,20 @@ const isBashReadOnly = (command: string): boolean => {
   );
 };
 
-// ファイル内の UO コメント数を数える
-const countUOComments = (filePath: string): number => {
+// ファイル内の UO/AN コメント数を数える
+const countComments = (filePath: string): number => {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
-    return content.match(UO_PATTERN)?.length ?? 0;
+    const uoCount = content.match(UO_PATTERN)?.length ?? 0;
+    const anCount = content.match(AN_PATTERN)?.length ?? 0;
+    return uoCount + anCount;
   } catch {
     return 0;
   }
 };
 
-// プロジェクト内の全ファイルを走査して UO コメントを含むファイルを検出
-const findUOFiles = (rootDir: string): Map<string, number> => {
+// プロジェクト内の全ファイルを走査して UO/AN コメントを含むファイルを検出
+const findAnnotatedFiles = (rootDir: string): Map<string, number> => {
   const counts = new Map<string, number>();
 
   const walk = (dir: string) => {
@@ -79,7 +82,7 @@ const findUOFiles = (rootDir: string): Map<string, number> => {
         walk(path.join(dir, entry.name));
       } else {
         const filePath = path.join(dir, entry.name);
-        const count = countUOComments(filePath);
+        const count = countComments(filePath);
         if (count > 0) counts.set(filePath, count);
       }
     }
@@ -92,7 +95,7 @@ const findUOFiles = (rootDir: string): Map<string, number> => {
 // スナップショット: { ファイルパス → UO コメント数 }
 let snapshot: Map<string, number> | null = null;
 
-export const UOProtectionPlugin: Plugin = async ({ worktree }) => {
+export const AnnotationProtectionPlugin: Plugin = async ({ worktree }) => {
   return {
     'tool.execute.before': async (input, output) => {
       if (READONLY_TOOLS.has(input.tool)) return;
@@ -100,11 +103,11 @@ export const UOProtectionPlugin: Plugin = async ({ worktree }) => {
       const filePath = (output.args as { filePath?: string } | undefined)?.filePath;
 
       if (filePath) {
-        snapshot = new Map([[filePath, countUOComments(filePath)]]);
+        snapshot = new Map([[filePath, countComments(filePath)]]);
       } else if (input.tool === 'bash') {
         const command = String((output.args as { command?: string } | undefined)?.command ?? '');
         if (isBashReadOnly(command)) return;
-        snapshot = findUOFiles(worktree);
+        snapshot = findAnnotatedFiles(worktree);
       }
     },
 
@@ -115,7 +118,7 @@ export const UOProtectionPlugin: Plugin = async ({ worktree }) => {
 
       if (input.tool === 'bash') {
         for (const [file, before] of snapshot) {
-          const after = countUOComments(file);
+          const after = countComments(file);
           if (after < before) {
             violations.push(`  - ${file}: ${before} → ${after}`);
           }
@@ -124,7 +127,7 @@ export const UOProtectionPlugin: Plugin = async ({ worktree }) => {
         const filePath = (input.args as { filePath?: string } | undefined)?.filePath;
         if (filePath && snapshot.has(filePath)) {
           const before = snapshot.get(filePath)!;
-          const after = countUOComments(filePath);
+          const after = countComments(filePath);
           if (after < before) {
             violations.push(`  - ${filePath}: ${before} → ${after}`);
           }
@@ -136,13 +139,12 @@ export const UOProtectionPlugin: Plugin = async ({ worktree }) => {
       if (violations.length > 0) {
         throw new Error(
           [
-            '🚫 UO comments were removed during implementation. Restore them before proceeding.',
+            '🚫 UO/AN comments were removed during implementation. Restore them before proceeding.',
             '',
             'Affected files:',
             ...violations,
             '',
-            'UO comments must remain untouched until the user explicitly says OK.',
-            'Only mark as [done] after user confirmation — do not delete.',
+            'UO/AN comments must remain untouched. Only mark as [done] — do not delete.',
           ].join('\n'),
         );
       }

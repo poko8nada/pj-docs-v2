@@ -218,21 +218,61 @@ function formatState(state: SessionState): string {
   const load = state.skills?.load;
 
   let skillsLoad = '';
+  const missing: string[] = [];
   if (load) {
-    skillsLoad = Object.keys(load)
-      .map((skill) => `- ${skill}: ${load[skill as keyof typeof load]}`)
+    const entries = Object.keys(load);
+    skillsLoad = entries
+      .map((skill) => {
+        const done = load[skill as keyof typeof load];
+        if (!done) missing.push(skill);
+        return `- ${skill}: ${done ? '✓' : '✗'}`;
+      })
       .join('\n');
   }
 
-  const excution = state.excutionSkillTriggered.toString();
+  const excution = state.excutionSkillTriggered;
+  const userReady = state.userTriggered;
   const issueTurns = state.issueSkillTurnsRemaining;
+
+  // 次に何をすべきか
+  let next = '';
+  if (phase === 'open_discussion') {
+    next = 'Say [setup] design/build/refine/chore to begin';
+  } else if (missing.length > 0) {
+    next = `Trigger: ${missing.join(' → ')}`;
+  } else if (!excution) {
+    next = 'Trigger an execution skill (implement, debug, etc.)';
+  } else if (!userReady) {
+    next = "Say 'GO' to unlock execution tools";
+  } else {
+    next = 'All conditions met. Execute.';
+  }
 
   return `## Execution Gate State
   - Phase: ${phase}
-  - Skills Load:
-      ${skillsLoad}
-  - ExcutionSkill Triggered: ${excution}
-  - Issue Skill Turns: ${issueTurns}`;
+  - Skills: ${skillsLoad || '(none required)'}
+  - Execution Skill: ${excution ? '✓' : '✗'}
+  - User Ready: ${userReady ? '✓' : '✗'}
+  - Issue Turns: ${issueTurns}
+  - Next: ${next}`;
+}
+
+// フェーズに応じた行動制約
+function phaseDirective(phase: string): string {
+  switch (phase) {
+    case 'open_discussion':
+      return 'You are in open_discussion. DISCUSS and PROPOSE only. Do NOT write code or edit files.';
+    case 'design':
+      return 'You are in design phase. RESEARCH best practices. Use feasibility skill. Do NOT implement yet.';
+    case 'build':
+      return 'You are in build phase. PLAN then IMPLEMENT. Use prepare → implement skills.';
+    case 'refine':
+      return 'You are in refine phase. ANALYZE then IMPROVE. Use prepare → implement skills.';
+    case 'chore':
+      return 'You are in chore phase. Minor changes only — harness, typos, config.';
+    default:
+      return '';
+  }
 }
 
 export const ExecutionGatePlugin: Plugin = async ({ client }) => {
@@ -409,11 +449,13 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           output.system.push(
             `[Model switched to ${currentModelId}]\nSession context is preserved. Current state:\n${formatState(state)}`,
           );
+          output.system.push(phaseDirective(state.phase));
           return;
         }
       }
 
       output.system.push(formatState(state));
+      output.system.push(phaseDirective(state.phase));
     },
 
     /* COMMENTED OUT: chat.message フック (OpenCode v1.17.1 で発火しない)
@@ -597,9 +639,8 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         if (/^\s*gh\s+/.test(trimmed)) {
           if (state.phase === 'open_discussion') {
             throw new Error(
-              `[execution-gate] Working gh command requires [setup] phase: \`${trimmed}\`\n` +
-                `- ✗ phase required (say '[setup] design' etc.)\n` +
-                `- Read-only gh commands work without [setup].`,
+              `[execution-gate] Blocked — gh commands require a phase.\n` +
+                `Next step: Say '[setup] design' (or build/refine/chore)`,
             );
           }
 
@@ -607,9 +648,8 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           const ghError = validateGhCommand(state, trimmed);
           if (ghError) {
             throw new Error(
-              `[execution-gate] Working gh command blocked.\n` +
-                `- ✗ ${ghError}\n` +
-                `- Trigger 'issue' skill and read the required references, then retry.`,
+              `[execution-gate] Blocked — ${ghError}.\n` +
+                `Next step: Trigger 'issue' skill and read the required references.`,
             );
           }
 
@@ -620,34 +660,41 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
       // open discussion なら全ブロック (phase チェック)
       if (state.phase === 'open_discussion') {
         throw new Error(
-          '[execution-gate] Now in open discussion. Ask user to trigger "setup command"',
+          `[execution-gate] Blocked — open discussion phase.\n` +
+            `Next step: Ask user to set a phase with [setup] design/build/refine/chore`,
         );
       }
 
       const missing: string[] = [];
+      const steps: string[] = [];
 
       const load = state.skills.load;
       if (load) {
         for (const skill of Object.keys(load)) {
           if (!load[skill as keyof typeof load]) {
-            missing.push(`- ✗ skill ${skill} not loaded`);
+            missing.push(skill);
           }
         }
       }
 
+      if (missing.length > 0) {
+        steps.push(`1. Trigger: ${missing.join(' → ')}`);
+      }
+
       if (!state.excutionSkillTriggered) {
-        const excutionSkills = EXECUTION_SKILLS.join(', ');
-        missing.push(`- ✗ execution skill not triggered. Choose ${excutionSkills}`);
+        steps.push(
+          `${steps.length + 1}. Trigger an execution skill (${EXECUTION_SKILLS.join(', ')})`,
+        );
       }
 
       if (!state.userTriggered) {
-        missing.push("- ✗ user trigger required (say 'GO')");
+        steps.push(
+          `${steps.length + 1}. Say 'GO' (GO alone is not enough — all steps above must be done first)`,
+        );
       }
 
-      if (missing.length > 0) {
-        throw new Error(
-          `[execution-gate] Cannot execute '${input.tool}'. Missing:\n${missing.join('\n')}`,
-        );
+      if (steps.length > 0) {
+        throw new Error(`[execution-gate] Blocked. Complete these steps:\n${steps.join('\n')}`);
       }
     },
   };

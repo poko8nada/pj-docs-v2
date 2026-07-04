@@ -115,16 +115,25 @@ const FLOW_DESCRIPTIONS = [
   '',
   '## Session Flow',
   '',
-  `Every session starts in **open-discussion.** Chat or search tool is allowed, but execution tools are blocked.
+  `Every session starts in **open-discussion.** You CANNOT execute tools (edit, write, bash).
+  Your role is to DISCUSS, RESEARCH, and PROPOSE — not to implement.
 
-  When the user decides to act during discussion, create or select an issue and move next step.
-  Basically, **SKILL FLOW** is defined. The next skill should be loaded only if the previous skill is completed. Don't skip ahead.
+  To execute tools, ALL of these conditions must be met:
+    1. Phase set via [setup] (design, build, refine, or chore)
+    2. Required skills loaded IN ORDER — do not skip:
+       design/build/refine → feasibility → prepare → execution skill
+       chore → execution skill
+    3. User says GO
+    GO alone is NOT enough. Skills must be loaded first.
 
-  - design/build/refine: [feasibility, preparation, EXCUTION_SKILLS]
-  - chore: [EXCUTION_SKILLS]
-  - EXCUTION_SKILLS: [implement, debug, opinion, image-search, readme]
+  Phase-specific behavior:
+    open_discussion — DISCUSS only. Propose approaches. Ask questions. Do NOT write code.
+    design — RESEARCH best practices. Use feasibility skill. Do NOT implement.
+    build — PLAN then IMPLEMENT. Use prepare → implement skills.
+    refine — ANALYZE then IMPROVE. Use prepare → implement skills.
+    chore — EXECUTE directly. Minor changes, harness, typos only.
 
-  ONLY the user control flow with trigger words (GO, RESET, STATE). The agent waits for the user's trigger`,
+  The agent proposes next steps. The user controls flow with trigger words (GO, RESET, STATE).`,
 ].join('\n');
 
 function buildAgentsContext(worktree: string): string {

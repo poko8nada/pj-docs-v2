@@ -15,10 +15,34 @@ If $1 is not provided, show an error:
 
 **NOW YOU ARE IN $1 PHASE**
 
-- user set `chore`, then ask what to do.
-- user set `design`, `build`, or `refine`, then check all registered issues.
-  - If a matching issue is found, retrieve its comments and present the current status to the user.
-  - If no match is found, suggest that the user create an issue and load the `issue` skill.
+- user set `chore` → ask what to do.
+- user set `design`, `build`, or `refine` → check all registered issues.
+
+  **If a matching issue is found**, do NOT just summarize the title. Verify the facts:
+  1. Read the issue body AND all comments.
+  2. Confirm the phase from the title prefix (`[Design]` = design, `[Build]` = build, `[Refine]` = refine).
+  3. Check the codebase — what files exist? What's described in the issue but missing?
+  4. Grep for context comments left in the codebase:
+     - `grep -rn "UO\[" . --exclude-dir={node_modules,.git,dist} | grep -v "\[done\]"`
+       UO = User Opinion. Issues the user flagged that need resolution.
+     - `grep -rn "AN\[" . --exclude-dir={node_modules,.git,dist} | grep -v "\[done\]"`
+       AN = Agent Note. Context left by previous sessions (blockers, assumptions, status).
+       Read and incorporate both into your understanding.
+  5. Identify the current blocker from the latest comments.
+  6. Present a structured status:
+
+  ```
+  **Phase**: {from title prefix}
+  **Decided**: {key decisions from issue + comments}
+  **Implemented**: {what actually exists in the codebase}
+  **Missing**: {what's planned but not built}
+  **Blocker**: {what's preventing progress, from latest comments}
+  **Next**: {proposed action — which skill, which approach}
+  ```
+
+  7. Wait for user agreement before proposing any skill or action.
+
+  **If no matching issue is found** → suggest creating one and load the `issue` skill.
 
 2. If phase is omitted:
 
