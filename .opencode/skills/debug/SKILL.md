@@ -15,10 +15,20 @@ Find and fix the root cause. Never guess — form a hypothesis, verify it, then 
 State in one sentence what is broken and what was expected.
 Do not attempt a fix yet.
 
-### Step 2 — Form a hypothesis
+### Step 2 — Analyze & hypothesize
 
-Research the codebase, logs, and web before forming a hypothesis.
-Use the `question` tool:「[仮説の説明]。この方向で調査してよいですか？」
+Research the codebase to understand the problem in context. Present your full analysis in one message:
+
+**Context**
+{current project phase, relevant files/code, what led to this bug}
+
+**Understanding**
+{your analysis of what's happening and why — trace the logic, identify the scope}
+
+**Hypothesis**
+{specific root cause candidate. one sentence.}
+
+Discuss with the user. Revise your analysis based on their feedback. Repeat until the understanding and hypothesis are agreed. Do not proceed to Step 3 until alignment is reached.
 
 ### Step 3 — Verify the hypothesis
 
@@ -54,7 +64,7 @@ Apply the minimal fix that resolves the confirmed cause. Nothing more.
 
 List what was fixed and why. Make it clear what the user should check.
 
-「[修正内容の要約]。この結果を確認してください。次に進んでよいですか？」
+Use the `question` tool:「[修正内容の要約]。この結果を確認してください。次に進んでよいですか？」
 
 - Approved → the agent proposes the next step based on the discussion
 - Changes needed → return to Step 2

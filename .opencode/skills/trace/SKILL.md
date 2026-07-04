@@ -1,49 +1,76 @@
 ---
 name: trace
-description: "Organize recent discussion topics into a chronological table when the conversation has drifted, jumped between topics, or needs a quick overview of what was discussed. Trigger proactively when multiple threads tangle or when the user asks for a recap. Not a checkpoint before actions — a mid-session orientation tool."
+description: "Organize the session into a structured handoff. Captures current state, key decisions with rationale, discussion topics, and next steps. Use when the conversation is long, context is fragmented, or a clear picture of where things stand is needed."
 ---
 
 # trace
 
-When the session has jumped between topics or lost its thread, list the recent discussion topics in chronological order. Each row is one topic, summarized in one line.
+Capture the full session picture in one structured output. Surface what lives in the model's working memory but isn't durable in chat history.
+
+## Why this matters
+
+Some context is fragile. It exists in the model's current reasoning state but is not explicitly recorded in the conversation:
+
+- **Reasoning / thinking** — the chain of thought that led to a decision. Lost when switching from a thinking model, or when the prefix cache is invalidated.
+- **Implicit assumptions** — things the model inferred from context but never stated. A new model (or the same model after context compaction) won't have them.
+- **Trade-off rationale** — why approach A was chosen over B. The chat may show the outcome but not the rejected alternatives.
+- **Unwritten conventions** — patterns the model noticed in the codebase and followed without documenting.
+
+Surfacing these makes the session resilient — whether you switch models, hit compaction, or just want a clear picture of where things stand.
 
 ## When to trigger
 
-- The conversation has drifted from the original Goal
-- Multiple threads are tangled
-- The user asks for a recap or "what did we discuss"
-- The agent itself is uncertain about what was just discussed
+- The conversation has drifted or multiple threads are tangled
+- The session is long and context may be fragmented
+- The user asks for a recap
+- The agent senses it may lose track of the full picture
+- Before a phase transition or context reset
 
 ## Output format
 
 ```markdown
-# [Topic]
+# Session Trace
+
+## Current State
+
+- Phase: {current phase}
+- Active issue: {#N title} (if any)
+- What's been built: {1-line summary of implemented changes}
+- Gate status: {skills loaded, triggers}
+
+## Key Decisions
+
+| Decision           | Rationale                                                 |
+| ------------------ | --------------------------------------------------------- |
+| {what was decided} | {why — the reasoning that led here, not just the outcome} |
+
+Include decisions where the rationale may not be obvious from chat history alone. Capture the "why" that lives in the model's thinking.
 
 ## Topics
 
-| #   | Topic               | Summary          | Status |
-| --- | ------------------- | ---------------- | ------ |
-| 1   | [first topic title] | [1-line summary] | close  |
-| 2   | [next topic title]  | [1-line summary] | open   |
-| 3   | [next topic title]  | [1-line summary] | close  |
+| #   | Topic         | Summary          | Status |
+| --- | ------------- | ---------------- | ------ |
+| 1   | {first topic} | {1-line summary} | close  |
+| 2   | {next topic}  | {1-line summary} | open   |
 
-( ... continue until the most recent topic )
+## Next
+
+- {pending action or open question}
+- {what needs attention next}
+
+## Context Notes
+
+{anything the current model understands from context that a fresh reader might miss — implicit assumptions, unwritten conventions, nuances from earlier discussion}
 ```
-
-## Column meanings
-
-1. **#** — chronological order (1 is the oldest, last is the most recent)
-2. **Topic** — short title of the discussion
-3. **Summary** — 1-line summary of what was discussed or decided
-4. **Status** — `open` (still in progress or unresolved) / `close` (resolved or moved past)
 
 ## Usage
 
 - Read the recent conversation and identify topic boundaries
-- Include all distinct topics, not just the current one
-- Be concise — 1 line per topic
-- Mark the current/most recent topic with the appropriate status
+- Extract key decisions — especially those where the reasoning was discussed but may not be explicitly recorded
+- The Context Notes section is the most important for handoff: surface implicit knowledge
+- Be concise — 1 line per item
+- Mark topics with `open` or `close`
 
 ## After showing
 
-Briefly note which topic is currently active and what to discuss next. Do not force the user to confirm unless they asked for a recap.
+Briefly note which topic is currently active. Do not force the user to confirm unless they asked for a recap.

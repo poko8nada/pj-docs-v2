@@ -7,6 +7,21 @@ description: "Manage substantial work using Spec-based flow. One Spec holds the 
 
 Manage issues using a Spec-based flow. One Spec holds the product design for a feature area. Design, Build, Refine issues are created sequentially, each referencing the previous phase's content and the current codebase.
 
+## Before creating any issue
+
+Always establish shared understanding first. Present in one message:
+
+**Context**
+{current project phase, existing issues and their status, what's been completed}
+
+**Understanding**
+{what issue is needed, why now, which phase (Spec/Design/Build/Refine) it belongs to}
+
+**Proposal**
+{issue type, suggested title following the convention below, key content points}
+
+Discuss with the user. Revise based on their feedback. Repeat until aligned. Only after agreement, read the corresponding template from References and create the issue.
+
 ## Principles
 
 - **Spec** — The product design for one feature area. Holds the abstract Goal, Scope, Architecture, and decisions. Rarely changes; only updated when Goal / Scope / Architecture shifts.
@@ -58,7 +73,7 @@ When creating a phase issue, the content must reference:
 
 ## Title convention
 
-- Spec: `[Spec] <product / feature area name>` (one per project)
+- Spec: `[Spec] <product / feature area name>` (one per project or version)
 - Design: `[Design] <what this design achieves>`
 - Build: `[Build] <what this build achieves>`
 - Refine: `[Refine] <what this refine achieves>`

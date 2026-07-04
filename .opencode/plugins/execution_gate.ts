@@ -23,10 +23,13 @@ interface SessionState {
   userTriggered: boolean;
   pendingOutputTool: string | null;
   lastEvent: string | null;
-  // NEW: ユーザー message の messageID (part filtering 用)
+  // ユーザー message の messageID (part filtering 用)
   userMessageIDs: Set<string>;
-  // NEW: 処理済み partID (dedup 用)
+  // 処理済み partID (dedup 用)
   processedPartIDs: Set<string>;
+  // gh 実行系の issue スキルゲート
+  issueSkillTurnsRemaining: number;
+  readFiles: Set<string>;
 }
 
 function defaultState(): SessionState {
@@ -42,11 +45,16 @@ function defaultState(): SessionState {
     lastEvent: null,
     userMessageIDs: new Set(),
     processedPartIDs: new Set(),
+    issueSkillTurnsRemaining: 0,
+    readFiles: new Set(),
   };
 }
 
 // モジュール変数: RESET トリガーでのみクリア
 let isHarnessReleased = false;
+
+// モデル切替検知用
+let lastModelId: string | null = null;
 
 const sessions = new Map<string, SessionState>();
 
@@ -64,6 +72,17 @@ function resetState(sessionID: string) {
 }
 
 const EXECUTION_SKILLS = ['implement', 'debug', 'image-search', 'readme'];
+
+// issue スキルの有効ターン数 (ユーザーメッセージを跨いで生存)
+const ISSUE_SKILL_TURNS = 2;
+
+// タイトルプレフィックス → 対応リファレンス
+const PREFIX_REFERENCES: Record<string, string> = {
+  '[Spec]': '.opencode/skills/issue/references/spec-template.md',
+  '[Design]': '.opencode/skills/issue/references/design-template.md',
+  '[Build]': '.opencode/skills/issue/references/build-template.md',
+  '[Refine]': '.opencode/skills/issue/references/refine-template.md',
+};
 
 // allowlist: tools that BYPASS the gate (read-only / workflow helpers / MCP ツール)
 // gate が必要な tool (edit / write / patch / list / bash / todoread / MCP 由来) はここに含めない
@@ -158,6 +177,41 @@ function isFreeMarkdownPath(filePath: string): boolean {
   return true;
 }
 
+// gh issue create/edit の --title / -t からタイトル文字列を抽出
+export function extractGhTitle(command: string): string | null {
+  const match = command.match(/(?:--title|-t)\s+"([^"]*)"/);
+  return match ? match[1] : null;
+}
+
+// タイトルから一致するプレフィックスを検出
+export function detectPrefix(title: string): string | null {
+  for (const prefix of Object.keys(PREFIX_REFERENCES)) {
+    if (title.startsWith(prefix)) return prefix;
+  }
+  return null;
+}
+
+// gh 実行系コマンドのバリデーション。null なら許可、文字列ならブロック理由
+export function validateGhCommand(
+  state: { issueSkillTurnsRemaining: number; readFiles: Set<string> },
+  command: string,
+): string | null {
+  if (state.issueSkillTurnsRemaining <= 0) {
+    return 'issue skill not triggered (or turns expired)';
+  }
+  const title = extractGhTitle(command);
+  if (title) {
+    const prefix = detectPrefix(title);
+    if (prefix) {
+      const refFile = PREFIX_REFERENCES[prefix];
+      if (!state.readFiles.has(refFile)) {
+        return `reference not read: ${refFile}`;
+      }
+    }
+  }
+  return null;
+}
+
 function formatState(state: SessionState): string {
   if (isHarnessReleased) return '## Execution Gate State\n- Harness released';
   const phase = state.phase;
@@ -171,12 +225,14 @@ function formatState(state: SessionState): string {
   }
 
   const excution = state.excutionSkillTriggered.toString();
+  const issueTurns = state.issueSkillTurnsRemaining;
 
   return `## Execution Gate State
   - Phase: ${phase}
   - Skills Load:
       ${skillsLoad}
-  - ExcutionSkill Triggered: ${excution}`;
+  - ExcutionSkill Triggered: ${excution}
+  - Issue Skill Turns: ${issueTurns}`;
 }
 
 export const ExecutionGatePlugin: Plugin = async ({ client }) => {
@@ -226,6 +282,11 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         if (!state.userMessageIDs.has(part.messageID)) return;
         if (state.processedPartIDs.has(part.id)) return;
         state.processedPartIDs.add(part.id);
+
+        // ユーザーターン消費: issue スキルの有効ターンをデクリメント
+        if (state.issueSkillTurnsRemaining > 0) {
+          state.issueSkillTurnsRemaining--;
+        }
 
         const text = part.text;
         if (!text.trim()) return;
@@ -330,6 +391,28 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
       if (subagentSessions.has(input.sessionID)) return; // skip subagent
       const state = getState(input.sessionID);
       if (!state) return;
+
+      // モデル切替検知: 前回と異なるモデルIDなら要約を注入 + トースト
+      const currentModelId = input.model?.id;
+      if (currentModelId && currentModelId !== lastModelId) {
+        const switched = lastModelId !== null;
+        lastModelId = currentModelId;
+        if (switched) {
+          await client.tui.showToast({
+            body: {
+              title: 'Execution Gate',
+              message: formatState(state),
+              variant: 'info',
+              duration: 10000,
+            },
+          });
+          output.system.push(
+            `[Model switched to ${currentModelId}]\nSession context is preserved. Current state:\n${formatState(state)}`,
+          );
+          return;
+        }
+      }
+
       output.system.push(formatState(state));
     },
 
@@ -429,20 +512,56 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         const name = args?.name;
         if (!name) return;
 
+        // issue スキル: gh 実行系ゲートの有効ターンをリセット
+        if (name === 'issue') {
+          state.issueSkillTurnsRemaining = ISSUE_SKILL_TURNS;
+          state.readFiles.clear();
+          await client.tui.showToast({
+            body: {
+              title: 'Execution Gate',
+              message: formatState(state),
+              variant: 'info',
+              duration: 10000,
+            },
+          });
+          return;
+        }
+
         const load = state.skills.load;
         if (load) {
+          let stateChanged = false;
           if (name in load) {
             state.skills = {
               ...state.skills,
               load: { ...load, [name]: true } as typeof load,
             };
+            stateChanged = true;
           }
           if (EXECUTION_SKILLS.includes(name)) {
             state.excutionSkillTriggered = true;
+            stateChanged = true;
+          }
+          if (stateChanged) {
+            await client.tui.showToast({
+              body: {
+                title: 'Execution Gate',
+                message: formatState(state),
+                variant: 'info',
+                duration: 10000,
+              },
+            });
           }
         }
 
         return;
+      }
+
+      // read ツールの追跡 (issue リファレンス read 検知用)
+      if (input.tool === 'read') {
+        const filePath = input.args?.filePath as string | undefined;
+        if (filePath) {
+          state.readFiles.add(filePath);
+        }
       }
     },
 
@@ -472,8 +591,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         bashCommand = String((output.args as { command?: string } | undefined)?.command ?? '');
         if (isBashReadOnly(bashCommand)) return;
 
-        // working gh check: gh コマンドは [setup] 後の phase があれば OK
-        // (issue 作成・更新は design/build/refine の通常操作なので GO / skills 不要)
+        // working gh check: issue スキルゲート + プレフィックス検証
         // read-only gh は前段の isBashReadOnly で bypass 済み
         const trimmed = bashCommand.trimStart();
         if (/^\s*gh\s+/.test(trimmed)) {
@@ -484,7 +602,18 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
                 `- Read-only gh commands work without [setup].`,
             );
           }
-          return; // gh は phase チェックのみで許可
+
+          // issue スキルゲート: 有効ターン内か + プレフィックス検証
+          const ghError = validateGhCommand(state, trimmed);
+          if (ghError) {
+            throw new Error(
+              `[execution-gate] Working gh command blocked.\n` +
+                `- ✗ ${ghError}\n` +
+                `- Trigger 'issue' skill and read the required references, then retry.`,
+            );
+          }
+
+          return; // gh は専用ゲート通過で許可
         }
       }
 

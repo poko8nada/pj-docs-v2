@@ -12,15 +12,7 @@ The screen is not a prototype — it's a thinking surface. Components are writte
 
 ---
 
-## Step 1 — Discuss the app
-
-Talk through the app's purpose, key features, and the screen to build. No tools, just chat. Understand enough to make reasonable design and component decisions.
-
-Do not ask about states, colors, or components yet. Just understand what the app does and what the user is trying to figure out.
-
----
-
-## Step 2 — Build the default screen
+## Step 1 — Build the default screen
 
 Without asking for further input, make reasonable design decisions and build the default screen.
 
@@ -139,7 +131,7 @@ Every component file gets a structured comment block at the top. Do not skip or 
 //   - propName: 型 — 説明
 //   - propName?: 型 — 説明（オプション）
 //
-// インタラクション:
+// productでのインタラクション:
 //   - ユーザーが何をできるか（クリック、ドラッグ、入力など）
 //   - 該当なければ「なし」と書く
 //
@@ -151,7 +143,7 @@ Every component file gets a structured comment block at the top. Do not skip or 
 
 ---
 
-## Step 3 — Discuss and iterate
+## Step 2 — Discuss and iterate
 
 Ask the user to open the screen in the browser. Then discuss freely — design, layout, components, data, anything. Edit the screen based on feedback.
 
@@ -161,7 +153,7 @@ Continue until the screen feels right.
 
 ---
 
-## Step 4 — Identify missing components
+## Step 3 — Identify missing components
 
 After the default screen is aligned, propose components that are necessary for the app but absent from the default screen. Present this as a chat list with reasoning — do not use question tools.
 
@@ -201,7 +193,7 @@ These components are added to the component matrix in `spec.md` — they are not
 
 ---
 
-## Step 5 — Generate spec.md
+## Step 4 — Generate spec.md
 
 When the screen and component list are aligned, generate `prototype/spec.md`.
 
@@ -237,7 +229,7 @@ Generated from app-design-align session.
 
 ---
 
-## Step 6 — Hand off
+## Step 5 — Hand off
 
 `prototype/` stays in the repo as an alignment snapshot for the duration of the early build phase.
 

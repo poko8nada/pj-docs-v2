@@ -14,9 +14,7 @@ The screen is not a prototype — it's a thinking surface. Components are writte
 
 ## Step 1 — Determine the web type
 
-Web projects vary significantly in structure and purpose. Determine the type first — it dictates the design approach, component set, and information architecture.
-
-### Web types
+The web type was discussed during Context & Understanding. Confirm it now before building:
 
 | Type                | Description                                             |
 | ------------------- | ------------------------------------------------------- |
@@ -26,18 +24,7 @@ Web projects vary significantly in structure and purpose. Determine the type fir
 | **Landing page**    | Single-page, conversion-focused                         |
 | **Documentation**   | Hierarchical structure, code examples                   |
 
-### How to determine
-
-Ask the user:
-
-1. What is the purpose of this site?
-2. Who is the target audience?
-3. What actions should visitors take?
-4. How many primary sections/pages do you expect?
-
-If the answer is unclear, propose the most likely type and ask for confirmation. Do not proceed without agreement on the type.
-
----
+If the type is still unclear, ask the user briefly. Do not re-open the full discussion — that happened in prepare Step 2.
 
 ## Step 2 — Build the default screen
 
@@ -174,13 +161,13 @@ Every component file gets a structured comment block at the top. Do not skip or 
 //   - empty: データなし（該当する場合）
 //   - loading: ローディング中（該当する場合）
 //   - error: エラー時（該当する場合）
-//   - その他アプリ固有の状態
+//   - その他固有の状態
 //
 // Props / データ:
 //   - propName: 型 — 説明
 //   - propName?: 型 — 説明（オプション）
 //
-// インタラクション:
+// productでのインタラクション:
 //   - ユーザーが何をできるか（クリック、ドラッグ、入力など）
 //   - 該当なければ「なし」と書く
 //

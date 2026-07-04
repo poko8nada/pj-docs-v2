@@ -28,50 +28,38 @@ Use the stack to decide **what to investigate and what to skip**.
 
 ## Tool usage policy
 
-This skill uses a strict tool policy to keep the flow natural and the user in control:
+- **Chat text — Step 1 & 2.** Present context, propose topics, and discuss in plain prose. The user responds in chat.
+- **`todowrite` tool — Step 3 only.** Publish the investigation checklist.
+- **`question` tool — Step 4 only.** Final confirmation of research output.
 
-- **`question` tool — Step 2 only.** Use it exactly once per shot to confirm the topic list. Do not use it to advance the proposal.
-- **`todowrite` tool — Step 4 only.** Use it to publish a per-topic × per-role investigation checklist. The user reads the checklist to follow progress.
-- **Chat text — Step 1 and natural dialogue.** Propose topic candidates and discuss in plain prose. The user responds in chat.
+## Step 1: Context & Understanding
 
-## Step 1: Propose topics
+Before proposing topics, establish shared understanding. Present in one message:
 
-Topics come from discussion. If the user did not identify topic, propose them now.
+**Context**
+{current project phase, what's been decided, what problem we're solving}
+
+**Understanding**
+{why this investigation is needed, what technical decisions depend on it, what constraints apply}
+
+Discuss with the user. Revise based on their feedback. Repeat until aligned. Do not proceed to Step 2 until agreement is reached.
+
+## Step 2: Propose topics
+
+Based on the agreed understanding, propose 2-5 candidate topics.
 
 A topic is:
 
 - A specific question, not a vague area ("How to drag-and-drop with @dnd-kit on a grid" not "DnD")
 - Actionable — a topic's answer can become a step
 
-Propose 2-5 candidate topics in chat (not via the `question` tool). The user picks, edits, or proposes alternatives in chat. The 3-source rule (Official / Practice / Failure) is enforced during Step 4, not at topic selection. If investigation cannot find 3 sources, the topic was too vague — revise it and re-investigate.
-
-## Step 2: Confirm topics
-
-Use the `question` tool exactly once to confirm the agreed topic list.
-
-The question prompt should embed the final topic list:
-
-```
-Use these topics?
-- [topic A]
-- [topic B]
-- [topic C]
-```
-
-Options:
-
-- `confirm` — proceed to Step 3
-- `change` — revise the topic list in chat, then re-ask this question
-
-If the user types "abort" or "cancel" in their response, stop the research entirely.
-
-After confirmation, proceed to Step 3. No additional `question` calls.
+Propose in chat (not via the `question` tool). The user picks, edits, or proposes alternatives. Discuss until the topic list is agreed. The 3-source rule (Official / Practice / Failure) is enforced during Step 3, not at topic selection. If investigation cannot find 3 sources, the topic was too vague — revise it and re-investigate.
 
 ## Step 3: Investigate (TodoWrite for tracking)
 
-For each topic in the registered array, perform **3 investigations** with different roles.
+For each topic, perform **3 investigations** with different roles.
 
-Use `todowrite` to publish a checklist of investigation items at the start of Step 4. The user reads the checklist to follow progress:
+Use `todowrite` to publish a checklist at the start of this step:
 
 ```
 - [ ] Topic A: Official
@@ -110,11 +98,11 @@ Mark each item done as you complete the corresponding investigation.
 
 A single source is not evidence. 3 sources with different roles is the minimum.
 
-## Step 4: Output Markdown (Show result in chat)
+## Step 4: Output & Confirm
 
-After investigating all topics in the registered array, compile the findings into Markdown and post to chat.
+After investigating all topics, compile the findings into Markdown and post to chat.
 
-The MD structure is fixed. The labels below are in English; the agent translates them to the user's language (typically Japanese) when rendering the MD to chat. The topic names must match the topics confirmed in Step 2 and committed in Step 3.
+The MD structure is fixed. The labels below are in English; the agent translates them to the user's language (typically Japanese) when rendering the MD to chat. The topic names must match the topics agreed in Step 2.
 
 ```markdown
 ## Research
@@ -138,6 +126,11 @@ The MD structure is fixed. The labels below are in English; the agent translates
 
 ...
 ```
+
+Use the `question` tool to confirm:「[調査結果の要約]。この結果で次に進んでよいですか？」
+
+- Approved → proceed
+- Changes needed → return to Step 2 with revised topics
 
 ## Source tiering
 
