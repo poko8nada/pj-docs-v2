@@ -13,6 +13,8 @@ If $1 is not provided, show an error:
 
 1. If phase is provided:
 
+**NOW YOU ARE IN $1 PHASE**
+
 - user set `chore`, then ask what to do.
 - user set `design`, `build`, or `refine`, then check all registered issues.
   - If a matching issue is found, retrieve its comments and present the current status to the user.

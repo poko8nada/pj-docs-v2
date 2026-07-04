@@ -4,14 +4,24 @@ import { createHash } from 'crypto';
 // git commit チェーン検出: 単一、または && / ; / | で連結された git commit
 const GIT_COMMIT_CHAIN = /(?:^|[&;|]\s*)git\s+commit/;
 
+const RESET_TRIGGERS = /^\s*(RESET)\s*$/;
+
 let isHarnessReleased = false;
 
 interface ForceReviewState {
   pendingStagedHash: string | null;
+  // ユーザー message の messageID (part filtering 用)
+  userMessageIDs: Set<string>;
+  // 処理済み partID (dedup 用)
+  processedPartIDs: Set<string>;
 }
 
 function createState(): ForceReviewState {
-  return { pendingStagedHash: null };
+  return {
+    pendingStagedHash: null,
+    userMessageIDs: new Set(),
+    processedPartIDs: new Set(),
+  };
 }
 
 const sessionStates = new Map<string, ForceReviewState>();
@@ -27,21 +37,85 @@ function getState(sessionID: string): ForceReviewState {
 
 export const ForceReviewPlugin: Plugin = async ({ $ }) => {
   return {
-    'chat.message': async (input, output) => {
-      const textPart = output.parts.find((p) => p.type === 'text' && (p.text ?? '').trim() !== '');
-      if (!textPart || textPart.type !== 'text') return;
+    /* COMMENTED OUT: chat.message フック (OpenCode v1.17.1 で発火しない)
+     * https://github.com/anomalyco/opencode/issues/31731
+     * トリガー検出は event フックの message.part.updated に移植済み
+     *
+    "chat.message": async (input, output) => {
+      const textPart = output.parts.find((p) => p.type === "text" && (p.text ?? "").trim() !== "");
+      if (!textPart || textPart.type !== "text") return;
 
-      const text = textPart.text ?? '';
+      const text = textPart.text ?? "";
       const firstLine =
         text
-          .split('\n')
+          .split("\n")
           .map((l) => l.trim())
-          .find((l) => l.length > 0) ?? '';
-      if (text.includes('[release-harness]')) {
+          .find((l) => l.length > 0) ?? "";
+      if (text.includes("[release-harness]")) {
         isHarnessReleased = true;
       }
-      if (text.includes('[setup]') || /^\s*RESET\s*$/.test(firstLine)) {
+      if (text.includes("[setup]") || /^\s*RESET\s*$/.test(firstLine)) {
         isHarnessReleased = false;
+      }
+    },
+    */
+
+    event: async ({ event }) => {
+      // message.updated: ユーザー message の messageID を記録
+      // chat.message 代替 (v1.17.1 で発火しないため event バスで処理)
+      if (event.type === 'message.updated') {
+        const { info } = event.properties;
+        if (info.role === 'user') {
+          const state = getState(info.sessionID);
+          state.userMessageIDs.add(info.id);
+        }
+        return;
+      }
+
+      // message.removed: userMessageIDs と同期 (DB との整合性)
+      if (event.type === 'message.removed') {
+        const { sessionID, messageID } = event.properties;
+        const state = getState(sessionID);
+        state.userMessageIDs.delete(messageID);
+        return;
+      }
+
+      // message.part.updated: ユーザー message の text part のみ処理
+      if (event.type === 'message.part.updated') {
+        const { part } = event.properties;
+        if (part.type !== 'text') return;
+
+        const state = getState(part.sessionID);
+        if (!state.userMessageIDs.has(part.messageID)) return;
+        if (state.processedPartIDs.has(part.id)) return;
+        state.processedPartIDs.add(part.id);
+
+        const text = part.text;
+        if (!text.trim()) return;
+
+        if (text.includes('[release-harness]')) {
+          isHarnessReleased = true;
+        }
+        if (
+          text.includes('[setup]') ||
+          RESET_TRIGGERS.test(
+            text
+              .split('\n')
+              .map((l) => l.trim())
+              .find((l) => l.length > 0) ?? '',
+          )
+        ) {
+          isHarnessReleased = false;
+        }
+        return;
+      }
+
+      // message.part.removed: processedPartIDs と同期
+      if (event.type === 'message.part.removed') {
+        const { sessionID, partID } = event.properties;
+        const state = getState(sessionID);
+        state.processedPartIDs.delete(partID);
+        return;
       }
     },
 

@@ -23,6 +23,10 @@ interface SessionState {
   userTriggered: boolean;
   pendingOutputTool: string | null;
   lastEvent: string | null;
+  // NEW: ユーザー message の messageID (part filtering 用)
+  userMessageIDs: Set<string>;
+  // NEW: 処理済み partID (dedup 用)
+  processedPartIDs: Set<string>;
 }
 
 function defaultState(): SessionState {
@@ -36,6 +40,8 @@ function defaultState(): SessionState {
     userTriggered: false,
     pendingOutputTool: null,
     lastEvent: null,
+    userMessageIDs: new Set(),
+    processedPartIDs: new Set(),
   };
 }
 
@@ -173,12 +179,13 @@ function formatState(state: SessionState): string {
   - ExcutionSkill Triggered: ${excution}`;
 }
 
-export const ExecutionGatePlugin: Plugin = async () => {
+export const ExecutionGatePlugin: Plugin = async ({ client }) => {
   // subagent session は gate 状態不要 (inject_context と同じ判断)
   const subagentSessions = new Set<string>();
 
   return {
     event: async ({ event }) => {
+      // session.created: subagent 判定 + state リセット
       if (event.type === 'session.created') {
         const info = event.properties.info;
         if (info.parentID) {
@@ -188,6 +195,131 @@ export const ExecutionGatePlugin: Plugin = async () => {
         }
       }
       // session.compacted: リセットしない (続行前提)
+
+      // message.updated: ユーザー message の messageID を記録
+      // chat.message 代替 (v1.17.1 で発火しないため event バスで処理)
+      // https://github.com/anomalyco/opencode/issues/31731
+      if (event.type === 'message.updated') {
+        const { info } = event.properties;
+        if (info.role === 'user') {
+          const state = getState(info.sessionID);
+          state.userMessageIDs.add(info.id);
+        }
+        return;
+      }
+
+      // message.removed: userMessageIDs と同期 (DB との整合性)
+      if (event.type === 'message.removed') {
+        const { sessionID, messageID } = event.properties;
+        const state = getState(sessionID);
+        state.userMessageIDs.delete(messageID);
+        return;
+      }
+
+      // message.part.updated: ユーザー message の text part のみ処理
+      if (event.type === 'message.part.updated') {
+        const { part } = event.properties;
+        if (part.type !== 'text') return;
+        if (subagentSessions.has(part.sessionID)) return;
+
+        const state = getState(part.sessionID);
+        if (!state.userMessageIDs.has(part.messageID)) return;
+        if (state.processedPartIDs.has(part.id)) return;
+        state.processedPartIDs.add(part.id);
+
+        const text = part.text;
+        if (!text.trim()) return;
+
+        const firstLine =
+          text
+            .split('\n')
+            .map((l) => l.trim())
+            .find((l) => l.length > 0) ?? '';
+
+        if (STATE_TRIGGER.test(firstLine)) {
+          // STATE 表示: client.tui.showToast で TUI に toast として表示
+          // (event フックには output.parts が無いので、chat.message 時代の
+          //  chat 内表示は不可。toast は ephemeral だが state 確認には十分)
+          state.lastEvent = 'state display requested';
+          await client.tui.showToast({
+            body: {
+              title: 'Execution Gate',
+              message: formatState(state),
+              variant: 'info',
+              duration: 10000, // 10s — state 全体を読むのに十分な時間
+            },
+          });
+          return;
+        }
+
+        if (text.includes('[release-harness]')) {
+          isHarnessReleased = true;
+          // formatState は isHarnessReleased=true で "Harness released" を返す
+          await client.tui.showToast({
+            body: {
+              title: 'Execution Gate',
+              message: formatState(state),
+              variant: 'info',
+              duration: 10000,
+            },
+          });
+        }
+
+        if (text.includes('[setup]')) {
+          isHarnessReleased = false;
+          const phaseMatch = text.match(/\[setup\]\s+(design|build|refine|chore)/);
+          const phase = (phaseMatch ? phaseMatch[1] : 'open_discussion') as PhaseType;
+          state.phase = phase;
+          state.skills = { type: phase, load: PHASE_LOADS[phase] } as Skills;
+          state.lastEvent = `phase set to ${phase}`;
+          await client.tui.showToast({
+            body: {
+              title: 'Execution Gate',
+              message: formatState(state),
+              variant: 'info',
+              duration: 10000,
+            },
+          });
+          return;
+        }
+
+        if (RESET_TRIGGERS.test(firstLine)) {
+          resetState(part.sessionID);
+          isHarnessReleased = false;
+          const s = getState(part.sessionID);
+          s.lastEvent = 'state reset';
+          await client.tui.showToast({
+            body: {
+              title: 'Execution Gate',
+              message: formatState(s),
+              variant: 'info',
+              duration: 10000,
+            },
+          });
+          return;
+        }
+
+        if (EXECUTE_TRIGGERS.test(firstLine)) {
+          state.userTriggered = true;
+          state.lastEvent = 'user trigger GO — gate opened, proceed with implementation';
+          await client.tui.showToast({
+            body: {
+              title: 'Execution Gate',
+              message: formatState(state),
+              variant: 'info',
+              duration: 10000,
+            },
+          });
+        }
+      }
+
+      // message.part.removed: processedPartIDs と同期
+      if (event.type === 'message.part.removed') {
+        const { sessionID, partID } = event.properties;
+        const state = getState(sessionID);
+        state.processedPartIDs.delete(partID);
+        return;
+      }
     },
 
     // ── experimental.chat.system.transform: LLM に gate state を注入 ─────
@@ -201,7 +333,11 @@ export const ExecutionGatePlugin: Plugin = async () => {
       output.system.push(formatState(state));
     },
 
-    'chat.message': async (input, output) => {
+    /* COMMENTED OUT: chat.message フック (OpenCode v1.17.1 で発火しない)
+     * https://github.com/anomalyco/opencode/issues/31731
+     * トリガー検出は event フックの message.updated に移植済み
+     *
+    "chat.message": async (input, output) => {
       if (!input.sessionID) return;
       const state = getState(input.sessionID);
 
@@ -210,24 +346,27 @@ export const ExecutionGatePlugin: Plugin = async () => {
       //   (inject のテキストが trigger word 検出を妨げるため)
       // - 空 text part もスキップ (multiline input の冒頭空対策)
       const textPart = output.parts.find(
-        (p) => p.type === 'text' && !p.id?.startsWith('prt_') && (p.text ?? '').trim() !== '',
+        (p) =>
+          p.type === "text" &&
+          !p.id?.startsWith("prt_") &&
+          (p.text ?? "").trim() !== "",
       );
-      if (!textPart || textPart.type !== 'text') return;
+      if (!textPart || textPart.type !== "text") return;
 
-      const text = textPart.text ?? '';
+      const text = textPart.text ?? "";
       // 最初の非空行を trigger word 検出に使う
       // ユーザが先頭に空行入れても trigger を効かせるため
       const firstLine =
         text
-          .split('\n')
+          .split("\n")
           .map((l) => l.trim())
-          .find((l) => l.length > 0) ?? '';
+          .find((l) => l.length > 0) ?? "";
 
       const injectStatus = (s: SessionState) => {
         const messageID = output.message.id;
         if (messageID) {
           output.parts.push({
-            type: 'text',
+            type: "text",
             id: `prt_${crypto.randomUUID()}`,
             sessionID: input.sessionID,
             messageID,
@@ -237,20 +376,24 @@ export const ExecutionGatePlugin: Plugin = async () => {
       };
 
       if (STATE_TRIGGER.test(firstLine)) {
-        state.lastEvent = 'state display requested';
+        state.lastEvent = "state display requested";
         injectStatus(state);
         return;
       }
 
       // 部分一致: メッセージ内の任意の位置で発火可能
-      if (text.includes('[release-harness]')) {
+      if (text.includes("[release-harness]")) {
         isHarnessReleased = true;
       }
 
-      if (text.includes('[setup]')) {
+      if (text.includes("[setup]")) {
         isHarnessReleased = false;
-        const phaseMatch = text.match(/\[setup\]\s+(design|build|refine|chore)/);
-        const phase = (phaseMatch ? phaseMatch[1] : 'open_discussion') as PhaseType;
+        const phaseMatch = text.match(
+          /\[setup\]\s+(design|build|refine|chore)/,
+        );
+        const phase = (
+          phaseMatch ? phaseMatch[1] : "open_discussion"
+        ) as PhaseType;
 
         if (phase) {
           state.phase = phase;
@@ -264,16 +407,18 @@ export const ExecutionGatePlugin: Plugin = async () => {
         resetState(input.sessionID);
         isHarnessReleased = false;
         const s = getState(input.sessionID);
-        s.lastEvent = 'state reset';
+        s.lastEvent = "state reset";
         injectStatus(s);
         return;
       }
 
       if (EXECUTE_TRIGGERS.test(firstLine)) {
         state.userTriggered = true;
-        state.lastEvent = 'user trigger GO — gate opened, proceed with implementation';
+        state.lastEvent =
+          "user trigger GO — gate opened, proceed with implementation";
       }
     },
+    */
 
     'tool.execute.after': async (input, _output) => {
       if (!input.sessionID) return;
@@ -325,17 +470,21 @@ export const ExecutionGatePlugin: Plugin = async () => {
       let bashCommand = '';
       if (input.tool === 'bash') {
         bashCommand = String((output.args as { command?: string } | undefined)?.command ?? '');
-        if (isBashReadOnly(bashCommand)) {
-          return;
-        }
-        // working gh check: gh コマンドで read-only 以外 → user trigger (GO) 必須
+        if (isBashReadOnly(bashCommand)) return;
+
+        // working gh check: gh コマンドは [setup] 後の phase があれば OK
+        // (issue 作成・更新は design/build/refine の通常操作なので GO / skills 不要)
+        // read-only gh は前段の isBashReadOnly で bypass 済み
         const trimmed = bashCommand.trimStart();
-        if (/^\s*gh\s+/.test(trimmed) && !state.userTriggered) {
-          throw new Error(
-            `[execution-gate] Working gh command requires the gate to be open: \`${trimmed}\`\n` +
-              `- ✗ user trigger required (say 'GO')\n` +
-              `- Read-only gh commands (view, list, status, checks, diff) work without the gate.`,
-          );
+        if (/^\s*gh\s+/.test(trimmed)) {
+          if (state.phase === 'open_discussion') {
+            throw new Error(
+              `[execution-gate] Working gh command requires [setup] phase: \`${trimmed}\`\n` +
+                `- ✗ phase required (say '[setup] design' etc.)\n` +
+                `- Read-only gh commands work without [setup].`,
+            );
+          }
+          return; // gh は phase チェックのみで許可
         }
       }
 
