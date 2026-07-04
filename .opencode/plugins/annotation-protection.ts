@@ -56,8 +56,12 @@ const isBashReadOnly = (command: string): boolean => {
   );
 };
 
+// テストファイルは注釈保護対象外 (文字列リテラルに UO[ / AN[ が含まれるため)
+const isTestFile = (filePath: string): boolean => /\.test\.\w+$/.test(filePath);
+
 // ファイル内の UO/AN コメント行を抽出
 export function extractAnnotations(filePath: string): string[] {
+  if (isTestFile(filePath)) return [];
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     return content
