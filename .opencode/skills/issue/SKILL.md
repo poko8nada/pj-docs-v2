@@ -11,13 +11,13 @@ Manage issues using a Spec-based flow. One Spec holds the product design for a f
 
 Always establish shared understanding first. Present in one message:
 
-**Context**
+**Context** (max 2 sentences)
 {current project phase, existing issues and their status, what's been completed}
 
-**Understanding**
+**Understanding** (max 3 sentences)
 {what issue is needed, why now, which phase (Spec/Design/Build/Refine) it belongs to}
 
-**Proposal**
+**Proposal** (max 2 sentences)
 {issue type, suggested title following the convention below, key content points}
 
 Discuss with the user. Revise based on their feedback. Repeat until aligned. Only after agreement, read the corresponding template from References and create the issue.

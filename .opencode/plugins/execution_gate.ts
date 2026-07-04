@@ -30,6 +30,8 @@ interface SessionState {
   // gh 実行系の issue スキルゲート
   issueSkillTurnsRemaining: number;
   readFiles: Set<string>;
+  // GO 以降に実行ツールを使ったか
+  toolsExecutedSinceGo: boolean;
 }
 
 function defaultState(): SessionState {
@@ -47,6 +49,7 @@ function defaultState(): SessionState {
     processedPartIDs: new Set(),
     issueSkillTurnsRemaining: 0,
     readFiles: new Set(),
+    toolsExecutedSinceGo: false,
   };
 }
 
@@ -261,13 +264,13 @@ function formatState(state: SessionState): string {
 function phaseDirective(phase: string): string {
   switch (phase) {
     case 'open_discussion':
-      return 'You are in open_discussion. DISCUSS and PROPOSE only. Do NOT write code or edit files.';
+      return 'You are in open-discussion. DISCUSS and PROPOSE only. You CANNOT write code or edit files.';
     case 'design':
-      return 'You are in design phase. RESEARCH best practices. Use feasibility skill. Do NOT implement yet.';
+      return 'You are in design phase. Build a prototype screen to ALIGN on DESIGN direction. Use feasibility → prepare → implement skills. GO resets after each execution turn. Do NOT implement production code.';
     case 'build':
-      return 'You are in build phase. PLAN then IMPLEMENT. Use prepare → implement skills.';
+      return 'You are in build phase. PLAN then IMPLEMENT. Use feasibility → prepare → implement skills. GO resets after each execution turn.';
     case 'refine':
-      return 'You are in refine phase. ANALYZE then IMPROVE. Use prepare → implement skills.';
+      return 'You are in refine phase. ANALYZE then IMPROVE. Use feasibility → prepare → implement skills. GO resets after each execution turn.';
     case 'chore':
       return 'You are in chore phase. Minor changes only — harness, typos, config.';
     default:
@@ -323,9 +326,13 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         if (state.processedPartIDs.has(part.id)) return;
         state.processedPartIDs.add(part.id);
 
-        // ユーザーターン消費: issue スキルの有効ターンをデクリメント
+        // ユーザーターン消費: issue スキルの有効ターンをデクリメント + GO を消費（実行があった場合のみ）
         if (state.issueSkillTurnsRemaining > 0) {
           state.issueSkillTurnsRemaining--;
+        }
+        if (state.toolsExecutedSinceGo) {
+          state.userTriggered = false;
+          state.toolsExecutedSinceGo = false;
         }
 
         const text = part.text;
@@ -604,6 +611,11 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         if (filePath) {
           state.readFiles.add(filePath);
         }
+      }
+
+      // 実行ツール使用フラグ (GO 消費判定用)
+      if (!isAllowedTool(input.tool)) {
+        state.toolsExecutedSinceGo = true;
       }
     },
 

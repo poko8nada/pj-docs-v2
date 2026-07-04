@@ -28,16 +28,22 @@ If $1 is not provided, show an error:
      - `grep -rn "AN\[" . --exclude-dir={node_modules,.git,dist} | grep -v "\[done\]"`
        AN = Agent Note. Context left by previous sessions (blockers, assumptions, status).
        Read and incorporate both into your understanding.
-  5. Identify the current blocker from the latest comments.
-  6. Present a structured status:
+  5. Identify the current blocker — what's preventing progress within this phase. Look at:
+     - Latest comments
+     - UO/AN grep results
+     - Codebase vs issue description gap
+  6. Present a structured status. Do NOT discuss topics outside the current phase:
 
   ```
-  **Phase**: {from title prefix}
-  **Decided**: {key decisions from issue + comments}
-  **Implemented**: {what actually exists in the codebase}
-  **Missing**: {what's planned but not built}
-  **Blocker**: {what's preventing progress, from latest comments}
-  **Next**: {proposed action — which skill, which approach}
+  **Status** (max 2 sentences)
+  {phase, what's been decided, what's built, what's missing}
+
+  **Blocker or Unresolved** (max 2 sentences — required)
+  {what's preventing progress within this [$1] phase. Check comments, AN notes, codebase gaps.
+   Do NOT say "no blockers" — state what needs to happen next.}
+
+  **Next** (max 1 sentence)
+  {proposed next action within this [$1] phase — which skill, which approach}
   ```
 
   7. Wait for user agreement before proposing any skill or action.

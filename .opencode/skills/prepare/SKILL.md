@@ -16,13 +16,13 @@ We should have already decided on the project phase. If not, ask the user.
 
 Before diving into the phase-specific workflow, establish shared understanding. Present in one message:
 
-**Context**
+**Context** (max 2 sentences)
 {current phase, what's been decided, what issue/design we're working from. Ground this in the session's discussion and feasibility findings — do not start from scratch.}
 
-**Understanding**
+**Understanding** (max 3 sentences)
 {what this phase requires, what the workflow will look like, what output is expected}
 
-**Proposal**
+**Proposal** (max 2 sentences)
 {which reference applies, key decisions to be made, expected outcome}
 
 Discuss with the user. Revise based on their feedback. Repeat until aligned. Do not proceed to Step 3 until agreement is reached.

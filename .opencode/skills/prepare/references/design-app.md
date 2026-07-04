@@ -6,9 +6,9 @@ Build a realistic default screen using production-ready components to align on d
 
 ## Principle
 
-The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. One screen: default. The conversation around the screen produces the real output: a component matrix and a minimal style guide in `spec.md`.
+The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. One screen: default. The conversation around the screen produces the real output: a component matrix and a minimal style guide in `_spec.md`.
 
-`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not `spec.md`, not the default screen. Delete `prototype/` when the product can speak for itself.
+`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not `_spec.md`, not the default screen. Delete `prototype/` when the product can speak for itself.
 
 ---
 
@@ -40,7 +40,7 @@ Read `package.json` and config files. Then:
 ```
 prototype/
   default.tsx    ← the only screen
-  spec.md        ← generated at the end
+  _spec.md        ← generated at the end
 ```
 
 ### Components
@@ -189,13 +189,15 @@ Use this list as a thinking prompt. Not all will apply — propose only what mak
 
 - First-run experience
 
-These components are added to the component matrix in `spec.md` — they are not built as additional screens.
+These components are added to the component matrix in `_spec.md` — they are not built as additional screens.
 
 ---
 
 ## Step 4 — Generate spec.md
 
-When the screen and component list are aligned, generate `prototype/spec.md`.
+When the screen and component list are aligned, generate `prototype/_spec.md`.
+Underscore prefix (`_`) prevents the file from being treated as a route by Next.js, SvelteKit, and Nuxt.
+If your framework uses a different convention for ignoring files, adjust accordingly.
 
 ```markdown
 # Design Spec
@@ -235,4 +237,4 @@ Generated from app-design-align session.
 
 **If a significant design change comes up during the build** — delete `prototype/` and run app-design-align again from scratch. Do not version or accumulate screens inside `prototype/`. Each run is disposable and self-contained.
 
-**If a small change comes up** — modify the product directly. Update `spec.md` by hand if it still matters. Do not re-run app-design-align for minor adjustments.
+**If a small change comes up** — modify the product directly. Update `_spec.md` by hand if it still matters. Do not re-run app-design-align for minor adjustments.

@@ -36,10 +36,10 @@ Use the stack to decide **what to investigate and what to skip**.
 
 Before proposing topics, establish shared understanding. Present in one message:
 
-**Context**
+**Context** (max 2 sentences)
 {current project phase, what's been decided, what problem we're solving}
 
-**Understanding**
+**Understanding** (max 3 sentences)
 {why this investigation is needed, what technical decisions depend on it, what constraints apply}
 
 Discuss with the user. Revise based on their feedback. Repeat until aligned. Do not proceed to Step 2 until agreement is reached.

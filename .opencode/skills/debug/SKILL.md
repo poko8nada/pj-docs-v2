@@ -19,10 +19,10 @@ Do not attempt a fix yet.
 
 Research the codebase to understand the problem in context. Present your full analysis in one message:
 
-**Context**
+**Context** (max 2 sentences)
 {current project phase, relevant files/code, what led to this bug}
 
-**Understanding**
+**Understanding** (max 3 sentences)
 {your analysis of what's happening and why — trace the logic, identify the scope}
 
 **Hypothesis**

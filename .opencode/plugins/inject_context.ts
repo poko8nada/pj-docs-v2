@@ -124,13 +124,13 @@ const FLOW_DESCRIPTIONS = [
        design/build/refine → feasibility → prepare → execution skill
        chore → execution skill
     3. User says GO
-    GO alone is NOT enough. Skills must be loaded first.
+    GO alone is NOT enough. Skills must be loaded first. GO resets after each execution turn.
 
   Phase-specific behavior:
-    open_discussion — DISCUSS only. Propose approaches. Ask questions. Do NOT write code.
-    design — RESEARCH best practices. Use feasibility skill. Do NOT implement.
-    build — PLAN then IMPLEMENT. Use prepare → implement skills.
-    refine — ANALYZE then IMPROVE. Use prepare → implement skills.
+    open_discussion — DISCUSS only.
+    design — Build a prototype screen to ALIGN on DDESIGN.
+    build — PLAN then IMPLEMENT.
+    refine — ANALYZE then IMPROVE.
     chore — EXECUTE directly. Minor changes, harness, typos only.
 
   The agent proposes next steps. The user controls flow with trigger words (GO, RESET, STATE).`,
