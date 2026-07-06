@@ -266,7 +266,7 @@ function phaseDirective(phase: string): string {
     case 'open_discussion':
       return 'You are in open-discussion. DISCUSS and PROPOSE only. You CANNOT write code or edit files.';
     case 'design':
-      return 'You are in design phase. Build a prototype screen to ALIGN on DESIGN direction. Use feasibility → prepare → implement skills. GO resets after each execution turn. Do NOT implement production code.';
+      return 'You are in design phase. Build prototype, discuss, expand to full scope, produce design spec (Style Guide, matrices). Use feasibility → prepare → implement skills. GO resets after each execution turn. Do NOT implement production code.';
     case 'build':
       return 'You are in build phase. PLAN then IMPLEMENT. Use feasibility → prepare → implement skills. GO resets after each execution turn.';
     case 'refine':

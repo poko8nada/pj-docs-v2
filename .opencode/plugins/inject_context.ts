@@ -128,7 +128,7 @@ const FLOW_DESCRIPTIONS = [
 
   Phase-specific behavior:
     open_discussion — DISCUSS only.
-    design — Build a prototype screen to ALIGN on DDESIGN.
+    design — Build prototype → discuss → expand to full scope → produce design spec (Style Guide, matrices).
     build — PLAN then IMPLEMENT.
     refine — ANALYZE then IMPROVE.
     chore — EXECUTE directly. Minor changes, harness, typos only.

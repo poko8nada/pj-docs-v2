@@ -3,6 +3,34 @@
 Use this template for the Build issue body. Reference the Design issue's body and all comments when creating.
 
 ```markdown
+<!-- FOR AGENT — do not edit. Operating instructions. -->
+
+## For Agent: Operating Instructions
+
+### Principles
+
+- Build turns a Design into working code. The deliverable is a 5-section plan, locked by explicit user agreement, then a vertical-slice implementation.
+- The plan must reconcile research with the actual codebase before any slice is written.
+- Slices are vertical, not horizontal — one slice per concern (R / C / U / D, draft → harden), each verifiable in one sitting. Bundled slices are forbidden.
+- Reference `prototype/_design-spec.md` and the Design issue for component structure, Props, and TODOs.
+
+### Success Criteria
+
+- All five plan sections are concrete: file paths, function names, library APIs from Step 1 reconciliation.
+- Slices split by concern (R / C / U / D), each with Test + App verification. Test policy decided per slice.
+- User has approved the plan via `question` before any code is written.
+
+### Common Failure Modes
+
+- Plan without Step 1 reconciliation — claims that contradict the actual code.
+- Bundled slices ("Add X CRUD", "Build the auth feature"). Draft-first, grow slice by slice.
+- Ad-hoc tests or no Test policy decision per slice.
+- Treating user agreement as implied.
+
+<!-- FOR AGENT — do not edit. Operating instructions. -->
+
+---
+
 ## Goal
 
 <このユニットで何を構築するか>

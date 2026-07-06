@@ -20,5 +20,7 @@ Follow these principles to build and maintain good context.
 ## Meta
 
 - The harness is monitoring, so if it gets blocked, follow the rules in the error message.
-- System includes subagents — `general`, `explore`.
+- Actively utilize the subagents built into the system.
+  - `general`: Simple tasks, repetitive or parallel tasks
+  - `explore`: Scanning the codebase, external research
 - Use pnpm for all package management.

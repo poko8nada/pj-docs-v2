@@ -6,9 +6,9 @@ Build a realistic default screen using production-ready components to align on d
 
 ## Principle
 
-The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. One screen: default. The conversation around the screen produces the real output: a component matrix and a minimal style guide in `_spec.md`.
+The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. One screen: default. The conversation around the screen produces the real output: a page structure, a section matrix, and a style guide in `_design-spec.md`.
 
-`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not `_spec.md`, not the default screen. Delete `prototype/` when the product can speak for itself.
+`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not `_design-spec.md`, not the default screen. Delete `prototype/` when the product can speak for itself.
 
 ---
 
@@ -32,13 +32,13 @@ Without asking for further input, make reasonable design decisions and build the
 
 ### What "default" means
 
-The default screen is the top page of the site. Unlike apps, web design alignment focuses on **style** rather than interaction. The goal is to agree on the visual direction — header, footer, sidebar (if applicable), hero section, and text sections.
+The default screen is the top page of the site — the entry point of the design process. Unlike apps, web design alignment focuses on **style** rather than interaction. The goal is to agree on the visual direction of this top page before expanding to the full site's pages and sections — header, footer, sidebar (if applicable), hero section, and text sections.
 
 - Build the top page with header, footer, and key content sections
 - Header, footer, and sidebar are not placeholders — build them with production-level style
 - Focus on typography, spacing, colors, and visual hierarchy
 - Responsive design is required for all sections
-- Interactive behavior is not implemented — the screen is static
+- Interactive behavior is not implemented — the screen is static. **Except for what CSS can does.**
 - The real deliverable is style agreement and a component list
 
 ### Stack detection
@@ -56,7 +56,7 @@ Read `package.json` and config files. Then:
 ```
 prototype/
   default.tsx    ← the only screen
-  _spec.md        ← generated at the end
+  _design-spec.md        ← generated at the end
 ```
 
 ### Pages
@@ -156,32 +156,43 @@ Every component file gets a structured comment block at the top. Do not skip or 
 // 役割:
 //   - このコンポーネントが何をするか1〜2行で
 //
-// 状態/バリアント:
-//   - default: 通常表示
-//   - empty: データなし（該当する場合）
-//   - loading: ローディング中（該当する場合）
-//   - error: エラー時（該当する場合）
-//   - その他固有の状態
+// 状態:
+//   - stateName[, stateName2, ...][: 補足説明]
+//   例:
+//     - default
+//     - open, closed: メニュー/アコーディオン開閉
+//   該当なければ「なし」と書く
 //
-// Props / データ:
-//   - propName: 型 — 説明
-//   - propName?: 型 — 説明（オプション）
+// バリアント:
+//   |        | primary | secondary | danger | n/a |
+//   | 該当✓ |         |           |        |     |
+//   - バリアントで補足が必要なら箇条書きで
 //
-// productでのインタラクション:
-//   - ユーザーが何をできるか（クリック、ドラッグ、入力など）
-//   - 該当なければ「なし」と書く
+// Props:
+//   - propName: 型 — 説明(propName? で任意)
+//   例:
+//     - title: string — 見出し
+//     - children: ReactNode
 //
-// TODO (本番実装時):
-//   - データ取得: どのようなAPIやフックを使うと想定されるか
-//   - イベント: どのようなハンドラが必要と想定されるか
-//   - その他実装上の注意
+// インタラクション:
+//   - on{Event}: 動作
+//   イベント: click / hover / focus / submit / scroll / keydown
+//   例: - onClick: ナビゲーション遷移
+//   該当なければ「なし」と書く
+//
+// 考慮事項:
+//   - 任意の free-form メモ(a11y / SEO / perf / edge case / browser 等)
+//   例:
+//     - a11y: aria-label、Tab フォーカス順序
+//     - SEO: 適切な見出しレベル、alt 属性
+//   該当なければ「なし」と書く
 ```
 
 ---
 
 ## Step 3 — Discuss and iterate
 
-Ask the user to open the screen in the browser. Then discuss freely — design, layout, sections, data, anything. Edit the screen based on feedback.
+Ask the user to open the screen in the browser. Then discuss freely — design, layout, pages and sections, data, anything. Edit the screen based on feedback.
 
 Refer to sections by their `data-component` name. If feedback is ambiguous, ask which section it applies to.
 
@@ -189,11 +200,16 @@ Continue until the screen feels right.
 
 ---
 
-## Step 4 — Identify missing sections
+## Step 4 — Expand to all pages and sections
 
-After the default screen is aligned, propose sections that are necessary for the site but absent from the default screen. Present this as a chat list with reasoning — do not use question tools.
+After the default screen is aligned, expand the discussion to identify all pages and sections that make up the full site. Present as a chat list with reasoning — do not use question tools.
 
 Use this list as a thinking prompt. Not all will apply — propose only what makes sense for this site.
+
+**Additional pages**
+
+- Error pages: 404, 500
+- Routes anticipated from the project: About, Services, Contact, etc.
 
 **Navigation variants**
 
@@ -202,32 +218,31 @@ Use this list as a thinking prompt. Not all will apply — propose only what mak
 - Pagination or infinite scroll
 - Search overlay or dedicated search page
 
-**Content states**
+**Content states** (per page)
 
 - Empty state — no results; layout and call-to-action differ significantly from default
-- Error state — 404, 500 pages
 - Loading state — skeleton screens
 
-**Additional sections**
+**Additional sections** (per page)
 
 - Modal or lightbox (image view, form)
 - Sidebar content (categories, filters)
 - Testimonials or social proof
 - FAQ or accordion
 
-**Structural variants**
+**Structural variants** (per page)
 
 - Sidebar collapsed / expanded
 - Filtered view — if structure changes significantly
 - Multi-level navigation expanded
 
-These sections are added to the page structure in `_spec.md` — they are not built as additional screens.
+These pages and sections are added to the page structure in `_design-spec.md` — they are not built as additional screens.
 
 ---
 
 ## Step 5 — Generate spec.md
 
-When the screen and section list are aligned, generate `prototype/_spec.md`.
+When the page list and section list are aligned, generate `prototype/_design-spec.md`.
 Underscore prefix (`_`) prevents the file from being treated as a route by Next.js, SvelteKit, and Nuxt.
 If your framework uses a different convention for ignoring files, adjust accordingly.
 
@@ -242,24 +257,66 @@ Generated from web-design-align session.
 
 ## Style Guide
 
-| Token        | Value             |
-| ------------ | ----------------- |
-| Primary      | #3B82F6           |
-| Background   | #F9FAFB           |
-| Text         | #111827           |
-| Border       | #E5E7EB           |
-| Radius       | 8px               |
-| Font         | Inter, sans-serif |
-| Base size    | 14px              |
-| Spacing unit | 4px               |
+### Color
+
+| Token       | Value   | Use               |
+| ----------- | ------- | ----------------- |
+| Brand       | #3B82F6 | primary CTA       |
+| Accent      | #8B5CF6 | links, highlights |
+| Neutral 50  | #F9FAFB | background        |
+| Neutral 100 | #F3F4F6 | surface           |
+| Neutral 900 | #111827 | text              |
+
+### Typography
+
+| Token   | Value                   | Use           |
+| ------- | ----------------------- | ------------- |
+| Display | Noto Serif JP 32 / 1.4  | page title    |
+| H1      | Noto Sans JP 28 / 1.4   | section head  |
+| H2      | Noto Sans JP 24 / 1.4   | subhead       |
+| H3      | Noto Sans JP 20 / 1.5   | sub-sub       |
+| Body    | Noto Sans JP 16 / 1.7   | body text     |
+| Caption | Noto Sans JP 12 / 1.5   | caption       |
+| Mono    | JetBrains Mono 14 / 1.5 | code, numbers |
+
+### Spacing
+
+| Token | Value | Use         |
+| ----- | ----- | ----------- |
+| 1     | 4px   | small gap   |
+| 2     | 8px   | element gap |
+| 4     | 16px  | block gap   |
+| 8     | 32px  | section gap |
+| 16    | 64px  | page gap    |
 
 ## Page Structure
 
-| Section | File       | Style Notes           | In default | TODOs      |
-| ------- | ---------- | --------------------- | ---------- | ---------- |
-| Header  | header.tsx | logo, nav alignment   | true       | responsive |
-| Hero    | hero.tsx   | headline, CTA styling | true       | -          |
-| Footer  | footer.tsx | links, copyright      | true       | -          |
+| Page     | URL       | Sections                                     |
+| -------- | --------- | -------------------------------------------- |
+| Home     | /         | Header, Hero, Services, Testimonials, Footer |
+| About    | /about    | Header, Story, Team, Footer                  |
+| Services | /services | Header, ServiceList, Pricing, Footer         |
+| Contact  | /contact  | Header, Form, Map, Footer                    |
+| 404      | /404      | Header, NotFound, Footer                     |
+| 500      | /500      | Header, ServerError, Footer                  |
+
+## Section Matrix
+
+| Section      | Layout (PC) | Layout (Mobile) | Main parts               |
+| ------------ | ----------- | --------------- | ------------------------ |
+| Header       | row         | hamburger       | nav, logo, link          |
+| Hero         | centered    | centered        | headline, cta, image     |
+| Services     | 3-col grid  | 1-col stack     | card, button             |
+| Testimonials | slider      | 1-col stack     | quote, card, image       |
+| Footer       | 4-col       | 1-col stack     | link                     |
+| Story        | centered    | centered        | —                        |
+| Team         | 3-col grid  | 1-col stack     | card, image              |
+| ServiceList  | 2-col grid  | 1-col stack     | card                     |
+| Pricing      | 3-col grid  | 1-col stack     | tier, button             |
+| Form         | centered    | centered        | field, button            |
+| Map          | full-width  | full-width      | —                        |
+| NotFound     | centered    | centered        | heading, message, button |
+| ServerError  | centered    | centered        | heading, message, button |
 ```
 
 ---
@@ -270,4 +327,4 @@ Generated from web-design-align session.
 
 **If a significant design change comes up during the build** — delete `prototype/` and run web-design-align again from scratch. Do not version or accumulate screens inside `prototype/`. Each run is disposable and self-contained.
 
-**If a small change comes up** — modify the product directly. Update `_spec.md` by hand if it still matters. Do not re-run web-design-align for minor adjustments.
+**If a small change comes up** — modify the product directly. Update `_design-spec.md` by hand if it still matters. Do not re-run web-design-align for minor adjustments.
