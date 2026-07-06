@@ -5,8 +5,10 @@ import * as os from 'os';
 import * as path from 'path';
 import { execFileSync } from 'child_process';
 
-const MAX_CONTEXT_CHARS = 4000;
-const MAX_LINE_LENGTH = 120;
+// null = 無制限 (opencode / LLM 側に委ねる)
+// 数値 = 文字数で機械カット
+// 安全マージン込みで 16000 chars (= 4000 tokens 程度)がいったん境界値
+const MAX_CONTEXT_CHARS: number | null = 16000;
 
 // グローバル opencode 配下の memory Layer 2 を直接参照
 // $XDG_CONFIG_HOME を優先、未設定なら ~/.config にフォールバック
@@ -21,17 +23,8 @@ const LAYER_2_PATH = path.join(
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function truncateLine(line: string, max = MAX_LINE_LENGTH): string {
-  return line.length > max ? line.slice(0, max) + '…' : line;
-}
-
 function sanitize(text: string): string {
-  return text
-    .replace(/\r/g, '')
-    .replace(/\t/g, ' ')
-    .split('\n')
-    .map((l) => truncateLine(l))
-    .join('\n');
+  return text.replace(/\r/g, '').replace(/\t/g, ' ');
 }
 
 function readIfExists(filePath: string, max = 500): string {
@@ -124,9 +117,15 @@ const FLOW_DESCRIPTIONS = [
     2. Required skills loaded IN ORDER — do not skip:
        design/build/refine → feasibility → prepare → execution skill
        chore → execution skill
-    3. User types the literal string "GO" on a new line. NOT inferred.
-       Question tool "yes/no" answers do NOT count.
-    GO alone is NOT enough. Skills must be loaded first. GO resets after each execution turn.
+    3. User types "[run]" or "[run] all" on a new line. NOT inferred.
+       - "[run]" (default) — the agent MUST use the question tool to ask
+         scope (which slice/phase of the agreed plan) before execution.
+         Execution is limited to the chosen scope; the next [run] continues.
+       - "[run] all" — executes the entire plan in one go, up to and
+         including verification (typecheck/lint/format). No commits, no pushes.
+       - Question tool "yes/no" answers do NOT count as [run].
+    4. "STOP" (on its own line) interrupts a running [run all] and closes
+       the execution gate. Phase and skills are preserved.
 
   Phase-specific behavior:
     open_discussion — DISCUSS only.
@@ -135,7 +134,8 @@ const FLOW_DESCRIPTIONS = [
     refine — ANALYZE then IMPROVE.
     chore — EXECUTE directly. Minor changes, harness, typos only.
 
-  The agent proposes next steps. The user controls flow with trigger words (GO, RESET, STATE).`,
+  The agent proposes next steps. The user controls flow with trigger words
+  ([run], [run] all, STOP, RESET, STATE).`,
 ].join('\n');
 
 function buildAgentsContext(worktree: string): string {
@@ -193,26 +193,43 @@ async function buildContext(worktree: string): Promise<string> {
   // 5. Flow descriptions — new model (Open discussion + types)
   sections.push(FLOW_DESCRIPTIONS);
 
-  return sections.join('\n\n---\n\n').slice(0, MAX_CONTEXT_CHARS);
+  const text = sections.join('\n\n---\n\n');
+  return MAX_CONTEXT_CHARS === null ? text : text.slice(0, MAX_CONTEXT_CHARS);
 }
 
 // ── plugin ────────────────────────────────────────────────────────────────────
 
 // chat.message hook は廃止。inject status の user-visible 表示は不安定 (opencode #885 / #23440)。
 // system.transform 経由での LLM 注入のみ残す (agent は context を受け取るが、user chat には出ない)。
-export const InjectContextPlugin: Plugin = async ({ worktree }) => {
+export const InjectContextPlugin: Plugin = async ({ client, worktree }) => {
   const contextCache = new Map<string, Promise<string>>();
+
+  const notifyInjection = async (event: string, size: number) => {
+    const limitText = MAX_CONTEXT_CHARS === null ? '∞' : String(MAX_CONTEXT_CHARS);
+    await client.tui.showToast({
+      body: {
+        title: 'Context Injected',
+        message: `${event} · ${size} / ${limitText} chars`,
+        variant: 'info',
+        duration: 5000,
+      },
+    });
+  };
 
   return {
     event: async ({ event }) => {
       if (event.type === 'session.created') {
         const info = event.properties.info;
         if (info.parentID) return; // skip subagent
-        contextCache.set(info.id, buildContext(worktree));
+        const text = await buildContext(worktree);
+        contextCache.set(info.id, Promise.resolve(text));
+        await notifyInjection('Session created', text.length);
       }
       if (event.type === 'session.compacted') {
         const { sessionID } = event.properties;
-        contextCache.set(sessionID, buildContext(worktree));
+        const text = await buildContext(worktree);
+        contextCache.set(sessionID, Promise.resolve(text));
+        await notifyInjection('Session compacted', text.length);
       }
     },
 

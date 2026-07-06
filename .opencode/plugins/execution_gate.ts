@@ -20,7 +20,13 @@ interface SessionState {
   skills: Skills;
   excutionSkillTriggered: boolean;
 
-  userTriggered: boolean;
+  // [run] コマンドの状態
+  runMode: 'normal' | 'all' | null;
+  // [run] (no all) のスコープ確認を question ツールで待っているか
+  awaitingScopeAnswer: boolean;
+  // STOP トリガー検出済み (runMode クリア用)
+  isStopTriggered: boolean;
+
   pendingOutputTool: string | null;
   lastEvent: string | null;
   // ユーザー message の messageID (part filtering 用)
@@ -30,8 +36,6 @@ interface SessionState {
   // gh 実行系の issue スキルゲート
   issueSkillTurnsRemaining: number;
   readFiles: Set<string>;
-  // GO 以降に実行ツールを使ったか
-  toolsExecutedSinceGo: boolean;
 }
 
 function defaultState(): SessionState {
@@ -42,14 +46,15 @@ function defaultState(): SessionState {
       load: null,
     },
     excutionSkillTriggered: false,
-    userTriggered: false,
+    runMode: null,
+    awaitingScopeAnswer: false,
+    isStopTriggered: false,
     pendingOutputTool: null,
     lastEvent: null,
     userMessageIDs: new Set(),
     processedPartIDs: new Set(),
     issueSkillTurnsRemaining: 0,
     readFiles: new Set(),
-    toolsExecutedSinceGo: false,
   };
 }
 
@@ -165,13 +170,16 @@ function isBashReadOnly(command: string): boolean {
 
 // trigger words — first line, exact match (case sensitive)
 // 規約: trigger は文頭かつ完全一致。コンテンツを続けたい場合は改行で区切る。
-const EXECUTE_TRIGGERS = /^\s*(GO)\s*$/;
+const SETUP_TRIGGER = /^\s*\[setup\]\s+(design|build|refine|chore)\s*$/;
+const HARNESS_TRIGGER = /^\s*\[release-harness\]\s*$/;
+const RUN_TRIGGER = /^\s*\[run\]\s*(.*)$/;
+const STOP_TRIGGERS = /^\s*(STOP)\s*$/;
 const RESET_TRIGGERS = /^\s*(RESET)\s*$/;
 const STATE_TRIGGER = /^\s*(STATE)\s*$/;
 
 // md ファイル (.opencode 配下以外) は gate バイパス
 // docs/, README.md, 任意の *.md など user/project content は
-// セットアップ/feasibility/プラン/GO/execution skill を要求せず自由に作成更新可
+// セットアップ/feasibility/プラン/[run]/execution skill を要求せず自由に作成更新可
 // .opencode/ 配下の md は system なので通常 gate 適用
 function isFreeMarkdownPath(filePath: string): boolean {
   if (!filePath.endsWith('.md')) return false;
@@ -234,7 +242,8 @@ function formatState(state: SessionState): string {
   }
 
   const excution = state.excutionSkillTriggered;
-  const userReady = state.userTriggered;
+  const runMode = state.runMode;
+  const awaitingScope = state.awaitingScopeAnswer;
   const issueTurns = state.issueSkillTurnsRemaining;
 
   // 次に何をすべきか
@@ -245,8 +254,11 @@ function formatState(state: SessionState): string {
     next = `Trigger: ${missing.join(' → ')}`;
   } else if (!excution) {
     next = 'Trigger an execution skill (implement, debug, etc.)';
-  } else if (!userReady) {
-    next = "User must type literal 'GO' on a new line (not from question answers)";
+  } else if (runMode === null) {
+    next =
+      "User must type '[run]' on a new line to start execution (or '[run] all' to skip stage confirmation)";
+  } else if (runMode === 'normal' && awaitingScope) {
+    next = 'Agent must use the question tool to ask scope before execution';
   } else {
     next = 'All conditions met. Execute.';
   }
@@ -255,7 +267,8 @@ function formatState(state: SessionState): string {
   - Phase: ${phase}
   - Skills: ${skillsLoad || '(none required)'}
   - Execution Skill: ${excution ? '✓' : '✗'}
-  - User Ready: ${userReady ? '✓' : '✗'}
+  - Run Mode: ${runMode ?? 'none'}
+  - Awaiting Scope: ${awaitingScope ? '✓' : '✗'}
   - Issue Turns: ${issueTurns}
   - Next: ${next}`;
 }
@@ -266,13 +279,13 @@ function phaseDirective(phase: string): string {
     case 'open_discussion':
       return 'You are in open-discussion. DISCUSS and PROPOSE only. You CANNOT write code or edit files.';
     case 'design':
-      return 'You are in design phase. Build prototype, discuss, expand to full scope, produce design spec (Style Guide, matrices). Use feasibility → prepare → implement skills. GO resets after each execution turn. Do NOT implement production code.';
+      return 'You are in design phase. Build prototype, discuss, expand to full scope, produce design spec (Style Guide, matrices). Use feasibility → prepare → implement skills. After plan is agreed, user types "[run]" or "[run] all" to execute. Do NOT implement production code.';
     case 'build':
-      return 'You are in build phase. PLAN then IMPLEMENT. Use feasibility → prepare → implement skills. GO resets after each execution turn.';
+      return 'You are in build phase. PLAN then IMPLEMENT. Use feasibility → prepare → implement skills. After plan is agreed, user types "[run]" or "[run] all" to execute. User can type "STOP" to interrupt [run all].';
     case 'refine':
-      return 'You are in refine phase. ANALYZE then IMPROVE. Use feasibility → prepare → implement skills. GO resets after each execution turn.';
+      return 'You are in refine phase. ANALYZE then IMPROVE. Use feasibility → prepare → implement skills. After plan is agreed, user types "[run]" or "[run] all" to execute. User can type "STOP" to interrupt [run all].';
     case 'chore':
-      return 'You are in chore phase. Minor changes only — harness, typos, config.';
+      return 'You are in chore phase. Minor changes only — harness, typos, config. User types "[run]" to execute.';
     default:
       return '';
   }
@@ -326,13 +339,14 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         if (state.processedPartIDs.has(part.id)) return;
         state.processedPartIDs.add(part.id);
 
-        // ユーザーターン消費: issue スキルの有効ターンをデクリメント + GO を消費（実行があった場合のみ）
+        // ユーザーターン消費: issue スキルの有効ターンをデクリメント + runMode 消費
         if (state.issueSkillTurnsRemaining > 0) {
           state.issueSkillTurnsRemaining--;
         }
-        if (state.toolsExecutedSinceGo) {
-          state.userTriggered = false;
-          state.toolsExecutedSinceGo = false;
+        // runMode = 'normal' は1ターンで消費、'all' は消費しない
+        if (state.runMode === 'normal') {
+          state.runMode = null;
+          state.awaitingScopeAnswer = false;
         }
 
         const text = part.text;
@@ -360,7 +374,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           return;
         }
 
-        if (text.includes('[release-harness]')) {
+        if (HARNESS_TRIGGER.test(firstLine)) {
           isHarnessReleased = true;
           // formatState は isHarnessReleased=true で "Harness released" を返す
           await client.tui.showToast({
@@ -371,12 +385,13 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
               duration: 10000,
             },
           });
+          return;
         }
 
-        if (text.includes('[setup]')) {
+        const setupMatch = firstLine.match(SETUP_TRIGGER);
+        if (setupMatch) {
           isHarnessReleased = false;
-          const phaseMatch = text.match(/\[setup\]\s+(design|build|refine|chore)/);
-          const phase = (phaseMatch ? phaseMatch[1] : 'open_discussion') as PhaseType;
+          const phase = setupMatch[1] as PhaseType;
           state.phase = phase;
           state.skills = { type: phase, load: PHASE_LOADS[phase] } as Skills;
           state.lastEvent = `phase set to ${phase}`;
@@ -407,9 +422,36 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           return;
         }
 
-        if (EXECUTE_TRIGGERS.test(firstLine)) {
-          state.userTriggered = true;
-          state.lastEvent = 'user trigger GO — gate opened, proceed with implementation';
+        if (STOP_TRIGGERS.test(firstLine)) {
+          if (state.runMode !== null) {
+            state.runMode = null;
+            state.awaitingScopeAnswer = false;
+            state.lastEvent = 'STOP — run gate closed, phase preserved';
+            await client.tui.showToast({
+              body: {
+                title: 'Execution Gate',
+                message: formatState(state),
+                variant: 'info',
+                duration: 10000,
+              },
+            });
+          }
+          return;
+        }
+
+        const runMatch = text.match(RUN_TRIGGER);
+        if (runMatch) {
+          isHarnessReleased = false;
+          const args = runMatch[1].trim();
+          if (args === 'all') {
+            state.runMode = 'all';
+            state.awaitingScopeAnswer = false;
+            state.lastEvent = '[run] all — gate open, run the whole plan';
+          } else {
+            state.runMode = 'normal';
+            state.awaitingScopeAnswer = true;
+            state.lastEvent = '[run] default — stage confirmation required via question tool';
+          }
           await client.tui.showToast({
             body: {
               title: 'Execution Gate',
@@ -418,6 +460,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
               duration: 10000,
             },
           });
+          return;
         }
       }
 
@@ -621,9 +664,22 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         }
       }
 
-      // 実行ツール使用フラグ (GO 消費判定用)
-      if (!isAllowedTool(input.tool)) {
-        state.toolsExecutedSinceGo = true;
+      // question ツール: [run] (normal) のスコープ確認として使用された場合、
+      // awaitingScopeAnswer を false にして次の実行ターンを gate 開放する
+      if (input.tool === 'question') {
+        if (state.runMode === 'normal' && state.awaitingScopeAnswer) {
+          state.awaitingScopeAnswer = false;
+          state.lastEvent = 'scope question asked — gate open for execution turn';
+          await client.tui.showToast({
+            body: {
+              title: 'Execution Gate',
+              message: formatState(state),
+              variant: 'info',
+              duration: 10000,
+            },
+          });
+        }
+        return;
       }
     },
 
@@ -707,9 +763,13 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         );
       }
 
-      if (!state.userTriggered) {
+      if (state.runMode === null) {
         steps.push(
-          `${steps.length + 1}. User must type literal 'GO' on a new line (not from question answers)`,
+          `${steps.length + 1}. User must type '[run]' on a new line (with optional 'all' arg) to start execution`,
+        );
+      } else if (state.runMode === 'normal' && state.awaitingScopeAnswer) {
+        steps.push(
+          `${steps.length + 1}. Agent must use the 'question' tool to ask scope before execution`,
         );
       }
 
