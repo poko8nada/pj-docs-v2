@@ -119,11 +119,13 @@ const FLOW_DESCRIPTIONS = [
   Your role is to DISCUSS, RESEARCH, and PROPOSE — not to implement.
 
   To execute tools, ALL of these conditions must be met:
-    1. Phase set via [setup] (design, build, refine, or chore)
+    1. Phase set via user's [setup] command. This is a LITERAL custom command —
+       the user types "[setup] design" exactly. Question tool answers do NOT set phase.
     2. Required skills loaded IN ORDER — do not skip:
        design/build/refine → feasibility → prepare → execution skill
        chore → execution skill
-    3. User says GO
+    3. User types the literal string "GO" on a new line. NOT inferred.
+       Question tool "yes/no" answers do NOT count.
     GO alone is NOT enough. Skills must be loaded first. GO resets after each execution turn.
 
   Phase-specific behavior:

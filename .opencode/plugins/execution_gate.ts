@@ -240,13 +240,13 @@ function formatState(state: SessionState): string {
   // 次に何をすべきか
   let next = '';
   if (phase === 'open_discussion') {
-    next = 'Say [setup] design/build/refine/chore to begin';
+    next = 'Run [setup] design/build/refine/chore (user custom command, not inferred)';
   } else if (missing.length > 0) {
     next = `Trigger: ${missing.join(' → ')}`;
   } else if (!excution) {
     next = 'Trigger an execution skill (implement, debug, etc.)';
   } else if (!userReady) {
-    next = "Say 'GO' to unlock execution tools";
+    next = "User must type literal 'GO' on a new line (not from question answers)";
   } else {
     next = 'All conditions met. Execute.';
   }
@@ -561,6 +561,11 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         const name = args?.name;
         if (!name) return;
 
+        // open_discussion では gate state を更新しない(skill 自体は実行OK)
+        if (state.phase === 'open_discussion') {
+          return;
+        }
+
         // issue スキル: gh 実行系ゲートの有効ターンをリセット
         if (name === 'issue') {
           state.issueSkillTurnsRemaining = ISSUE_SKILL_TURNS;
@@ -576,9 +581,15 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           return;
         }
 
+        let stateChanged = false;
+
+        if (EXECUTION_SKILLS.includes(name)) {
+          state.excutionSkillTriggered = true;
+          stateChanged = true;
+        }
+
         const load = state.skills.load;
         if (load) {
-          let stateChanged = false;
           if (name in load) {
             state.skills = {
               ...state.skills,
@@ -586,20 +597,17 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
             };
             stateChanged = true;
           }
-          if (EXECUTION_SKILLS.includes(name)) {
-            state.excutionSkillTriggered = true;
-            stateChanged = true;
-          }
-          if (stateChanged) {
-            await client.tui.showToast({
-              body: {
-                title: 'Execution Gate',
-                message: formatState(state),
-                variant: 'info',
-                duration: 10000,
-              },
-            });
-          }
+        }
+
+        if (stateChanged) {
+          await client.tui.showToast({
+            body: {
+              title: 'Execution Gate',
+              message: formatState(state),
+              variant: 'info',
+              duration: 10000,
+            },
+          });
         }
 
         return;
@@ -652,7 +660,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           if (state.phase === 'open_discussion') {
             throw new Error(
               `[execution-gate] Blocked — gh commands require a phase.\n` +
-                `Next step: Say '[setup] design' (or build/refine/chore)`,
+                `Next step: Run [setup] design/build/refine/chore (user custom command, not inferred)`,
             );
           }
 
@@ -673,7 +681,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
       if (state.phase === 'open_discussion') {
         throw new Error(
           `[execution-gate] Blocked — open discussion phase.\n` +
-            `Next step: Ask user to set a phase with [setup] design/build/refine/chore`,
+            `Next step: Run [setup] design/build/refine/chore (user custom command, not inferred)`,
         );
       }
 
@@ -701,7 +709,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
 
       if (!state.userTriggered) {
         steps.push(
-          `${steps.length + 1}. Say 'GO' (GO alone is not enough — all steps above must be done first)`,
+          `${steps.length + 1}. User must type literal 'GO' on a new line (not from question answers)`,
         );
       }
 
