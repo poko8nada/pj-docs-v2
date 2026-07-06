@@ -285,58 +285,58 @@ Record semantic HTML quality and schema types found (e.g. `Organization`, `Produ
 
 #### Global services
 
-| Category    | Service          | Signal                                           |
-| ----------- | ---------------- | ------------------------------------------------ |
-| Analytics   | Google Analytics | `gtag`, `ga.js`, `analytics.js`                  |
-| Analytics   | Google Tag Manager | `gtm.js`, `GTM-` id                             |
-| Analytics   | Hotjar           | `hotjar.com`, `hj()`                             |
-| Analytics   | Microsoft Clarity | `clarity.ms`                                    |
-| Analytics   | Amplitude        | `amplitude.com`                                  |
-| Analytics   | FullStory        | `fullstory.com`                                  |
-| Marketing   | HubSpot          | `hs-scripts.com`, `hubspot`                      |
-| Marketing   | Marketo          | `munchkin.marketo.net`                           |
-| Marketing   | Pardot           | `pardot.com`                                     |
-| Chat        | Intercom         | `intercom.io`, `widget.intercom.io`              |
-| Chat        | Zendesk          | `zendesk.com`, `zdassets.com`                    |
-| Payment     | Stripe           | `js.stripe.com`                                  |
-| Error       | Sentry           | `sentry.io`                                      |
-| Search      | Algolia          | `algolianet.com`                                 |
+| Category  | Service            | Signal                              |
+| --------- | ------------------ | ----------------------------------- |
+| Analytics | Google Analytics   | `gtag`, `ga.js`, `analytics.js`     |
+| Analytics | Google Tag Manager | `gtm.js`, `GTM-` id                 |
+| Analytics | Hotjar             | `hotjar.com`, `hj()`                |
+| Analytics | Microsoft Clarity  | `clarity.ms`                        |
+| Analytics | Amplitude          | `amplitude.com`                     |
+| Analytics | FullStory          | `fullstory.com`                     |
+| Marketing | HubSpot            | `hs-scripts.com`, `hubspot`         |
+| Marketing | Marketo            | `munchkin.marketo.net`              |
+| Marketing | Pardot             | `pardot.com`                        |
+| Chat      | Intercom           | `intercom.io`, `widget.intercom.io` |
+| Chat      | Zendesk            | `zendesk.com`, `zdassets.com`       |
+| Payment   | Stripe             | `js.stripe.com`                     |
+| Error     | Sentry             | `sentry.io`                         |
+| Search    | Algolia            | `algolianet.com`                    |
 
 #### Japanese-specific services
 
 **Analytics / MA**
 
-| Service        | Signal                                       |
-| -------------- | -------------------------------------------- |
+| Service          | Signal                                          |
+| ---------------- | ----------------------------------------------- |
 | Yahoo! Analytics | `yimg.jp/es/analytics`, `analytics.yahoo.co.jp` |
-| Ptengine       | `ptengine.com`                               |
-| KARTE          | `karte.io`                                   |
-| Repro          | `repro.io`                                   |
-| Satori         | `satori.marketing`                           |
-| R-toaster      | `rtoaster.com`                               |
-| Kaizen Platform | `kaizenplatform.net`                        |
+| Ptengine         | `ptengine.com`                                  |
+| KARTE            | `karte.io`                                      |
+| Repro            | `repro.io`                                      |
+| Satori           | `satori.marketing`                              |
+| R-toaster        | `rtoaster.com`                                  |
+| Kaizen Platform  | `kaizenplatform.net`                            |
 
 **Chat / Support**
 
-| Service     | Signal              |
-| ----------- | ------------------- |
-| ChatPlus    | `chatplus.jp`       |
-| Tayori      | `tayori.com`        |
-| LINE        | `liff.line.me`, `tr.line.me`, `access.line.me` |
+| Service  | Signal                                         |
+| -------- | ---------------------------------------------- |
+| ChatPlus | `chatplus.jp`                                  |
+| Tayori   | `tayori.com`                                   |
+| LINE     | `liff.line.me`, `tr.line.me`, `access.line.me` |
 
 **Payment / EC**
 
-| Service       | Signal                                   |
-| ------------- | ---------------------------------------- |
-| PAY.JP        | `pay.jp`                                 |
-| GMO PG        | `mul-pay.com`                            |
-| SB Payment    | `sbpayment.jp`                           |
-| KOMOJU        | `komoju.com`                             |
-| EC-CUBE       | `eccube`                                 |
-| BASE          | `thebase.in`                             |
-| STORES        | `stores.jp`                              |
-| MakeShop      | `makeshop.jp`                            |
-| Color Me Shop | `shop-pro.jp`, `colormeapp.com`          |
+| Service       | Signal                          |
+| ------------- | ------------------------------- |
+| PAY.JP        | `pay.jp`                        |
+| GMO PG        | `mul-pay.com`                   |
+| SB Payment    | `sbpayment.jp`                  |
+| KOMOJU        | `komoju.com`                    |
+| EC-CUBE       | `eccube`                        |
+| BASE          | `thebase.in`                    |
+| STORES        | `stores.jp`                     |
+| MakeShop      | `makeshop.jp`                   |
+| Color Me Shop | `shop-pro.jp`, `colormeapp.com` |
 
 **Reservation**
 

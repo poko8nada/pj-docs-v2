@@ -1,24 +1,49 @@
 pre-commit:
-  parallel: true
-  commands:
-    format:
-      glob: '*.{js,jsx,ts,tsx}'
-      run: pnpm format:check {staged_files}
-      stage_fixed: true
-      fail_text: 'Format failed. Run: pnpm format:check to fix.'
-
-    lint:
-      glob: '*.{js,jsx,ts,tsx}'
-      run: pnpm lint {staged_files}
-      fail_text: 'Lint failed. Run: pnpm lint:fix for details. Fix the code, not the config.'
-
-    typecheck:
-      glob: '*.{js,jsx,ts,tsx}'
-      run: pnpm typecheck:staged {staged_files}
-      fail_text: 'Type check failed. Run: pnpm typecheck:staged for details.'
+  jobs:
+    - name: cleanup-uo
+      run: |
+        files=$(grep -rEln 'UO\[[0-9]+\]\[done\]' . --exclude-dir={node_modules,.git,dist})
+        if [ -n "$files" ]; then
+          echo "$files" | xargs sed -E -i '' '/UO\[[0-9]+\]\[done\]/d'
+          echo "$files" | xargs sed -E -i '' '/^$/N;/^\n$/d'
+          echo "☑︎ Removed [done] UO comments from: $files"
+          git add $files
+        fi
+        an_files=$(grep -rEln 'AN\[[a-z]+\]\[[0-9]+\]\[done\]' . --exclude-dir={node_modules,.git,dist})
+        if [ -n "$an_files" ]; then
+          echo "$an_files" | xargs sed -E -i '' '/AN\[[a-z]+\]\[[0-9]+\]\[done\]/d'
+          echo "$an_files" | xargs sed -E -i '' '/^$/N;/^\n$/d'
+          echo "☑︎ Removed [done] AN comments from: $an_files"
+          git add $an_files
+        fi
+    - name: checks
+      group:
+        parallel: true
+        jobs:
+          - name: format
+            glob: '*.{js,jsx,ts,tsx}'
+            run: pnpm format {staged_files}
+            stage_fixed: true
+            fail_text: 'Format auto-fixed. Re-stage and re-commit if needed (stage_fixed usually handles this).'
+          - name: lint
+            glob: '*.{js,jsx,ts,tsx}'
+            run: pnpm lint {staged_files}
+            fail_text: 'Lint failed. Run: pnpm lint:fix for details. Fix the code, not the config.'
+          - name: typecheck
+            glob: '*.{js,jsx,ts,tsx}'
+            run: pnpm typecheck:staged {staged_files}
+            fail_text: 'Type check failed. Run: pnpm typecheck:staged for details.'
 
 pre-push:
   commands:
+    check-uo:
+      run: |
+        if grep -rEn 'UO\[[0-9]+\]:' . --exclude-dir={node_modules,.git,dist} > /dev/null 2>&1; then
+          echo "× UO comments found:"
+          grep -rEn 'UO\[[0-9]+\]:' . --exclude-dir={node_modules,.git,dist}
+          exit 1
+        fi
+      fail_text: 'All UO comments must be resolved before pushing.'
     typecheck:
       run: pnpm typecheck
       fail_text: 'Type check failed. Run: pnpm typecheck for details.'
@@ -26,5 +51,5 @@ pre-push:
     #   run: pnpm test:run
     #   fail_text: 'Tests failed. Fix all failing tests before pushing.'
     # build:
-    # run: pnpm run rebuild
-    # fail_text: 'Build failed. Fix all issues before pushing.'
+    #   run: pnpm run rebuild
+    #   fail_text: 'Build failed. Fix all issues before pushing.'

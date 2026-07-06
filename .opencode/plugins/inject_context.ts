@@ -8,16 +8,6 @@ import { execFileSync } from 'child_process';
 const MAX_CONTEXT_CHARS = 4000;
 const MAX_LINE_LENGTH = 120;
 
-const IGNORE_DIRS = new Set([
-  'node_modules',
-  '.git',
-  '.opencode',
-  'dist',
-  'build',
-  '.next',
-  'coverage',
-]);
-
 // グローバル opencode 配下の memory Layer 2 を直接参照
 // $XDG_CONFIG_HOME を優先、未設定なら ~/.config にフォールバック
 const LAYER_2_PATH = path.join(
@@ -53,28 +43,7 @@ function readIfExists(filePath: string, max = 500): string {
   }
 }
 
-function fileSize(filePath: string): number {
-  if (!fs.existsSync(filePath)) return 0;
-  try {
-    return fs.readFileSync(filePath, 'utf-8').length;
-  } catch {
-    return 0;
-  }
-}
-
-function buildFlatTree(dir: string): string {
-  try {
-    const entries = fs
-      .readdirSync(dir, { withFileTypes: true })
-      .filter((e) => !IGNORE_DIRS.has(e.name))
-      .toSorted((a, b) => a.name.localeCompare(b.name));
-    return entries
-      .map((entry) => (entry.isDirectory() ? `📁 ${entry.name}/` : `📄 ${entry.name}`))
-      .join('\n');
-  } catch {
-    return '';
-  }
-}
+// ── GitHub issues ─────────────────────────────────────────────────────────────
 
 function readGithubIssues(worktree: string): string {
   try {
@@ -99,60 +68,73 @@ function readGithubIssues(worktree: string): string {
   }
 }
 
-function hasGithubIssues(worktree: string): boolean {
+function readSpecIssue(worktree: string): { title: string; body: string } | null {
   try {
     const stdout = execFileSync(
       'gh',
-      ['issue', 'list', '--state', 'open', '--json', 'number', '--limit', '1'],
+      ['issue', 'list', '--state', 'open', '--json', 'number,title,body', '--limit', '10'],
       { cwd: worktree, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
     );
     const issues = JSON.parse(stdout);
-    return Array.isArray(issues) && issues.length > 0;
+    if (!Array.isArray(issues)) return null;
+
+    // Find issue with [Spec] prefix in title
+    const spec = issues.find(
+      (i: unknown) => typeof i.title === 'string' && i.title.startsWith('[Spec]'),
+    );
+    if (!spec) return null;
+
+    return {
+      title: spec.title,
+      body: sanitize(spec.body || ''),
+    };
   } catch {
-    return false;
+    return '';
   }
 }
 
-// ── inject status ─────────────────────────────────────────────────────────────
-
-type InjectStatus = {
-  agents: { ok: boolean; size: number };
-  layer2: { ok: boolean; size: number };
-  issues: { ok: boolean; count: number };
-  readme: { ok: boolean; size: number };
-  tree: { ok: boolean; size: number };
-};
-
-function buildInjectStatus(worktree: string): InjectStatus {
-  const agentsPath = path.join(worktree, 'AGENTS.md');
-  const layer2Path = LAYER_2_PATH;
-  const readmePath = path.join(worktree, 'README.md');
-
-  return {
-    agents: { ok: fileSize(agentsPath) > 0, size: fileSize(agentsPath) },
-    layer2: { ok: fileSize(layer2Path) > 0, size: fileSize(layer2Path) },
-    issues: { ok: hasGithubIssues(worktree), count: hasGithubIssues(worktree) ? 1 : 0 },
-    readme: { ok: fileSize(readmePath) > 0, size: fileSize(readmePath) },
-    tree: { ok: buildFlatTree(worktree).length > 0, size: buildFlatTree(worktree).length },
-  };
-}
-
-function formatStatusField(s: { ok: boolean; size?: number; count?: number }): string {
-  return s.ok ? `✓ ${s.size ?? s.count} chars` : '✗ not found';
-}
-
-function formatInjectStatus(status: InjectStatus): string {
-  return [
-    '[Inject Status]',
-    `- AGENTS.md: ${formatStatusField(status.agents)}`,
-    `- Memory Layer 2: ${formatStatusField(status.layer2)}`,
-    `- GitHub Issues: ${status.issues.ok ? `✓ ${status.issues.count}+` : '✗ none'}`,
-    `- README.md: ${formatStatusField(status.readme)}`,
-    `- Project Tree: ${formatStatusField(status.tree)}`,
-  ].join('\n');
-}
-
 // ── context builders ──────────────────────────────────────────────────────────
+
+const FLOW_DESCRIPTIONS = [
+  '## Project protocol',
+  '',
+  `The project is driven by design → build → refine as one loop.
+  - Design is based on the spec issue.
+  - Build is based on the design.
+  - Refine is performed based on the build.`,
+  '',
+  `Project phases and states are managed by issues. Especially, "spec" issue is a definition of a project.
+  Here is the definition of each phase.
+
+  | phase  | overview                                           |
+  | ------ | -------------------------------------------------- |
+  | design | Agree on design / project direction                |
+  | build  | Implement product                                  |
+  | refine | Refactor / polish product                          |
+  | chore  | meta / minor modify / others (harness, typo, etc.) |`,
+  '',
+  '## Session Flow',
+  '',
+  `Every session starts in **open-discussion.** You CANNOT execute tools (edit, write, bash).
+  Your role is to DISCUSS, RESEARCH, and PROPOSE — not to implement.
+
+  To execute tools, ALL of these conditions must be met:
+    1. Phase set via [setup] (design, build, refine, or chore)
+    2. Required skills loaded IN ORDER — do not skip:
+       design/build/refine → feasibility → prepare → execution skill
+       chore → execution skill
+    3. User says GO
+    GO alone is NOT enough. Skills must be loaded first. GO resets after each execution turn.
+
+  Phase-specific behavior:
+    open_discussion — DISCUSS only.
+    design — Build prototype → discuss → expand to full scope → produce design spec (Style Guide, matrices).
+    build — PLAN then IMPLEMENT.
+    refine — ANALYZE then IMPROVE.
+    chore — EXECUTE directly. Minor changes, harness, typos only.
+
+  The agent proposes next steps. The user controls flow with trigger words (GO, RESET, STATE).`,
+].join('\n');
 
 function buildAgentsContext(worktree: string): string {
   return readIfExists(path.join(worktree, 'AGENTS.md'), 4000);
@@ -162,17 +144,27 @@ function buildLayer2Context(_worktree: string): string {
   return readIfExists(LAYER_2_PATH, 2000);
 }
 
+function buildSpecContext(worktree: string): string {
+  const spec = readSpecIssue(worktree);
+  if (spec) {
+    return ['## Spec', '', `### ${spec.title}`, '', spec.body].join('\n');
+  }
+
+  // No spec found — suggest checking for project documents
+  return [
+    '## No spec Found',
+    '',
+    'No spec issue exists yet. Check if there are planning documents in the project',
+    '(e.g., README.md, docs/). If so, review them and consider creating a spec',
+    'issue to track the product design.',
+  ].join('\n');
+}
+
 function buildProjectContext(worktree: string): string {
   const sections: string[] = [];
 
   const issues = readGithubIssues(worktree);
   if (issues) sections.push(['## Open GitHub Issues', '', '```text', issues, '```'].join('\n'));
-
-  const readme = readIfExists(path.join(worktree, 'README.md'), 500);
-  if (readme) sections.push(['## README', '', '```text', readme, '```'].join('\n'));
-
-  const tree = buildFlatTree(worktree);
-  if (tree) sections.push(['## Project Structure', '', '```text', tree, '```'].join('\n'));
 
   return sections.join('\n\n---\n\n');
 }
@@ -186,26 +178,28 @@ async function buildContext(worktree: string): Promise<string> {
 
   // 2. Layer 2 — what to know (memory principles)
   const layer2 = buildLayer2Context(worktree);
-  if (layer2)
-    sections.push(['# Memory Principles (Layer 2)', '', '```text', layer2, '```'].join('\n'));
+  if (layer2) sections.push(['# Memory Principles', '', '```text', layer2, '```'].join('\n'));
 
-  // 3. Project Context — current state
+  // 3. Spec — product design
+  const spec = buildSpecContext(worktree);
+  if (spec) sections.push(['# Product Design', '', spec].join('\n'));
+
+  // 4. Project Context — current state
   const project = buildProjectContext(worktree);
   if (project) sections.push(['# Project Context', '', project].join('\n'));
+
+  // 5. Flow descriptions — new model (Open discussion + types)
+  sections.push(FLOW_DESCRIPTIONS);
 
   return sections.join('\n\n---\n\n').slice(0, MAX_CONTEXT_CHARS);
 }
 
 // ── plugin ────────────────────────────────────────────────────────────────────
 
+// chat.message hook は廃止。inject status の user-visible 表示は不安定 (opencode #885 / #23440)。
+// system.transform 経由での LLM 注入のみ残す (agent は context を受け取るが、user chat には出ない)。
 export const InjectContextPlugin: Plugin = async ({ worktree }) => {
   const contextCache = new Map<string, Promise<string>>();
-  // Sessions that should receive a one-time Inject Status display.
-  const pendingStatus = new Set<string>();
-
-  const enqueueStatus = (sessionID: string) => {
-    if (sessionID) pendingStatus.add(sessionID);
-  };
 
   return {
     event: async ({ event }) => {
@@ -213,12 +207,10 @@ export const InjectContextPlugin: Plugin = async ({ worktree }) => {
         const info = event.properties.info;
         if (info.parentID) return; // skip subagent
         contextCache.set(info.id, buildContext(worktree));
-        enqueueStatus(info.id);
       }
       if (event.type === 'session.compacted') {
         const { sessionID } = event.properties;
         contextCache.set(sessionID, buildContext(worktree));
-        enqueueStatus(sessionID);
       }
     },
 
@@ -233,30 +225,6 @@ export const InjectContextPlugin: Plugin = async ({ worktree }) => {
       if (!ctx?.trim()) return;
 
       output.system.push(ctx);
-    },
-
-    'chat.message': async (input, output) => {
-      const sessionID = input.sessionID;
-      if (!sessionID) return;
-      if (!pendingStatus.has(sessionID)) return;
-      pendingStatus.delete(sessionID);
-
-      const status = buildInjectStatus(worktree);
-      const text = formatInjectStatus(status);
-
-      const firstPart = output.parts.find((p) => p.type === 'text');
-      if (!firstPart || firstPart.type !== 'text') return;
-
-      const messageID = output.message.id;
-      if (!messageID) return;
-
-      output.parts.unshift({
-        type: 'text',
-        id: `prt_${crypto.randomUUID()}`,
-        sessionID,
-        messageID,
-        text,
-      });
     },
   };
 };

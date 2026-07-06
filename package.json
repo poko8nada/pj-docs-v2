@@ -8,10 +8,10 @@
     "test": "vitest --passWithNoTests",
     "test:run": "vitest run --passWithNoTests",
     "lint": "oxlint",
-    "lint:fix": "oxlint --fix .",
+    "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p .opencode/tsconfig.json",
     "typecheck:staged": "tsc-files",
     "prepare": "lefthook install"
   },
