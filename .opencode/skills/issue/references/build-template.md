@@ -12,7 +12,7 @@ Use this template for the Build issue body. Reference the Design issue's body an
 - Build turns a Design into working code. The deliverable is a 5-section plan, locked by explicit user agreement, then a vertical-slice implementation.
 - The plan must reconcile research with the actual codebase before any slice is written.
 - Slices are vertical, not horizontal — one slice per concern (R / C / U / D, draft → harden), each verifiable in one sitting. Bundled slices are forbidden.
-- Reference `prototype/_design-spec.md` and the Design issue for component structure, Props, and TODOs.
+- Reference the [Design] issue body for component structure, Props, and TODOs. Fetch with `gh issue view <design_number> --json body | jq -r '.body'`.
 
 ### Success Criteria
 

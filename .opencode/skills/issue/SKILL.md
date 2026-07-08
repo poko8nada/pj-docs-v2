@@ -26,6 +26,7 @@ Discuss with the user. Revise based on their feedback. Repeat until aligned. Onl
 
 - **Spec** — The product design for one feature area. Holds the abstract Goal, Scope, Architecture, and decisions. Rarely changes; only updated when Goal / Scope / Architecture shifts.
 - **Phase issues** — Design, Build, Refine issues are created just-in-time and closed after completion. Each phase references the previous phase's issue content, all comments, and the current codebase.
+- **Design issue body is the spec** — The design spec (Style Guide, Component Matrix / Page Structure, Section Matrix) lives in the [Design] issue body and is kept up to date throughout the design phase via `gh issue edit --body "$(cat <<'EOF' ... EOF)"`.
 - **Comments** — The living work log. Spec comments record lifecycle events. Phase issue comments record updates and progress.
 - Issues serve as session-to-session memory. Always reference the issue number in commits and PR descriptions.
 - **Update Spec body** — Only when Goal / Scope / Architecture changes. After updating, record the change and its reason in a comment.
@@ -80,5 +81,6 @@ When creating a phase issue, the content must reference:
 
 ## References
 
-- Phase templates: `references/spec-template.md`, `references/design-template.md`, `references/build-template.md`, `references/refine-template.md`
+- Phase templates: `references/spec-template.md`, `references/design-app-template.md`, `references/design-web-template.md`, `references/build-template.md`, `references/refine-template.md`
+- Design has two variants — app and web — chosen from project type and stack. Use the matching template.
 - Commands: `references/commands.md`

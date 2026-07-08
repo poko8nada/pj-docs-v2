@@ -129,7 +129,7 @@ const FLOW_DESCRIPTIONS = [
 
   Phase-specific behavior:
     open_discussion — Discuss freely. Create .md files anywhere outside .opencode/. Manage issues via \`gh\` (Spec/Design/Build/Refine) as long as the \`issue\` skill is triggered and the corresponding template is read. Code implementation requires [setup] design/build/refine/chore.
-    design — Build prototype → discuss → expand to full scope → produce design spec (Style Guide, matrices).
+    design — Build prototype → discuss → expand to full scope → produce design spec (Style Guide, matrices) in the [Design] issue body.
     build — PLAN then IMPLEMENT.
     refine — ANALYZE then IMPROVE.
     chore — EXECUTE directly. Minor changes, harness, typos only.

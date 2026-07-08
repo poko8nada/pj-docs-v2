@@ -2,13 +2,13 @@
 
 **These are the rules and protocol one should be aware of before beginning implementaion on the session.**
 
-Build a realistic default screen using production-ready components to align on design direction and clarify what needs to be built. The screen is the discussion tool. The real deliverable is the spec that comes out of the conversation.
+Build a realistic default screen using production-ready components to align on design direction and clarify what needs to be built. The screen is the discussion tool. The real deliverable is the spec that comes out of the conversation, stored in the [Design] issue body.
 
 ## Principle
 
-The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. One screen: default. The conversation around the screen produces the real output: a component matrix and a minimal style guide in `_design-spec.md`.
+The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. One screen: default. The conversation around the screen produces the real output: a component matrix and a minimal style guide in the [Design] issue body.
 
-`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not `_design-spec.md`, not the default screen. Delete `prototype/` when the product can speak for itself.
+`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not the design spec (which lives in the [Design] issue body), not the default screen. Delete `prototype/` when the product can speak for itself.
 
 ---
 
@@ -30,18 +30,10 @@ The default screen is the standard loaded state a typical user sees after the ap
 Read `package.json` and config files. Then:
 
 **File-routing frameworks** (Next.js App Router, SvelteKit, Nuxt, Remix, etc.)
-→ `prototype/default` inside the routing root
+→ `prototype/index.tsx` inside the routing root (e.g., `app/prototype/index.tsx` for App Router).
 
 **Non-routing setups** (Vite + React, Vite + Vue, plain HTML, etc.)
-→ `src/prototype/default` or `prototype/default.html` at project root
-
-### Directory structure
-
-```
-prototype/
-  default.tsx    ← the only screen
-  _design-spec.md        ← generated at the end
-```
+→ `src/prototype/index.tsx` or `prototype/index.html` at project root
 
 ### Components
 
@@ -234,15 +226,15 @@ Use this list as a thinking prompt. Not all will apply — propose only what mak
 - `PATCH /tasks/:id` — update task
 - `DELETE /tasks/:id` — delete task
 
-These populate the **Component Matrix** and **Implementation Matrix** in `_design-spec.md` — they are not built as additional screens.
+These populate the **Component Matrix** and **Implementation Matrix** in the [Design] issue body — they are not built as additional screens.
 
 ---
 
-## Step 4 — Generate spec.md
+## Step 4 — Update [Design] issue body
 
-When the screen and component list are aligned, generate `prototype/_design-spec.md`.
-Underscore prefix (`_`) prevents the file from being treated as a route by Next.js, SvelteKit, and Nuxt.
-If your framework uses a different convention for ignoring files, adjust accordingly.
+The design spec lives in the [Design] issue body — not in a local file. Throughout the design phase, keep the body up to date. Each time the design conversation changes a decision, reflect it in the body before the next user turn.
+
+### Body structure (app)
 
 ```markdown
 # Design Spec
@@ -289,6 +281,13 @@ Generated from app-design-align session.
 | `api/tasks/[id]/route.ts` | updateTask, deleteTask | PATCH, DELETE /tasks/:id |
 ```
 
+### Update procedure
+
+1. Compose the full body in a heredoc and pass via `gh issue edit <design_number> --body "$(cat <<'EOF' ... EOF)"`.
+2. Do not skip sections. Every section in the structure above must be present in the final body, even with `(none)` for empty entries.
+
+See `issue/references/commands.md` for the exact `gh` invocation.
+
 ---
 
 ## Step 5 — Hand off
@@ -297,4 +296,4 @@ Generated from app-design-align session.
 
 **If a significant design change comes up during the build** — delete `prototype/` and run app-design-align again from scratch. Do not version or accumulate screens inside `prototype/`. Each run is disposable and self-contained.
 
-**If a small change comes up** — modify the product directly. Update `_design-spec.md` by hand if it still matters. Do not re-run app-design-align for minor adjustments.
+**If a small change comes up** — modify the product directly. Update the [Design] issue body by hand if it still matters. Do not re-run app-design-align for minor adjustments.

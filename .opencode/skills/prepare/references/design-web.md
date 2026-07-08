@@ -6,9 +6,9 @@ Build a realistic default screen using production-ready components to align on d
 
 ## Principle
 
-The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. One screen: default. The conversation around the screen produces the real output: a page structure, a section matrix, and a style guide in `_design-spec.md`.
+The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. One screen: default. The conversation around the screen produces the real output: a page structure, a section matrix, and a style guide in the [Design] issue body.
 
-`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not `_design-spec.md`, not the default screen. Delete `prototype/` when the product can speak for itself.
+`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not the design spec (which lives in the [Design] issue body), not the default screen. Delete `prototype/` when the product can speak for itself.
 
 ---
 
@@ -46,18 +46,10 @@ The default screen is the top page of the site — the entry point of the design
 Read `package.json` and config files. Then:
 
 **File-routing frameworks** (Next.js App Router, SvelteKit, Nuxt, Remix, etc.)
-→ `prototype/default` inside the routing root
+→ `prototype/index.tsx` inside the routing root (e.g., `app/prototype/index.tsx` for App Router).
 
 **Non-routing setups** (Vite + React, Vite + Vue, plain HTML, etc.)
-→ `src/prototype/default` or `prototype/default.html` at project root
-
-### Directory structure
-
-```
-prototype/
-  default.tsx    ← the only screen
-  _design-spec.md        ← generated at the end
-```
+→ `src/prototype/index.tsx` or `prototype/index.html` at project root
 
 ### Pages
 
@@ -236,15 +228,13 @@ Use this list as a thinking prompt. Not all will apply — propose only what mak
 - Filtered view — if structure changes significantly
 - Multi-level navigation expanded
 
-These pages and sections are added to the page structure in `_design-spec.md` — they are not built as additional screens.
+These pages and sections are added to the page structure in the [Design] issue body — they are not built as additional screens.
 
 ---
 
-## Step 5 — Generate spec.md
+## Step 5 — Update [Design] issue body
 
-When the page list and section list are aligned, generate `prototype/_design-spec.md`.
-Underscore prefix (`_`) prevents the file from being treated as a route by Next.js, SvelteKit, and Nuxt.
-If your framework uses a different convention for ignoring files, adjust accordingly.
+The design spec lives in the [Design] issue body — not in a local file. Throughout the design phase, keep the body up to date. Each time the design conversation changes a decision, reflect it in the body before the next user turn.
 
 ```markdown
 # Design Spec
@@ -319,6 +309,13 @@ Generated from web-design-align session.
 | ServerError  | centered    | centered        | heading, message, button |
 ```
 
+### Update procedure
+
+1. Compose the full body in a heredoc and pass via `gh issue edit <design_number> --body "$(cat <<'EOF' ... EOF)"`.
+2. Do not skip sections. Every section in the structure above must be present in the final body, even with `(none)` for empty entries.
+
+See `issue/references/commands.md` for the exact `gh` invocation.
+
 ---
 
 ## Step 6 — Hand off
@@ -327,4 +324,4 @@ Generated from web-design-align session.
 
 **If a significant design change comes up during the build** — delete `prototype/` and run web-design-align again from scratch. Do not version or accumulate screens inside `prototype/`. Each run is disposable and self-contained.
 
-**If a small change comes up** — modify the product directly. Update `_design-spec.md` by hand if it still matters. Do not re-run web-design-align for minor adjustments.
+**If a small change comes up** — modify the product directly. Update the [Design] issue body by hand if it still matters. Do not re-run web-design-align for minor adjustments.

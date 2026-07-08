@@ -33,6 +33,38 @@ gh issue list --state open --limit 10
 gh issue view <number>
 ```
 
+## Edit issue body (for Design spec body updates)
+
+The design spec is stored directly in the [Design] issue body and updated as the design conversation evolves. The LLM keeps the body up to date throughout the design phase.
+
+Pass the full body via `--body` with a heredoc. The heredoc keeps multi-line markdown intact without temp files or path concerns.
+
+```bash
+gh issue edit <design_number> --body "$(cat <<'EOF'
+## Goal
+<this unit's goal>
+
+## Reference
+- Spec: #<spec_number>
+
+## Style Guide
+### Color
+| Token | Value | Use |
+| Brand | #3B82F6 | primary CTA |
+
+## Component Matrix
+| Component | Props | State | TODO |
+| Header   | siteName, nav | - | - |
+EOF
+)"
+```
+
+To read the body (used by the build phase to fetch the spec):
+
+```bash
+gh issue view <design_number> --json body | jq -r '.body'
+```
+
 ## Comment examples
 
 ```bash

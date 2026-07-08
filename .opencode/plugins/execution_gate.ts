@@ -85,12 +85,15 @@ const EXECUTION_SKILLS = ['implement', 'debug', 'image-search', 'readme'];
 // issue スキルの有効ターン数 (ユーザーメッセージを跨いで生存)
 const ISSUE_SKILL_TURNS = 2;
 
-// タイトルプレフィックス → 対応リファレンス
-const PREFIX_REFERENCES: Record<string, string> = {
-  '[Spec]': '.opencode/skills/issue/references/spec-template.md',
-  '[Design]': '.opencode/skills/issue/references/design-template.md',
-  '[Build]': '.opencode/skills/issue/references/build-template.md',
-  '[Refine]': '.opencode/skills/issue/references/refine-template.md',
+// タイトルプレフィックス → 対応リファレンス（複数可）
+const PREFIX_REFERENCES: Record<string, string[]> = {
+  '[Spec]': ['.opencode/skills/issue/references/spec-template.md'],
+  '[Design]': [
+    '.opencode/skills/issue/references/design-app-template.md',
+    '.opencode/skills/issue/references/design-web-template.md',
+  ],
+  '[Build]': ['.opencode/skills/issue/references/build-template.md'],
+  '[Refine]': ['.opencode/skills/issue/references/refine-template.md'],
 };
 
 // allowlist: tools that BYPASS the gate (read-only / workflow helpers / MCP ツール)
@@ -225,11 +228,12 @@ export function checkIssueGate(
   if (title) {
     const prefix = detectPrefix(title);
     if (prefix) {
-      const refRel = PREFIX_REFERENCES[prefix];
-      if (refRel) {
-        const refAbs = canonicalPath(refRel, worktree);
-        if (!state.readFiles.has(refAbs)) {
-          return `reference not read: ${refRel}`;
+      const refRels = PREFIX_REFERENCES[prefix];
+      if (refRels) {
+        // 複数候補のいずれかが読まれていれば OK（例: Design は app/web どちらか）
+        const anyRead = refRels.some((rel) => state.readFiles.has(canonicalPath(rel, worktree)));
+        if (!anyRead) {
+          return `reference not read: ${refRels.join(' or ')}`;
         }
       }
     }
@@ -331,7 +335,7 @@ function phaseDirective(phase: string): string {
     case 'open_discussion':
       return 'You are in open-discussion. You CAN discuss, create .md files anywhere outside .opencode/, and manage issues via `gh` (Spec/Design/Build/Refine) when the `issue` skill is triggered and the corresponding template is read. You CANNOT edit code files (.ts, .tsx, etc.) or run non-`gh` working bash — those require [setup] design/build/refine/chore.';
     case 'design':
-      return 'You are in design phase. Build prototype, discuss, expand to full scope, produce design spec (Style Guide, matrices). Use feasibility → prepare → implement skills. After plan is agreed, user types "[run]" or "[run] all" to execute. Do NOT implement production code.';
+      return 'You are in design phase. Build prototype, discuss, expand to full scope, produce design spec (Style Guide, matrices) in the [Design] issue body. Use feasibility → prepare → implement skills. After plan is agreed, user types "[run]" or "[run] all" to execute. Do NOT implement production code.';
     case 'build':
       return 'You are in build phase. PLAN then IMPLEMENT. Use feasibility → prepare → implement skills. After plan is agreed, user types "[run]" or "[run] all" to execute. User can type "STOP" to interrupt [run all].';
     case 'refine':
