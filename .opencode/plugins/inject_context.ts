@@ -128,7 +128,7 @@ const FLOW_DESCRIPTIONS = [
        the execution gate. Phase and skills are preserved.
 
   Phase-specific behavior:
-    open_discussion — DISCUSS only.
+    open_discussion — Discuss freely. Create .md files anywhere outside .opencode/. Manage issues via \`gh\` (Spec/Design/Build/Refine) as long as the \`issue\` skill is triggered and the corresponding template is read. Code implementation requires [setup] design/build/refine/chore.
     design — Build prototype → discuss → expand to full scope → produce design spec (Style Guide, matrices).
     build — PLAN then IMPLEMENT.
     refine — ANALYZE then IMPROVE.
@@ -136,6 +136,26 @@ const FLOW_DESCRIPTIONS = [
 
   The agent proposes next steps. The user controls flow with trigger words
   ([run], [run] all, STOP, RESET, STATE).`,
+].join('\n');
+
+// 実行ゲートの責務分離を LLM に伝える
+// - 読み取り専用ツール: 常に許可
+// - .md ファイル (.opencode/ 配下以外): 常に許可 (notes / design docs / spec drafts 用途)
+// - bash `gh` (write): issue スキル + テンプレ (フェーズ非依存)
+// - bash read-only / gh read-only: 常に許可
+// - .opencode/* or non-md の edit/write/patch + その他の working bash: phase + execution skill + [run]
+const PHASE_RULES = [
+  '## Phase Rules',
+  '',
+  'The execution gate separates three concerns:',
+  '',
+  '- **Read-only tools** (read, grep, glob, websearch, webfetch, question, todowrite): always allowed.',
+  '- **`.md` files outside `.opencode/`** (edit/write/patch): always allowed in any phase — use freely for notes, design docs, spec drafts.',
+  '- **bash `gh` (write)**: gated by `issue` skill trigger + corresponding template read. **Phase-agnostic** — Spec/Design/Build/Refine issues are operable in any phase as long as the gate is satisfied.',
+  '- **bash read-only / `gh` read-only** (ls, cat, gh issue list, gh search, etc.): always allowed.',
+  '- **`.opencode/*` or non-md files** (edit/write/patch) and **other working bash**: requires phase ≠ open_discussion + execution skill + `[run]`.',
+  '',
+  '**Phase gates code implementation, not issue management.**',
 ].join('\n');
 
 function buildAgentsContext(worktree: string): string {
@@ -192,6 +212,9 @@ async function buildContext(worktree: string): Promise<string> {
 
   // 5. Flow descriptions — new model (Open discussion + types)
   sections.push(FLOW_DESCRIPTIONS);
+
+  // 6. Phase Rules — 実行ゲートの責務分離
+  sections.push(PHASE_RULES);
 
   const text = sections.join('\n\n---\n\n');
   return MAX_CONTEXT_CHARS === null ? text : text.slice(0, MAX_CONTEXT_CHARS);

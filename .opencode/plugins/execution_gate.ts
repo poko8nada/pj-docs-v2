@@ -1,4 +1,5 @@
 import type { Plugin } from '@opencode-ai/plugin';
+import * as path from 'path';
 
 // phase → load の対応
 const PHASE_LOADS = {
@@ -18,7 +19,7 @@ type Skills = {
 interface SessionState {
   phase: PhaseType;
   skills: Skills;
-  excutionSkillTriggered: boolean;
+  executionSkillTriggered: boolean;
 
   // [run] コマンドの状態
   runMode: 'normal' | 'all' | null;
@@ -45,7 +46,7 @@ function defaultState(): SessionState {
       type: 'open_discussion',
       load: null,
     },
-    excutionSkillTriggered: false,
+    executionSkillTriggered: false,
     runMode: null,
     awaitingScopeAnswer: false,
     isStopTriggered: false,
@@ -168,11 +169,19 @@ function isBashReadOnly(command: string): boolean {
   );
 }
 
+// path 正規化: 相対/絶対を worktree からの絶対パスに揃える
+// - 絶対パスはそのまま返す（worktree 配下前提）
+// - 相対パスは worktree 起点で解決
+// - "./" や "../" も path.resolve が吸収
+export function canonicalPath(p: string, worktree: string): string {
+  return path.resolve(worktree, p);
+}
+
 // trigger words — first line, exact match (case sensitive)
 // 規約: trigger は文頭かつ完全一致。コンテンツを続けたい場合は改行で区切る。
 const SETUP_TRIGGER = /^\s*\[setup\]\s+(design|build|refine|chore)\s*$/;
-const HARNESS_TRIGGER = /^\s*\[release-harness\]\s*$/;
-const RUN_TRIGGER = /^\s*\[run\]\s*(.*)$/;
+export const HARNESS_TRIGGER = /^\s*\[release-harness\]\s*$/;
+export const RUN_TRIGGER = /^\s*\[run\]\s*(.*)$/;
 const STOP_TRIGGERS = /^\s*(STOP)\s*$/;
 const RESET_TRIGGERS = /^\s*(RESET)\s*$/;
 const STATE_TRIGGER = /^\s*(STATE)\s*$/;
@@ -203,9 +212,11 @@ export function detectPrefix(title: string): string | null {
 }
 
 // gh 実行系コマンドのバリデーション。null なら許可、文字列ならブロック理由
-export function validateGhCommand(
+// フェーズに依存しない: どの phase でも issue スキルが効いてれば通る
+export function checkIssueGate(
   state: { issueSkillTurnsRemaining: number; readFiles: Set<string> },
   command: string,
+  worktree: string,
 ): string | null {
   if (state.issueSkillTurnsRemaining <= 0) {
     return 'issue skill not triggered (or turns expired)';
@@ -214,11 +225,51 @@ export function validateGhCommand(
   if (title) {
     const prefix = detectPrefix(title);
     if (prefix) {
-      const refFile = PREFIX_REFERENCES[prefix];
-      if (!state.readFiles.has(refFile)) {
-        return `reference not read: ${refFile}`;
+      const refRel = PREFIX_REFERENCES[prefix];
+      if (refRel) {
+        const refAbs = canonicalPath(refRel, worktree);
+        if (!state.readFiles.has(refAbs)) {
+          return `reference not read: ${refRel}`;
+        }
       }
     }
+  }
+  return null;
+}
+
+// コード実装ゲート: phase + execution skill + run mode を要求
+// gh / .md outside .opencode/ / read-only はこのゲートを通らない
+// SessionState の構造的部分型を受け取る: テスタビリティのため
+export function checkCodeGate(state: {
+  phase: string;
+  skills: { load: Record<string, boolean> | null };
+  executionSkillTriggered: boolean;
+  runMode: 'normal' | 'all' | null;
+  awaitingScopeAnswer: boolean;
+}): string | null {
+  if (state.phase === 'open_discussion') {
+    return 'open discussion phase';
+  }
+  const load = state.skills.load;
+  if (load) {
+    const missing: string[] = [];
+    for (const skill of Object.keys(load)) {
+      if (!load[skill]) {
+        missing.push(skill);
+      }
+    }
+    if (missing.length > 0) {
+      return `missing skills: ${missing.join(', ')}`;
+    }
+  }
+  if (!state.executionSkillTriggered) {
+    return 'execution skill not triggered';
+  }
+  if (state.runMode === null) {
+    return "user must type '[run]' on a new line";
+  }
+  if (state.runMode === 'normal' && state.awaitingScopeAnswer) {
+    return 'awaiting scope confirmation via question tool';
   }
   return null;
 }
@@ -241,7 +292,7 @@ function formatState(state: SessionState): string {
       .join('\n');
   }
 
-  const excution = state.excutionSkillTriggered;
+  const execution = state.executionSkillTriggered;
   const runMode = state.runMode;
   const awaitingScope = state.awaitingScopeAnswer;
   const issueTurns = state.issueSkillTurnsRemaining;
@@ -249,10 +300,11 @@ function formatState(state: SessionState): string {
   // 次に何をすべきか
   let next = '';
   if (phase === 'open_discussion') {
-    next = 'Run [setup] design/build/refine/chore (user custom command, not inferred)';
+    next =
+      'Discuss, create .md files, or manage issues via `gh`. Run [setup] only when code implementation is needed.';
   } else if (missing.length > 0) {
     next = `Trigger: ${missing.join(' → ')}`;
-  } else if (!excution) {
+  } else if (!execution) {
     next = 'Trigger an execution skill (implement, debug, etc.)';
   } else if (runMode === null) {
     next =
@@ -266,7 +318,7 @@ function formatState(state: SessionState): string {
   return `## Execution Gate State
   - Phase: ${phase}
   - Skills: ${skillsLoad || '(none required)'}
-  - Execution Skill: ${excution ? '✓' : '✗'}
+  - Execution Skill: ${execution ? '✓' : '✗'}
   - Run Mode: ${runMode ?? 'none'}
   - Awaiting Scope: ${awaitingScope ? '✓' : '✗'}
   - Issue Turns: ${issueTurns}
@@ -277,7 +329,7 @@ function formatState(state: SessionState): string {
 function phaseDirective(phase: string): string {
   switch (phase) {
     case 'open_discussion':
-      return 'You are in open-discussion. DISCUSS and PROPOSE only. You CANNOT write code or edit files.';
+      return 'You are in open-discussion. You CAN discuss, create .md files anywhere outside .opencode/, and manage issues via `gh` (Spec/Design/Build/Refine) when the `issue` skill is triggered and the corresponding template is read. You CANNOT edit code files (.ts, .tsx, etc.) or run non-`gh` working bash — those require [setup] design/build/refine/chore.';
     case 'design':
       return 'You are in design phase. Build prototype, discuss, expand to full scope, produce design spec (Style Guide, matrices). Use feasibility → prepare → implement skills. After plan is agreed, user types "[run]" or "[run] all" to execute. Do NOT implement production code.';
     case 'build':
@@ -291,7 +343,7 @@ function phaseDirective(phase: string): string {
   }
 }
 
-export const ExecutionGatePlugin: Plugin = async ({ client }) => {
+export const ExecutionGatePlugin: Plugin = async ({ client, worktree }) => {
   // subagent session は gate 状態不要 (inject_context と同じ判断)
   const subagentSessions = new Set<string>();
 
@@ -439,7 +491,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           return;
         }
 
-        const runMatch = text.match(RUN_TRIGGER);
+        const runMatch = firstLine.match(RUN_TRIGGER);
         if (runMatch) {
           isHarnessReleased = false;
           const args = runMatch[1].trim();
@@ -627,7 +679,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         let stateChanged = false;
 
         if (EXECUTION_SKILLS.includes(name)) {
-          state.excutionSkillTriggered = true;
+          state.executionSkillTriggered = true;
           stateChanged = true;
         }
 
@@ -657,10 +709,11 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
       }
 
       // read ツールの追跡 (issue リファレンス read 検知用)
+      // path は canonicalPath で正規化: 相対/絶対混在を吸収して PREFIX_REFERENCES と比較可能にする
       if (input.tool === 'read') {
         const filePath = input.args?.filePath as string | undefined;
         if (filePath) {
-          state.readFiles.add(filePath);
+          state.readFiles.add(canonicalPath(filePath, worktree));
         }
       }
 
@@ -711,17 +764,10 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
 
         // working gh check: issue スキルゲート + プレフィックス検証
         // read-only gh は前段の isBashReadOnly で bypass 済み
+        // gh は phase とは独立: issue スキルが効いてれば open_discussion でも通る
         const trimmed = bashCommand.trimStart();
         if (/^\s*gh\s+/.test(trimmed)) {
-          if (state.phase === 'open_discussion') {
-            throw new Error(
-              `[execution-gate] Blocked — gh commands require a phase.\n` +
-                `Next step: Run [setup] design/build/refine/chore (user custom command, not inferred)`,
-            );
-          }
-
-          // issue スキルゲート: 有効ターン内か + プレフィックス検証
-          const ghError = validateGhCommand(state, trimmed);
+          const ghError = checkIssueGate(state, trimmed, worktree);
           if (ghError) {
             throw new Error(
               `[execution-gate] Blocked — ${ghError}.\n` +
@@ -729,52 +775,18 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
             );
           }
 
-          return; // gh は専用ゲート通過で許可
+          return; // gh は issue ゲート通過で許可
         }
       }
 
-      // open discussion なら全ブロック (phase チェック)
-      if (state.phase === 'open_discussion') {
+      // コード実装ゲート: phase + execution skill + run mode
+      // gh / .md outside .opencode/ / read-only はすでに上で return 済み
+      const codeError = checkCodeGate(state);
+      if (codeError) {
         throw new Error(
-          `[execution-gate] Blocked — open discussion phase.\n` +
-            `Next step: Run [setup] design/build/refine/chore (user custom command, not inferred)`,
+          `[execution-gate] Blocked — ${codeError}.\n` +
+            `Next step: Run [setup] design/build/refine/chore or trigger the required skills.`,
         );
-      }
-
-      const missing: string[] = [];
-      const steps: string[] = [];
-
-      const load = state.skills.load;
-      if (load) {
-        for (const skill of Object.keys(load)) {
-          if (!load[skill as keyof typeof load]) {
-            missing.push(skill);
-          }
-        }
-      }
-
-      if (missing.length > 0) {
-        steps.push(`1. Trigger: ${missing.join(' → ')}`);
-      }
-
-      if (!state.excutionSkillTriggered) {
-        steps.push(
-          `${steps.length + 1}. Trigger an execution skill (${EXECUTION_SKILLS.join(', ')})`,
-        );
-      }
-
-      if (state.runMode === null) {
-        steps.push(
-          `${steps.length + 1}. User must type '[run]' on a new line (with optional 'all' arg) to start execution`,
-        );
-      } else if (state.runMode === 'normal' && state.awaitingScopeAnswer) {
-        steps.push(
-          `${steps.length + 1}. Agent must use the 'question' tool to ask scope before execution`,
-        );
-      }
-
-      if (steps.length > 0) {
-        throw new Error(`[execution-gate] Blocked. Complete these steps:\n${steps.join('\n')}`);
       }
     },
   };

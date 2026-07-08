@@ -93,18 +93,17 @@ export const ForceReviewPlugin: Plugin = async ({ $ }) => {
         const text = part.text;
         if (!text.trim()) return;
 
-        if (text.includes('[release-harness]')) {
+        // trigger は firstLine 基準で統一 (execution_gate.ts と一貫)
+        const firstLine =
+          text
+            .split('\n')
+            .map((l) => l.trim())
+            .find((l) => l.length > 0) ?? '';
+
+        if (firstLine === '[release-harness]') {
           isHarnessReleased = true;
         }
-        if (
-          text.includes('[setup]') ||
-          RESET_TRIGGERS.test(
-            text
-              .split('\n')
-              .map((l) => l.trim())
-              .find((l) => l.length > 0) ?? '',
-          )
-        ) {
+        if (firstLine.startsWith('[setup]') || RESET_TRIGGERS.test(firstLine)) {
           isHarnessReleased = false;
         }
         return;
