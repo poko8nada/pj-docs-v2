@@ -1,32 +1,32 @@
 ---
-description: プリコンパクトメモを保存する。次回 compaction プロンプトをデフォルトから MECE 構造に置換し、重要な状態を保持する。
+description: Save a pre-compaction memo. Replaces the default compaction prompt with a MECE structure on the next compaction to preserve important state.
 ---
 
-セッションを compaction する前に、`precompact_save` ツールを使って重要な状態をキャプチャする。
+Before compacting the session, use the `precompact_save` tool to capture important state.
 
-ツールの `content` パラメータに以下の 4 セクションを埋めて呼び出すこと（**必ず全て埋める**）:
+Call the tool with the `content` parameter filled in with the 4 sections below (**all sections must be filled**):
 
-## 1. 採用済み決定 (Adopted Decisions)
+## 1. Adopted Decisions
 
-このセッションで**実際に実装された**決定のみ記載する。先に決定されたが上書きされたものがある場合、最終版のみを書く。検討のみで reject された代替案は書かない。
+Only list decisions that were **actually implemented** in this session. If a previous decision was overwritten, only write the final version. Do not list alternatives that were considered but rejected.
 
-## 2. 却下したアプローチ (Rejected Approaches)
+## 2. Rejected Approaches
 
-却下した各アプローチについて、何を試して、なぜ reject されたか、代わりに何を採用したかを記載。compaction 後の再提案を防ぐために重要。
+For each rejected approach, describe what was tried, why it was rejected, and what was used instead. This prevents re-proposing after compaction.
 
-## 3. フェーズ境界 (Phase Boundaries)
+## 3. Phase Boundaries
 
-現在のphase (open_discussion / design / build / refine / chore)。ユーザーと合意した明示的な制約（例: 「デプロイ前に検証」「破壊的操作は確認必須」）。現在の run mode。
+Current phase (open_discussion / design / build / refine / chore). Explicit constraints agreed with the user (e.g., "verify before deploy", "destructive operations require confirmation"). Current run mode.
 
-## 4. セッション状態 (Session State)
+## 4. Session State
 
-- 現在の phase
-- run mode (normal / all、scope 確認待機の有無)
-- issue スキル残ターン数
-- 次に取るアクション（ユーザーと合意済み）
+- Current phase
+- Run mode (normal / all, and whether scope confirmation is pending)
+- Issue skill remaining turns
+- Next action to take (agreed with the user)
 
-呼び出し: `precompact_save({ content: "<上記 4 セクションの markdown>" })`
+Invocation: `precompact_save({ content: "<markdown of the 4 sections above>" })`
 
-`write` は使用しないこと。ツールは note を plugin メモリに保存し、デフォルトの compaction プロンプト テンプレートを 4 セクションを統合する MECE 構造に置換する。
+Do not use `write`. The tool saves the note to plugin memory and replaces the default compaction prompt template with a MECE structure that integrates the 4 sections.
 
-Note: /precompact を呼ばなくても MECE テンプレートは常に使われる（[ADOPTED]/[REJECTED] タグと「次のアクション」の禁則付き）。ただし明示的に /precompact を実行することで、LLM に head start を与え、決定/却下を verbatim でキャプチャできる。
+Note: The MECE template is always used even without /precompact (with [ADOPTED]/[REJECTED] tags and forbidden patterns for "next action"). However, explicitly running /precompact gives the LLM a head start and captures decisions/rejections verbatim.
