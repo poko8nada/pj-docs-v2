@@ -1,83 +1,110 @@
+# Design (web) Template
+
+Use this template for the Design (web) issue body. Reference the Spec issue's body and all comments when creating. 1 Design issue is open at a time during the design phase.
+
+```markdown
 <!-- FOR AGENT — do not edit. Operating instructions. -->
 
 ## For Agent: Operating Instructions
 
 ### Principles
 
-- Design aligns on visual and structural direction through a default screen — a thinking surface, not a prototype.
-- Components are written production-ready from the start. Hardcoded data only: no event handlers, no state, no fetched data.
-- The real deliverable is the spec, stored in the [Design] issue body. The body evolves with the design conversation.
-- The LLM keeps the [Design] issue body up to date throughout the phase via `gh issue edit --body "$(cat <<'EOF' ... EOF)"`.
-- `prototype/` is disposable. Significant changes during build → delete it and re-run Design.
+- Design aligns on visual direction through the Wireframe (homepage) and the Design Spec (Web Type, Style Guide, Page Structure, Section Matrix, Implementation Matrix).
+- The Plan (Slices) is in the body. Slices are vertical user-facing concerns (e.g., "Hero", "Features", "Post list"). One slice includes all sections for that concern, the index.tsx update, and the comment blocks.
+- The Plan format (Slices + Notes) is defined by this template. Prepare fills in the slice list; the agent marks slices done and updates Notes at natural break points.
+- The Design Spec is the deliverable. The Wireframe is the visual reference.
 
 ### Success Criteria
 
-- Default screen renders with realistic data and visible edge cases.
-- Every component has a structured comment block (state, Props, TODO).
-- The [Design] issue body has all spec sections filled (Style Guide, Page Structure, Section Matrix for web) — no `(TBD)` placeholders left.
+- Homepage renders with realistic data and visible edge cases.
+- Every section has a structured comment block.
+- The Design Spec (Web Type, Style Guide, Page Structure, Section Matrix, Implementation Matrix) is filled with no `(TBD)` placeholders.
 - User has confirmed the screen in the browser before Design closes.
 
 ### Common Failure Modes
 
-- Treating `prototype/` as the product. Writing components in a one-off style instead of production location.
-- Skipping the Section Matrix, or leaving component comments vague.
-- Building more than one screen. Adding interactivity, state, or fetched data.
-- Accumulating `prototype/` versions instead of regenerating it whole.
+- Treating the homepage as a prototype to maintain. It is a thinking surface.
+- Skipping the Section Matrix or leaving section comments vague.
+- Building more than one page. Adding interactivity, state, or fetched data.
 - Closing Design with `(TBD)` placeholders still in the body.
 
 <!-- FOR AGENT — do not edit. Operating instructions. -->
 
 ---
 
-## Goal
-
-<このユニットで何を設計するか>
-
 ## Reference
 
 - Spec: #<spec_number>
 - Key decisions from Spec comments: <summary>
 
-## What
+---
 
-<何を設計するか — コンポーネント、ページ、スタイル等>
+# Plan (進捗管理)
 
-## Constraints
+## Slices
 
-- <制約事項1>
-- <制約事項2>
+- [ ] 
+- [ ] 
+- [ ] 
 
-## Output
+## Notes
 
-- Style Guide + Page Structure + Section Matrix（[Design] issue body）
+---
+
+# Wireframe (homepage)
+
+```
++----------------------+
+|                      |
++----------------------+
+|                      |
+|                      |
++----------------------+
+|                      |
+|                      |
++----------------------+
+|                      |
+|                      |
++----------------------+
+|                      |
++----------------------+
+```
 
 ---
 
 # Design Spec (web)
+
+## Web Type
 
 ## Style Guide
 
 ### Color
 
 | Token | Value | Use |
-| ----- | ----- | --- |
+| --- | --- | --- |
 
 ### Typography
 
 | Token | Value | Use |
-| ----- | ----- | --- |
+| --- | --- | --- |
 
 ### Spacing
 
 | Token | Value | Use |
-| ----- | ----- | --- |
+| --- | --- | --- |
 
 ## Page Structure
 
 | Page | URL | Sections |
-| ---- | --- | -------- |
+| --- | --- | --- |
 
 ## Section Matrix
 
 | Section | Layout (PC) | Layout (Mobile) | Main parts |
-| ------- | ----------- | --------------- | ---------- |
+| --- | --- | --- | --- |
+
+## Implementation Matrix
+
+| File | Functions | API |
+| --- | --- | --- |
+```
