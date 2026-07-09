@@ -27,6 +27,7 @@ Discuss with the user. Revise based on their feedback. Repeat until aligned. Onl
 - **Spec** — The product design for one feature area. Holds the abstract Goal, Scope, Architecture, and decisions. Rarely changes; only updated when Goal / Scope / Architecture shifts.
 - **Phase issues** — Design, Build, Refine issues are created just-in-time and closed after completion. Each phase references the previous phase's issue content, all comments, and the current codebase.
 - **Design issue body is the spec** — The design spec (Style Guide, Component Matrix / Page Structure, Section Matrix) lives in the [Design] issue body and is kept up to date throughout the design phase via `gh issue edit --body "$(cat <<'EOF' ... EOF)"`.
+- **Build / Refine issue body has a Progress section** — `# Build Progress` / `# Refine Progress` lives at the bottom of the body. It tracks stage completion across sessions and is updated as work proceeds. The Design issue follows the same pattern with `# Design Spec (app/web)` as the spec surface.
 - **Comments** — The living work log. Spec comments record lifecycle events. Phase issue comments record updates and progress.
 - Issues serve as session-to-session memory. Always reference the issue number in commits and PR descriptions.
 - **Update Spec body** — Only when Goal / Scope / Architecture changes. After updating, record the change and its reason in a comment.
@@ -36,11 +37,11 @@ Discuss with the user. Revise based on their feedback. Repeat until aligned. Onl
 ```
 Spec (1 per product/version)
   ↓ (Spec body + all comments)
-Design → Design complete (close issue)
+Design (body: Style Guide + Component Matrix / Page Structure + Section Matrix)
   ↓ (Design Issue body + all comments + codebase)
-Build → Build complete (close issue)
+Build (body: Plan + Build Progress)
   ↓ (Build Issue body + all comments + codebase)
-Refine → Refine complete (close issue)
+Refine (body: Plan + Refine Progress)
   ↓
 Next Spec
 ```
@@ -49,22 +50,22 @@ Next Spec
 
 Every lifecycle event must produce a comment. The comment is the work log.
 
-| Event           | Target       | Comment format                            |
-| --------------- | ------------ | ----------------------------------------- |
-| Spec created    | -            | (no comment — creation body is enough)    |
-| Spec updated    | Spec         | `## 更新: <what changed>\n<why>`          |
-| Design created  | Spec         | `## Design作成: <title>\n<what>`          |
-| Design updated  | Design Issue | `## 更新: <what changed>\n<why>`          |
-| Design progress | Design Issue | `## 進捗: <current state>`                |
-| Design complete | Spec         | `## Design完了: <title>\n<what was done>` |
-| Build created   | Spec         | `## Build作成: <title>\n<what>`           |
-| Build updated   | Build Issue  | `## 更新: <what changed>\n<why>`          |
-| Build progress  | Build Issue  | `## 進捗: <current state>`                |
-| Build complete  | Spec         | `## Build完了: <title>\n<what was done>`  |
-| Refine created  | Spec         | `## Refine作成: <title>\n<what>`          |
-| Refine updated  | Refine Issue | `## 更新: <what changed>\n<why>`          |
-| Refine progress | Refine Issue | `## 進捗: <current state>`                |
-| Refine complete | Spec         | `## Refine完了: <title>\n<what was done>` |
+| Event           | Target       | Comment format                            | Body update pairing                          |
+| --------------- | ------------ | ----------------------------------------- | -------------------------------------------- |
+| Spec created    | -            | (no comment — creation body is enough)    | -                                            |
+| Spec updated    | Spec         | `## 更新: <what changed>\n<why>`          | Spec body 更新とペア                         |
+| Design created  | Spec         | `## Design作成: <title>\n<what>`          | -                                            |
+| Design updated  | Design Issue | `## 更新: <what changed>\n<why>`          | Design body 更新とペア                       |
+| Design progress | Design Issue | `## 進捗: <current state>`                | `# Design Spec (app/web)` 更新と必ずペア     |
+| Design complete | Spec         | `## Design完了: <title>\n<what was done>` | Design issue close + Spec コメント           |
+| Build created   | Spec         | `## Build作成: <title>\n<what>`           | -                                            |
+| Build updated   | Build Issue  | `## 更新: <what changed>\n<why>`          | Build body 更新とペア                        |
+| Build progress  | Build Issue  | `## 進捗: <current state>`                | `# Build Progress` 更新と必ずペア            |
+| Build complete  | Spec         | `## Build完了: <title>\n<what was done>`  | Build issue close + Spec コメント            |
+| Refine created  | Spec         | `## Refine作成: <title>\n<what>`         | -                                            |
+| Refine updated  | Refine Issue | `## 更新: <what changed>\n<why>`          | Refine body 更新とペア                       |
+| Refine progress | Refine Issue | `## 進捗: <current state>`                | `# Refine Progress` 更新と必ずペア           |
+| Refine complete | Spec         | `## Refine完了: <title>\n<what was done>` | Refine issue close + Spec コメント           |
 
 When creating a phase issue, the content must reference:
 

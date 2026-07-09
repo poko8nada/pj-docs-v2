@@ -56,4 +56,18 @@ Use this template for the Build issue body. Reference the Design issue's body an
 ## Verify
 
 <どう検証するか — test pass + ユーザーがアプリ動かして確認>
+
+---
+
+# Build Progress
+
+## Stages
+
+<!-- [Order] セクションの slice 一覧を stage 単位で転記。stage 完了時に [x] に更新する -->
+
+- [ ]
+
+## Notes
+
+<!-- 各 stage 完了時のメモ、out-of-scope / defer / 仕様変更など、次セッションが拾う情報 -->
 ```

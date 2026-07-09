@@ -59,9 +59,9 @@ To execute tools, ALL of these conditions must be met:
 Phase-specific behavior:
 
 - **open_discussion** — Discuss freely. Create \`.md\` files anywhere outside \`.opencode/\`. Manage issues via \`gh\` (Spec / Design / Build / Refine) as long as the \`issue\` skill is triggered and the corresponding template is read. Code implementation requires \`[setup] design / build / refine / chore\`.
-- **design** — Build prototype → discuss → expand to full scope → produce design spec (Style Guide, matrices) in the \`[Design]\` issue body.
-- **build** — PLAN then IMPLEMENT.
-- **refine** — ANALYZE then IMPROVE.
+- **design** — Build prototype → discuss → expand to full scope. The plan is the 7 stages (project setup, components, default screen, component comments, discuss/iterate, update issue body, hand off). The spec (Style Guide, matrices) is written to the [Design] issue body in one shot at run stage 6.
+- **build** — PLAN then IMPLEMENT. The plan's slice list is written to the # Build Progress section of the [Build] issue body at prepare time; each [run] updates the Stages checkboxes and appends to the ## Notes section at completion (or STOP).
+- **refine** — ANALYZE then IMPROVE. The plan's tier-grouped slice list is written to the # Refine Progress section of the [Refine] issue body at prepare time; each [run] updates the Stages checkboxes and appends to the ## Notes section at completion (or STOP).
 - **chore** — EXECUTE directly. Minor changes, harness, typos only.
 
 The agent proposes next steps. The user controls flow with trigger words (\`[run]\`, \`[run] all\`, \`STOP\`, \`RESET\`, \`STATE\`).

@@ -65,6 +65,47 @@ To read the body (used by the build phase to fetch the spec):
 gh issue view <design_number> --json body | jq -r '.body'
 ```
 
+## Edit issue body (for Build / Refine progress updates)
+
+The Build / Refine Progress section lives at the bottom of the issue body. After each `[run]` invocation (or STOP), update the section to mark completed stages and append a note. The same heredoc pattern as Design applies.
+
+```bash
+gh issue edit <build_number> --body "$(cat <<'EOF'
+... existing body content ...
+
+# Build Progress
+
+## Stages
+
+- [x] Stage 1: <done>
+- [ ] Stage 2: <next>
+
+## Notes
+
+- Stage 1: <one-line summary>
+EOF
+)"
+
+# Refine (same pattern, with impact tier labels)
+gh issue edit <refine_number> --body "$(cat <<'EOF'
+... existing body content ...
+
+# Refine Progress
+
+## Stages (by impact tier)
+
+- [x] **High**: <done>
+- [ ] **Medium**: <next>
+
+## Notes
+
+- High tier: <one-line summary>
+EOF
+)"
+```
+
+Pair each `gh issue edit` call with a `## 進捗:` comment on the same issue — the comment is the event log, the body edit is the structured record.
+
 ## Comment examples
 
 ```bash

@@ -58,4 +58,21 @@ Use this template for the Refine issue body. Reference the Build issue's body an
 ## Verify
 
 <どう検証するか — 既存テストが通ること + 改善効果の確認>
+
+---
+
+# Refine Progress
+
+## Stages (by impact tier)
+
+<!-- [Order] セクションの slice を High / Medium / Low / Risky でグルーピング。stage 完了時に [x] に更新する -->
+
+- [ ] **High**:
+- [ ] **Medium**:
+- [ ] **Low**:
+- [ ] **Risky**:
+
+## Notes
+
+<!-- 各 stage 完了時のメモ、out-of-scope / defer / 仕様変更など、次セッションが拾う情報 -->
 ```

@@ -232,7 +232,7 @@ These populate the **Component Matrix** and **Implementation Matrix** in the [De
 
 ## Step 4 — Update [Design] issue body
 
-The design spec lives in the [Design] issue body — not in a local file. Throughout the design phase, keep the body up to date. Each time the design conversation changes a decision, reflect it in the body before the next user turn.
+The design spec lives in the [Design] issue body — not in a local file. The body is written **in one shot at run stage 6** (`Update the [Design] issue body`). Stages 1–5 of the run (project setup, components, default screen, component comments, discuss/iterate) do not touch the body — the prototype and the chat discussion are the working surface during those stages.
 
 ### Body structure (app)
 

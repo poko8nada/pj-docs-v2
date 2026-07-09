@@ -28,8 +28,10 @@ If the user types `[run] all`, the agent executes `all`. Otherwise the agent use
 5. Execute ONLY the chosen stage. Do not touch out-of-scope units.
 6. Run verification as needed: `pnpm typecheck && pnpm lint && pnpm format:check`.
 7. Mark executed units as `completed` in `todowrite`.
-8. Present a confirm message (changed files, deviations, verification result).
-9. Stop. Do not proceed to the next stage. The next `/run` continues.
+8. **Update the issue body** — read it via `gh issue view <number> --json body | jq -r '.body'`, mark the completed stage's checkbox as `[x]` in `# Build Progress` / `# Refine Progress`, append a one-line summary to `## Notes`, then write back via `gh issue edit`. For design stage 6, the body update is the full spec (Style Guide + matrices). For design stages 1–5, skip the body write — only the comment in step 9 fires. See "Body update procedure" below.
+9. **Post a `## 進捗:` comment** on the issue with the same one-line summary (see issue skill's Comment Rules).
+10. Present a confirm message (changed files, deviations, verification result).
+11. Stop. Do not proceed to the next stage. The next `/run` continues.
 
 # all flow
 
@@ -38,8 +40,52 @@ If the user types `[run] all`, the agent executes `all`. Otherwise the agent use
 3. Execute the entire plan.
 4. Run verification once: `pnpm typecheck && pnpm lint && pnpm format:check`.
 5. Mark all units as `completed`.
-6. Present a final confirm message.
-7. Stop. The user can interrupt with `STOP` (lightweight) or `RESET` (full state clear).
+6. **Update the issue body** — mark all completed stages' checkboxes as `[x]`, append a per-stage summary to `## Notes` (or write the full spec for design stage 6). See "Body update procedure" below.
+7. **Post a single `## 進捗:` comment** on the issue with the overall summary.
+8. Present a final confirm message.
+9. Stop. The user can interrupt with `STOP` (lightweight) or `RESET` (full state clear).
+
+# Body update procedure
+
+After executing a stage (default flow) or all stages (`all` flow), the issue body must be updated to reflect the work done. This makes progress durable across sessions — the next session reads the body and resumes from the last completed stage.
+
+## Which section to update
+
+- **build phase** → `# Build Progress` (every `[run]`)
+- **refine phase** → `# Refine Progress` (every `[run]`)
+- **design phase** → `# Design Spec (app/web)` (only at stage 6; stages 1–5 leave the body untouched)
+
+## Procedure
+
+1. **Read the current body**:
+   ```bash
+   gh issue view <number> --json body | jq -r '.body'
+   ```
+
+2. **Modify the progress section** in memory:
+   - **build / refine**: change `- [ ] Stage N: ...` to `- [x] Stage N: ...` for each completed stage, and append a one-line entry per stage to `## Notes` (preserve tier labels for refine)
+   - **design stage 6**: replace the spec content (Style Guide + Component Matrix for app, or Style Guide + Page Structure + Section Matrix for web) — no `(TBD)` placeholders
+
+3. **Write back** via heredoc. Preserve all sections above the progress section untouched:
+   ```bash
+   gh issue edit <number> --body "$(cat <<'EOF'
+   <full modified body>
+   EOF
+   )"
+   ```
+
+4. **Post the `## 進捗:` comment** on the issue with a one-line summary:
+   ```bash
+   gh issue comment <number> --body "## 進捗: <what was done in this run, one line>"
+   ```
+
+## Notes
+
+- The body section may be empty or missing if the issue was created before the empty Progress section was added to the issue template. In that case, the section is created on first update.
+- If the body update fails (e.g., body too large for heredoc), fall back to writing to a temp file and using `--body-file`.
+- Pair the `gh issue edit` (body) with the `gh issue comment` (event log) — both happen in the same step, not separately.
+- For design stages 1–5, skip the body write — the spec section is created at stage 6. The `## 進捗:` comment is still posted.
+- See `.opencode/skills/issue/references/commands.md` for the full `gh` invocation examples.
 
 # What "all" means (HARD boundary)
 
@@ -143,7 +189,7 @@ On subsequent `/run` invocations, read `todowrite` to identify completed units. 
 
 # Stopping
 
-While in `/run all` (or while running a default-flow stage), interrupt by typing `STOP` on its own line. This closes the gate but keeps phase and skills loaded — resume with another `/run`. For a full reset (clear phase, skills, run state), use `RESET` instead. Do NOT include `STOP` in any other text. It is a trigger, not a word.
+While in `/run all` (or while running a default-flow stage), interrupt by typing `STOP` on its own line. **The agent must update the issue body before stopping** — mark the stages done so far as `[x]`, append a partial summary to `## Notes`, and post a `## 進捗:` comment indicating partial completion (see "Body update procedure"). The gate then closes, but phase and skills are kept loaded — resume with another `/run`. For a full reset (clear phase, skills, run state), use `RESET` instead. Do NOT include `STOP` in any other text. It is a trigger, not a word.
 
 # Hard rules
 
