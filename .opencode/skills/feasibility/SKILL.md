@@ -1,6 +1,6 @@
 ---
 name: feasibility
-description: "Pre-plan technical-feasibility investigation. Anchors every claim in current best practices with 3 independent sources (Official / Practice / Failure) per topic. Required by the execution gate before plan submission."
+description: "Investigate technical topics with 3 sources (Official / Practice / Failure) for current best practice. Use when making technical decisions, validating an unfamiliar approach, or filling a knowledge gap. Do not use for non-technical tasks or when the answer is already known."
 compatibility: opencode
 ---
 
@@ -29,33 +29,21 @@ Use the stack to decide **what to investigate and what to skip**.
 ## Tool usage policy
 
 - **Chat text — Step 1 & 2.** Present context, propose topics, and discuss in plain prose. The user responds in chat.
-- **`todowrite` tool — Step 3 only.** Publish the investigation checklist.
-- **`question` tool — Step 4 only.** Final confirmation of research output.
+- **`todowrite` tool — Step 2 only.** Publish the investigation checklist.
+- **`question` tool — Step 3 only.** Final confirmation of research output.
 
-## Step 1: Context & Understanding
+## Step 1: Propose topics
 
-Before proposing topics, establish shared understanding. Present in one message:
-
-**Context** (max 2 sentences)
-{current project phase, what's been decided, what problem we're solving}
-
-**Understanding** (max 3 sentences)
-{why this investigation is needed, what technical decisions depend on it, what constraints apply}
-
-Discuss with the user. Revise based on their feedback. Repeat until aligned. Do not proceed to Step 2 until agreement is reached.
-
-## Step 2: Propose topics
-
-Based on the agreed understanding, propose 2-5 candidate topics.
+Propose 2-5 candidate topics.
 
 A topic is:
 
 - A specific question, not a vague area ("How to drag-and-drop with @dnd-kit on a grid" not "DnD")
 - Actionable — a topic's answer can become a step
 
-Propose in chat (not via the `question` tool). The user picks, edits, or proposes alternatives. Discuss until the topic list is agreed. The 3-source rule (Official / Practice / Failure) is enforced during Step 3, not at topic selection. If investigation cannot find 3 sources, the topic was too vague — revise it and re-investigate.
+Propose in chat (not via the `question` tool). The user picks, edits, or proposes alternatives. Discuss until the topic list is agreed. The 3-source rule (Official / Practice / Failure) is enforced during Step 2, not at topic selection. If investigation cannot find 3 sources, the topic was too vague — revise it and re-investigate.
 
-## Step 3: Investigate (TodoWrite for tracking)
+## Step 2: Investigate (TodoWrite for tracking)
 
 For each topic, perform **3 investigations** with different roles.
 
@@ -98,11 +86,11 @@ Mark each item done as you complete the corresponding investigation.
 
 A single source is not evidence. 3 sources with different roles is the minimum.
 
-## Step 4: Output & Confirm
+## Step 3: Output & Confirm
 
 After investigating all topics, compile the findings into Markdown and post to chat.
 
-The MD structure is fixed. The labels below are in English; the agent translates them to the user's language (typically Japanese) when rendering the MD to chat. The topic names must match the topics agreed in Step 2.
+The MD structure is fixed. The labels below are in English; the agent translates them to the user's language (typically Japanese) when rendering the MD to chat. The topic names must match the topics agreed in Step 1.
 
 ```markdown
 ## Research
@@ -130,7 +118,7 @@ The MD structure is fixed. The labels below are in English; the agent translates
 Use the `question` tool to confirm:「[調査結果の要約]。この結果で次に進んでよいですか？」
 
 - Approved → proceed
-- Changes needed → return to Step 2 with revised topics
+- Changes needed → return to Step 1 with revised topics
 
 ## Source tiering
 
