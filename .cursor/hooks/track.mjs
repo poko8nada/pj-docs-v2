@@ -8,11 +8,16 @@
  * | Read*              | implement: true on implement/SKILL.md Read  |
  * | postToolUse Write* | review.required + review.done=false         |
  * | preToolUse Task    | review.done=true on /pre-commit-reviewer    |
+ * | afterShellExecution| review reset on successful git commit       |
  */
 import { realpathSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { disableBootstrap, enableBootstrap } from './_bootstrap.mjs';
-import { isPreCommitReviewerContext, isReviewablePath } from './_review.mjs';
+import {
+  commandIncludesGitCommit,
+  isPreCommitReviewerContext,
+  isReviewablePath,
+} from './_review.mjs';
 import {
   conversationId,
   defaultReview,
@@ -24,6 +29,7 @@ import {
   normalizeImplement,
   normalizeReview,
   PHASE_DISCUSSION,
+  resetReview,
   saveState,
   WORK_PHASES,
   workspaceRoot,
@@ -146,6 +152,29 @@ function handlePreToolUseTask(root, payload) {
   return allow();
 }
 
+function shellCommand(payload) {
+  return String(payload.command ?? payload.tool_input?.command ?? '');
+}
+
+function shellSucceeded(payload) {
+  if (payload.success === false) return false;
+  const code = payload.exit_code ?? payload.exitCode ?? payload.exit_status;
+  if (code !== undefined && code !== null) return Number(code) === 0;
+  return payload.success === true;
+}
+
+function handleAfterShellExecution(root, payload) {
+  const command = shellCommand(payload);
+  if (!commandIncludesGitCommit(command) || !shellSucceeded(payload)) return empty();
+
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  if (!normalizeReview(state.review).required) return empty();
+
+  resetReview(root, id);
+  return empty();
+}
+
 async function main() {
   const payload = await readStdinJson();
   const root = workspaceRoot(payload);
@@ -154,6 +183,10 @@ async function main() {
 
   if (event === 'beforeSubmitPrompt') {
     return handleBeforeSubmitPrompt(root, payload);
+  }
+
+  if (event === 'afterShellExecution') {
+    return handleAfterShellExecution(root, payload);
   }
 
   if (event === 'preToolUse' && toolName === 'Task') {

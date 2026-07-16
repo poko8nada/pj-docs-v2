@@ -241,6 +241,12 @@ export function markReviewDone(root, id) {
   return saveState(root, id, { phase: prev.phase, implement: prev.implement, review });
 }
 
+/** git commit 成功後に review を初期状態へ */
+export function resetReview(root, id) {
+  const prev = loadState(root, id);
+  return saveState(root, id, { phase: prev.phase, implement: prev.implement, review: defaultReview() });
+}
+
 /**
  * sessionStart: ファイルは作らない（起動→resume で捨てられるゴミを防ぐ）。
  * TTL 掃除だけ行う。作成は beforeSubmitPrompt（初回発話）で discussion として行う。

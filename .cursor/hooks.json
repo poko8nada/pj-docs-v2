@@ -25,6 +25,12 @@
         "failClosed": true
       }
     ],
+    "afterShellExecution": [
+      {
+        "command": "node .cursor/hooks/track.mjs",
+        "failClosed": false
+      }
+    ],
     "preToolUse": [
       {
         "command": "node .cursor/hooks/track.mjs",
