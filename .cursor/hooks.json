@@ -27,12 +27,16 @@
       {
         "command": "node .cursor/hooks/restrict-root.mjs",
         "failClosed": true
+      },
+      {
+        "command": "node .cursor/hooks/reject-cd-root.mjs",
+        "failClosed": true
       }
     ],
     "preToolUse": [
       {
         "command": "node .cursor/hooks/track-implement.mjs",
-        "matcher": "Read",
+        "matcher": "Read|ReadFile",
         "failClosed": false
       },
       {
@@ -49,7 +53,7 @@
     "postToolUse": [
       {
         "command": "node .cursor/hooks/track-implement.mjs",
-        "matcher": "Read",
+        "matcher": "Read|ReadFile",
         "failClosed": false
       }
     ],

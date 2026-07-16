@@ -26,6 +26,7 @@ import {
 import {
   findStateFileName,
   formatJstIso,
+  GATE_CONVERSATION_ENV,
   idFromTranscriptPath,
   loadState,
   onSessionStart,
@@ -43,13 +44,14 @@ const id = 'test-conversation';
 
 let failed = 0;
 
-function run(script, payload) {
+function run(script, payload, hookEnv = {}) {
   const r = spawnSync(process.execPath, [join(hooksDir, script)], {
     input: JSON.stringify(payload),
     encoding: 'utf8',
     env: {
       ...process.env,
       CURSOR_GATE_STATE_DIR: stateTmp,
+      ...hookEnv,
     },
   });
   if (r.status !== 0) {
@@ -96,9 +98,19 @@ try {
     const outInject = run('inject-context.mjs', { ...base, is_background_agent: false });
     const ctx0 = outInject.additional_context || '';
     assert(
+      'inject returns conversation env',
+      outInject.env?.[GATE_CONVERSATION_ENV] === id,
+      JSON.stringify(outInject),
+    );
+    assert(
       'inject hints glob path',
       ctx0.includes(`*__${id}.json`),
       ctx0.includes('hooks/state') ? 'glob missing' : 'no gate section',
+    );
+    assert(
+      'inject includes shell cwd rule',
+      ctx0.includes('Shell cwd') && ctx0.includes('git -C'),
+      'shell section missing',
     );
     assert('inject still no file', findStateFileName(root, id) === null);
 
@@ -498,6 +510,120 @@ try {
     );
   }
 
+  // 16b. preToolUse ReadFile（Cursor 内部名）で implement 解禁
+  {
+    const readId = 'pretooluse-readfile-id';
+    const readBase = { conversation_id: readId, workspace_roots: [root], cwd: root };
+    run('track-phase.mjs', { ...readBase, prompt: '/chore go' });
+    run('track-implement.mjs', {
+      ...readBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+    });
+    const st = loadState(root, readId);
+    assert(
+      'preToolUse ReadFile sets implement true',
+      st.phase === 'chore' && st.implement === true,
+      JSON.stringify(st),
+    );
+  }
+
+  // 16c. sessionStart env で conversation_id を補完
+  {
+    const envId = 'session-env-id';
+    const prev = process.env[GATE_CONVERSATION_ENV];
+    process.env[GATE_CONVERSATION_ENV] = envId;
+    try {
+      writeFileSync(
+        join(stateTmp, `20260716-130000+0900__${envId}.json`),
+        JSON.stringify({ phase: 'chore', implement: false, updatedAt: formatJstIso() }, null, 2) +
+          '\n',
+      );
+      run('track-implement.mjs', {
+        workspace_roots: [root],
+        cwd: root,
+        hook_event_name: 'preToolUse',
+        tool_name: 'ReadFile',
+        tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+      });
+      const st = loadState(root, envId);
+      assert(
+        'GATE_CONVERSATION_ENV unlocks implement',
+        st.phase === 'chore' && st.implement === true,
+        JSON.stringify(st),
+      );
+    } finally {
+      if (prev === undefined) delete process.env[GATE_CONVERSATION_ENV];
+      else process.env[GATE_CONVERSATION_ENV] = prev;
+    }
+  }
+
+  // 20. 統合: track-phase（ID あり）→ implement Read（ID なし）→ Write
+  // 実機で壊れた経路。16/16b は毎回 conversation_id 付きなので拾えない。
+  {
+    const realId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const withId = { conversation_id: realId, workspace_roots: [root], cwd: root };
+    const noId = { workspace_roots: [root], cwd: root };
+    const implementPath = join(root, '.cursor/skills/implement/SKILL.md');
+    const probePath = join(root, '.cursor/hooks/_integration-probe.txt');
+
+    run('track-phase.mjs', { ...withId, prompt: '/chore integration' });
+    let st = loadState(root, realId);
+    assert(
+      'integration starts chore locked',
+      st.phase === 'chore' && st.implement === false,
+      JSON.stringify(st),
+    );
+
+    run('track-implement.mjs', {
+      ...noId,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: implementPath },
+    });
+    st = loadState(root, realId);
+    assert('integration without id/env stays locked', st.implement === false, JSON.stringify(st));
+
+    const outInject = run('inject-context.mjs', { ...withId });
+    assert(
+      'integration inject exports env',
+      outInject.env?.[GATE_CONVERSATION_ENV] === realId,
+      JSON.stringify(outInject),
+    );
+
+    const envOnly = { [GATE_CONVERSATION_ENV]: realId };
+    run(
+      'track-implement.mjs',
+      {
+        ...noId,
+        hook_event_name: 'preToolUse',
+        tool_name: 'ReadFile',
+        tool_input: { path: implementPath },
+      },
+      envOnly,
+    );
+    st = loadState(root, realId);
+    assert('integration env unlocks implement', st.implement === true, JSON.stringify(st));
+
+    const outWrite = run(
+      'gate-code.mjs',
+      {
+        ...noId,
+        hook_event_name: 'preToolUse',
+        tool_name: 'Write',
+        tool_input: { path: probePath },
+      },
+      envOnly,
+    );
+    assert('integration Write allow', outWrite.permission === 'allow', JSON.stringify(outWrite));
+    try {
+      unlinkSync(probePath);
+    } catch {
+      // 無ければ無視
+    }
+  }
+
   // 17. bootstrap: discussion でも gate バイパス（state / マーカー編集は除く）
   {
     enableBootstrap(root);
@@ -567,6 +693,51 @@ try {
     enableBootstrap(root);
     run('session-end.mjs', { ...base });
     assert('sessionEnd removes bootstrap marker', !isBootstrapActive(root));
+  }
+
+  // 20. reject-cd-root: root への cd は拒否（restrict-root とは別枠）
+  {
+    const denyAbs = run('reject-cd-root.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: `cd ${root} && pnpm test`,
+    });
+    assert('reject cd to workspace root', denyAbs.permission === 'deny', JSON.stringify(denyAbs));
+
+    const denyDot = run('reject-cd-root.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'cd . && pnpm test',
+    });
+    assert('reject cd . at root', denyDot.permission === 'deny', JSON.stringify(denyDot));
+
+    const denyChain = run('reject-cd-root.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'cd utils && cd ..',
+    });
+    assert('reject cd utils then cd ..', denyChain.permission === 'deny', JSON.stringify(denyChain));
+
+    const allowSub = run('reject-cd-root.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'cd utils && pnpm test',
+    });
+    assert('allow cd into subdir', allowSub.permission === 'allow', JSON.stringify(allowSub));
+
+    const allowPlain = run('reject-cd-root.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm test',
+    });
+    assert('allow command without cd', allowPlain.permission === 'allow', JSON.stringify(allowPlain));
+
+    const allowParent = run('reject-cd-root.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'cd ..',
+    });
+    assert('allow cd .. from root', allowParent.permission === 'allow', JSON.stringify(allowParent));
   }
 } finally {
   rmSync(stateTmp, { recursive: true, force: true });

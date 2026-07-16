@@ -66,15 +66,18 @@ List concrete changes: files, functions, components created or modified. Note an
 
 Return to the caller so they can update the issue / ask for the next slice.
 
-## Step 5 — Update annotations (if present)
+## Step 5 — NOTE comments (if present)
 
-If changed files contain `UO[` / `AN[` comments, check whether this unit resolved them:
+If changed files contain pending `NOTE:` lines, check whether this unit resolved them:
 
 ```bash
-rg -n 'UO\[|AN\[' <changed files> | rg -v '\[done\]'
+rg -n 'NOTE:' <changed files>
 ```
 
-- Still relevant → leave
+- Still relevant → leave the line
+- Resolved by this unit → delete the `NOTE:` line after user confirms (see `notes` skill)
 - Uncertain → mention in confirm
 
-Do **not** delete those comments — only mark `[done]` when clearly resolved. Lefthook (if configured) handles deletion.
+## Step 6 — Before commit
+
+After `git add`, before `git commit`, run **`notes` skill — Commit check** (`.cursor/skills/notes/scripts/list-removed.mjs`). Do not commit until the user OKs any removed NOTE lines.

@@ -49,13 +49,18 @@ export function idFromTranscriptPath(transcriptPath) {
   return null;
 }
 
+/** sessionStart が返す env（公式: セッション中の後続 hook へ伝播） */
+export const GATE_CONVERSATION_ENV = 'CURSOR_GATE_CONVERSATION_ID';
+
 export function conversationId(payload) {
   if (payload?.conversation_id) return String(payload.conversation_id);
   if (payload?.session_id) return String(payload.session_id);
   const fromPayload = idFromTranscriptPath(payload?.transcript_path);
   if (fromPayload) return fromPayload;
-  const fromEnv = idFromTranscriptPath(process.env.CURSOR_TRANSCRIPT_PATH);
-  if (fromEnv) return fromEnv;
+  const fromTranscriptEnv = idFromTranscriptPath(process.env.CURSOR_TRANSCRIPT_PATH);
+  if (fromTranscriptEnv) return fromTranscriptEnv;
+  const fromGateEnv = process.env[GATE_CONVERSATION_ENV];
+  if (fromGateEnv && fromGateEnv !== 'unknown') return String(fromGateEnv);
   return 'unknown';
 }
 

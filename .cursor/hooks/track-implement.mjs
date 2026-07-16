@@ -64,9 +64,10 @@ async function main() {
   const event = payload.hook_event_name ?? '';
   const toolName = payload.tool_name ?? '';
 
+  const isReadTool = toolName === 'Read' || toolName === 'ReadFile';
   const isReadEvent =
     event === 'beforeReadFile' ||
-    ((event === 'preToolUse' || event === 'postToolUse') && toolName === 'Read');
+    ((event === 'preToolUse' || event === 'postToolUse') && isReadTool);
 
   if (isReadEvent) {
     maybeUnlock(root, payload);

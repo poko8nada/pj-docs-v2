@@ -7,7 +7,13 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { conversationId, onSessionStart, statePathRelative, workspaceRoot } from './_state.mjs';
+import {
+  conversationId,
+  GATE_CONVERSATION_ENV,
+  onSessionStart,
+  statePathRelative,
+  workspaceRoot,
+} from './_state.mjs';
 
 // null = 無制限 / 数値 = 文字数で機械カット
 const MAX_CONTEXT_CHARS = 16000;
@@ -120,6 +126,14 @@ function readPhase() {
   ].join('\n');
 }
 
+function readShell() {
+  return [
+    'Shell cwd is always the workspace root at session start.',
+    'Do not prefix commands with `cd` to the workspace root or `git -C <workspace-root>`.',
+    'Run commands directly (`git add …`, `pnpm test`). `cd` into subdirectories is fine (`cd utils && …`).',
+  ].join('\n');
+}
+
 function readGateState(stateFileRel) {
   return [
     `Your gate state (read-only for you; hooks write it): \`${stateFileRel}\``,
@@ -139,6 +153,7 @@ function buildSectionDefs(stateFileRel) {
     { id: 'issues', title: 'Open GitHub Issues', level: 2, codeblock: true, source: readIssues },
     { id: 'prior', title: 'Prior phases', level: 2, source: readPrior },
     { id: 'phase', title: 'Phase entry rules', level: 2, source: readPhase },
+    { id: 'shell', title: 'Shell cwd', level: 2, source: readShell },
     {
       id: 'gate',
       title: 'Gate state',
@@ -179,9 +194,15 @@ async function main() {
   const stateFileRel = statePathRelative(root, id);
 
   const ctx = buildContext(root, stateFileRel);
-  if (!ctx.trim()) return respond({});
+  const out = {};
+  // 公式 sessionStart env — 後続 hook で conversation_id が欠ける場合の正規の伝播手段
+  if (id && id !== 'unknown') {
+    out.env = { [GATE_CONVERSATION_ENV]: id };
+  }
+  if (ctx.trim()) out.additional_context = ctx;
+  if (Object.keys(out).length === 0) return respond({});
 
-  return respond({ additional_context: ctx });
+  return respond(out);
 }
 
 main().catch((error) => {
