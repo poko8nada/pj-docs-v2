@@ -7,8 +7,9 @@
  * | beforeSubmitPrompt | phase / bootstrap                           |
  * | Read*              | implement: true on implement/SKILL.md Read  |
  * | postToolUse Write* | review.required + review.done=false         |
- * | preToolUse Task    | review.done=true on /pre-commit-reviewer    |
- * | afterShellExecution| review reset on successful git commit       |
+ * | preToolUse Task         | review.done=true on /pre-commit-reviewer    |
+ * | beforeShellExecution    | review reset when git commit is allowed     |
+ * | afterShellExecution     | review reset on successful git commit (IDE) |
  */
 import { realpathSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
@@ -160,7 +161,20 @@ function shellSucceeded(payload) {
   if (payload.success === false) return false;
   const code = payload.exit_code ?? payload.exitCode ?? payload.exit_status;
   if (code !== undefined && code !== null) return Number(code) === 0;
-  return payload.success === true;
+  return true;
+}
+
+function maybeResetReviewAfterCommit(root, payload) {
+  const command = shellCommand(payload);
+  if (!commandIncludesGitCommit(command)) return empty();
+
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  if (isReviewBlocking(state)) return empty();
+  if (!normalizeReview(state.review).required) return empty();
+
+  resetReview(root, id);
+  return empty();
 }
 
 function handleAfterShellExecution(root, payload) {
@@ -187,6 +201,10 @@ async function main() {
 
   if (event === 'afterShellExecution') {
     return handleAfterShellExecution(root, payload);
+  }
+
+  if (event === 'beforeShellExecution') {
+    return maybeResetReviewAfterCommit(root, payload);
   }
 
   if (event === 'preToolUse' && toolName === 'Task') {

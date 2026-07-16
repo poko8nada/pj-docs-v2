@@ -140,7 +140,7 @@ function readReview() {
     '`git commit` is blocked while `review.required && !review.done` (agent shell only — lefthook covers human paths).',
     'Before commit: `notes` Commit check → `/pre-commit-reviewer` → read output → fix GAPS if any → `git commit`.',
     'Reviewer is readonly — harness does not re-review after GAPS; main agent fixes then commits.',
-    'Successful `git commit` resets `review` to idle (`required: false`).',
+    'Successful `git commit` (or an allowed commit attempt) resets `review` to idle (`required: false`).',
   ].join('\n');
 }
 

@@ -811,15 +811,27 @@ try {
 
     run('track.mjs', {
       ...reviewBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git commit -m test',
+    });
+    const stReset = loadState(root, reviewId);
+    assert(
+      'review resets when commit allowed',
+      stReset.review?.required === false && stReset.review?.done === true,
+      JSON.stringify(stReset),
+    );
+
+    run('track.mjs', {
+      ...reviewBase,
       hook_event_name: 'afterShellExecution',
       command: 'git commit -m test',
       exit_code: 0,
     });
-    const stReset = loadState(root, reviewId);
+    const stAfter = loadState(root, reviewId);
     assert(
-      'review resets after successful commit',
-      stReset.review?.required === false && stReset.review?.done === true,
-      JSON.stringify(stReset),
+      'review stays idle after afterShellExecution',
+      stAfter.review?.required === false && stAfter.review?.done === true,
+      JSON.stringify(stAfter),
     );
 
     run('track.mjs', {
