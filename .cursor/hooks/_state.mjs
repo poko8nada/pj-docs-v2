@@ -13,7 +13,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const hooksDir = fileURLToPath(new URL('.', import.meta.url));
@@ -37,8 +37,26 @@ export function workspaceRoot(payload) {
   return projectRootFallback;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** transcript パスから conversation UUID を抽出 */
+export function idFromTranscriptPath(transcriptPath) {
+  if (!transcriptPath || typeof transcriptPath !== 'string') return null;
+  const stem = basename(transcriptPath, '.jsonl');
+  if (UUID_RE.test(stem)) return stem;
+  const parent = basename(dirname(transcriptPath));
+  if (UUID_RE.test(parent)) return parent;
+  return null;
+}
+
 export function conversationId(payload) {
-  return String(payload?.conversation_id || payload?.session_id || 'unknown');
+  if (payload?.conversation_id) return String(payload.conversation_id);
+  if (payload?.session_id) return String(payload.session_id);
+  const fromPayload = idFromTranscriptPath(payload?.transcript_path);
+  if (fromPayload) return fromPayload;
+  const fromEnv = idFromTranscriptPath(process.env.CURSOR_TRANSCRIPT_PATH);
+  if (fromEnv) return fromEnv;
+  return 'unknown';
 }
 
 export function stateDir(root) {

@@ -1,0 +1,33 @@
+---
+name: bootstrap
+description: >-
+  Emergency gate bypass when the harness is broken and normal /chore → implement Read cannot unlock edits.
+  User-only — do not self-invoke.
+disable-model-invocation: true
+---
+
+# bootstrap
+
+**User-only rescue.** When the gate is broken (e.g. phase/implement state out of sync), normal work phases cannot unlock code edits. `/bootstrap` turns on a temporary bypass so harness files can be fixed.
+
+Does **not** change gate state (`phase` / `implement`). Creates `.cursor/hooks/.bootstrap` only.
+
+## On
+
+User sends `/bootstrap` in the prompt. Gate allows edits and shell until turned off.
+
+## Off
+
+| Method           | Action                               |
+| ---------------- | ------------------------------------ |
+| `/bootstrap off` | Removes the marker immediately       |
+| CLI session ends | `sessionEnd` hook removes the marker |
+| Terminal         | `rm .cursor/hooks/.bootstrap`        |
+
+Turn off after the harness is fixed. Do not leave bootstrap on for normal work.
+
+## Hard limits
+
+- **Agents must not** invoke `/bootstrap` or `/bootstrap off` on their own.
+- Do not use for product features — use `/chore` (or other work phases) when the gate works.
+- Marker file is hooks-only; do not create or delete it via Write/Shell.

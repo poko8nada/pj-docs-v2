@@ -4,7 +4,9 @@
  * - この会話で初めての発話 → 無ければ discussion state を作成（implement: null）
  * - /discussion → discussion に戻す（implement: null）
  * - /spec|/design|/forge|/refine|/chore → 作業フェーズ（implement: false または維持）
+ * - /bootstrap → 非常口マーカー作成、/bootstrap off → 削除（state は触らない）
  */
+import { disableBootstrap, enableBootstrap } from './_bootstrap.mjs';
 import {
   conversationId,
   findStateFileName,
@@ -13,9 +15,11 @@ import {
   PHASE_DISCUSSION,
   saveState,
   workspaceRoot,
-} from './state.mjs';
+} from './_state.mjs';
 
 const PHASE_RE = /(?:^|[\s`])\/(discussion|spec|design|forge|refine|chore)(?=[\s`/]|$)/i;
+const BOOTSTRAP_OFF_RE = /(?:^|[\s`])\/bootstrap\s+off(?=[\s`/]|$)/i;
+const BOOTSTRAP_ON_RE = /(?:^|[\s`])\/bootstrap(?=[\s`/]|$)/i;
 
 async function readStdinJson() {
   const chunks = [];
@@ -34,6 +38,12 @@ async function main() {
   const root = workspaceRoot(payload);
   const id = conversationId(payload);
   const prompt = String(payload.prompt ?? '');
+
+  if (BOOTSTRAP_OFF_RE.test(prompt)) {
+    disableBootstrap(root);
+  } else if (BOOTSTRAP_ON_RE.test(prompt)) {
+    enableBootstrap(root);
+  }
 
   // 初回発話で discussion を実体化（起動だけ／未発話の resume 捨て打ちでは作らない）
   if (!findStateFileName(root, id)) {

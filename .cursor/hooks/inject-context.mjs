@@ -7,7 +7,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { conversationId, onSessionStart, statePathRelative, workspaceRoot } from './state.mjs';
+import { conversationId, onSessionStart, statePathRelative, workspaceRoot } from './_state.mjs';
 
 // null = 無制限 / 数値 = 文字数で機械カット
 const MAX_CONTEXT_CHARS = 16000;
@@ -115,6 +115,7 @@ function readPhase() {
     'Work phases start only when the user explicitly invokes `/spec`, `/design`, `/forge`, `/refine`, or `/chore`. That unlocks full gh/git (issue writes, commits, etc.).',
     'Do not self-invoke phase skills or treat a work phase as active without that invocation.',
     'Code edits require a work phase first, then Read of `.cursor/skills/implement/SKILL.md` (`implement: true`). In `discussion`, `implement` is `null` — not applicable.',
+    'If the gate is broken, the user may invoke `/bootstrap` (emergency bypass) — do not self-invoke. How-to: `.cursor/skills/bootstrap/SKILL.md`.',
     'Phase how-to lives in each phase skill — not here.',
   ].join('\n');
 }

@@ -7,8 +7,14 @@
  *   - discussion → 読み取り系 + gh/git の read サブコマンドのみ
  *   - 作業フェーズ入場後 → gh/git は解放（implement 不要）。その他は implement まで制限
  * `.cursor/hooks/state/**` は解禁後も常時編集禁止（Read は可）。
+ * bootstrap: `.cursor/hooks/.bootstrap` または CURSOR_GATE_BOOTSTRAP=1 → 先頭で allow（state/マーカー編集は除く）。
  */
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
+import {
+  isBootstrapActive,
+  isBootstrapMarkerPath,
+  isShellWriteToBootstrapMarker,
+} from './_bootstrap.mjs';
 import {
   conversationId,
   isUnderStateDir,
@@ -17,7 +23,7 @@ import {
   stateDir,
   WORK_PHASES,
   workspaceRoot,
-} from './state.mjs';
+} from './_state.mjs';
 
 const DENY_CODE =
   '[gate] Code edits require a work phase (/spec|/design|/forge|/refine|/chore) and Read of .cursor/skills/implement/SKILL.md. Default phase is discussion (no code).';
@@ -27,6 +33,9 @@ const DENY_SHELL =
 
 const DENY_STATE =
   '[gate] Gate state files are hooks-only. Read is allowed; do not edit `.cursor/hooks/state/**`.';
+
+const DENY_BOOTSTRAP =
+  '[gate] Bootstrap marker is hooks-only. User invokes /bootstrap or /bootstrap off.';
 
 const READONLY_CMDS = new Set([
   'ls',
@@ -405,12 +414,16 @@ async function main() {
     if (isShellWriteToState(root, command)) {
       return deny(DENY_STATE);
     }
+    if (isShellWriteToBootstrapMarker(root, command)) {
+      return deny(DENY_BOOTSTRAP);
+    }
+    if (isBootstrapActive(root)) return allow();
     if (unlocked) return allow();
     if (isAllowedWithoutCodeUnlock(command, inWorkPhase)) return allow();
     return deny(DENY_SHELL);
   }
 
-  // ファイル変更系: state 配下は常時 deny
+  // ファイル変更系: state / bootstrap マーカーは常時 deny
   const toolInput = payload.tool_input ?? {};
   const fileArg = fileArgFromToolInput(toolInput) ?? payload.file_path;
   if (fileArg) {
@@ -418,8 +431,10 @@ async function main() {
       isAbsolute(String(fileArg)) ? String(fileArg) : resolve(root, String(fileArg)),
     );
     if (isUnderStateDir(root, abs)) return deny(DENY_STATE);
+    if (isBootstrapMarkerPath(root, abs)) return deny(DENY_BOOTSTRAP);
   }
 
+  if (isBootstrapActive(root)) return allow();
   if (unlocked) return allow();
   if (fileArg && isRootMarkdown(root, String(fileArg))) return allow();
   return deny(DENY_CODE);
