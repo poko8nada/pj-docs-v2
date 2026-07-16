@@ -1,2 +1,3 @@
 plans/
 hooks/probe-phase-entry.log.jsonl
+hooks/state/
