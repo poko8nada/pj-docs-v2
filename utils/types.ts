@@ -13,6 +13,7 @@
  * Notes:
  *  - Avoids `any` usage.
  *  - Functional style helpers for convenience.
+ *  - E2E review.done full flow (remove after test).
  */
 
 export type Ok<T> = Readonly<{ ok: true; value: T }>;
