@@ -80,4 +80,7 @@ rg -n 'NOTE:' <changed files>
 
 ## Step 6 — Before commit
 
-After `git add`, before `git commit`, run **`notes` skill — Commit check** (`.cursor/skills/notes/scripts/list-removed.mjs`). Do not commit until the user OKs any removed NOTE lines.
+After `git add`, before `git commit`:
+
+1. Run **`notes` skill — Commit check** (`.cursor/skills/notes/scripts/list-removed.mjs`). Do not commit until the user OKs any removed NOTE lines.
+2. Run **`/pre-commit-reviewer`** once on changed files. Harness blocks `git commit` until the reviewer Task is invoked (`review.done`). Read the output; if `REVIEW: GAPS`, fix in main agent (harness does not require a second review).

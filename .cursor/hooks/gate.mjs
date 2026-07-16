@@ -1,22 +1,24 @@
 #!/usr/bin/env node
 /**
- * phase + implement Read まで、プロダクト／ハーネスのコード編集を止める。
- * 対象: preToolUse（Write|StrReplace|Delete|EditNotebook）、beforeShellExecution。
- * ルート直下 *.md は常時許可。
- * Shell:
- *   - discussion → 読み取り系 + gh/git の read サブコマンドのみ
- *   - 作業フェーズ入場後 → gh/git は解放（implement 不要）。その他は implement まで制限
- * `.cursor/hooks/state/**` は解禁後も常時編集禁止（Read は可）。
- * bootstrap: `.cursor/hooks/.bootstrap` または CURSOR_GATE_BOOTSTRAP=1 → 先頭で allow（state/マーカー編集は除く）。
+ * gate.mjs — 許可/拒否のみ（state は書かない）
+ *
+ * | Event              | Checks                                              |
+ * |--------------------|-----------------------------------------------------|
+ * | beforeShellExecution | state/bootstrap, cd-root, outside-root, review, code |
+ * | preToolUse (file)  | state/bootstrap, outside-root, code unlock            |
+ * | beforeReadFile     | outside-root                                        |
  */
-import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
+import { homedir } from 'node:os';
+import { basename, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 import {
   isBootstrapActive,
   isBootstrapMarkerPath,
   isShellWriteToBootstrapMarker,
 } from './_bootstrap.mjs';
+import { commandIncludesGitCommit, DENY_REVIEW } from './_review.mjs';
 import {
   conversationId,
+  isReviewBlocking,
   isUnderStateDir,
   isUnlocked,
   loadState,
@@ -36,6 +38,9 @@ const DENY_STATE =
 
 const DENY_BOOTSTRAP =
   '[gate] Bootstrap marker is hooks-only. User invokes /bootstrap or /bootstrap off.';
+
+const DENY_CD_ROOT =
+  '[reject-cd-root] Shell is already at the workspace root. Remove `cd` and any absolute path to the workspace (including `git -C`). Run commands as-is — e.g. `git add … && git commit …`.';
 
 const READONLY_CMDS = new Set([
   'ls',
@@ -74,7 +79,6 @@ const READONLY_CMDS = new Set([
   'id',
 ]);
 
-/** discussion 中に許可する git サブコマンド（読み取り） */
 const GIT_READ_SUBS = new Set([
   'status',
   'log',
@@ -102,17 +106,13 @@ const GIT_READ_SUBS = new Set([
   'range-diff',
   'var',
   'count-objects',
-  'branch', // 作成・削除は isGitReadOnly で除外
-  'remote', // 変更系は isGitReadOnly で除外
-  'tag', // 一覧のみ
-  'stash', // list / show のみ
-  'config', // --get / --list のみ
+  'branch',
+  'remote',
+  'tag',
+  'stash',
+  'config',
 ]);
 
-/**
- * discussion 中に許可する gh の (command → subcommands)。
- * subcommands が null ならその command 配下をすべて許可（例: search）。
- */
 const GH_READ = new Map([
   ['issue', new Set(['list', 'view', 'status'])],
   ['pr', new Set(['list', 'view', 'status', 'checks', 'diff'])],
@@ -163,7 +163,6 @@ function fileArgFromToolInput(toolInput) {
   );
 }
 
-/** プロジェクトルート直下の *.md のみ（ネストは不可） */
 function isRootMarkdown(root, filePath) {
   if (!filePath) return false;
   const abs = resolve(isAbsolute(filePath) ? filePath : resolve(root, filePath));
@@ -171,6 +170,88 @@ function isRootMarkdown(root, filePath) {
   if (!rel || rel.startsWith('..') || rel.includes(`..${sep}`)) return false;
   if (rel.includes(sep) || rel.includes('/')) return false;
   return /\.md$/i.test(rel);
+}
+
+function expandPath(filePath) {
+  if (filePath === '~') return homedir();
+  if (filePath.startsWith('~/')) return join(homedir(), filePath.slice(2));
+  return filePath;
+}
+
+function normalizePath(root, filePath) {
+  const expanded = expandPath(filePath);
+  const absolute = isAbsolute(expanded) ? expanded : resolve(root, expanded);
+  return normalize(absolute);
+}
+
+function allowedExternalRoots() {
+  const xdg = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config');
+  return [join(homedir(), '.cursor'), join(xdg, 'opencode')];
+}
+
+function isInside(root, target) {
+  const r = resolve(root);
+  const t = resolve(target);
+  return t === r || t.startsWith(r + '/');
+}
+
+function checkPathOutsideRoot(root, filePath) {
+  if (!filePath || filePath === '/dev/null') return null;
+  if (filePath.startsWith('-')) return null;
+  const normalized = normalizePath(root, filePath);
+  if (isInside(root, normalized)) return null;
+  if (allowedExternalRoots().some((p) => isInside(p, normalized))) return null;
+  return `[restrict-root] Access outside the project root directory is prohibited: ${filePath}`;
+}
+
+function extractPathsFromCommand(command) {
+  let cleaned = command.replace(/<<-?\s*["']?(\w+)["']?[\s\S]*?\n\s*\1/g, '');
+  cleaned = cleaned.replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, '');
+  const paths = [];
+  for (const m of cleaned.matchAll(/(?:^|[\s>|&;"'])([/~][^\s'"<>|&;]+)/g)) {
+    const p = m[1];
+    if (p && !p.startsWith('//')) paths.push(p);
+  }
+  return paths;
+}
+
+function shellCwd(payload, root) {
+  if (payload.cwd) return resolve(payload.cwd);
+  return root;
+}
+
+function resolveCdTarget(cwd, arg) {
+  const expanded = expandPath(arg);
+  return isAbsolute(expanded) ? normalize(expanded) : normalize(resolve(cwd, expanded));
+}
+
+function stripNoise(command) {
+  let cleaned = command.replace(/<<-?\s*["']?(\w+)["']?[\s\S]*?\n\s*\1/g, '');
+  cleaned = cleaned.replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, '""');
+  return cleaned;
+}
+
+function extractCdArgs(command) {
+  const cleaned = stripNoise(command);
+  const args = [];
+  const re = /\bcd(?:\s+(?:"([^"]*)"|'([^']*)'|([^\s;&|)]+)))?/g;
+  let m;
+  while ((m = re.exec(cleaned))) {
+    args.push(m[1] ?? m[2] ?? m[3] ?? '');
+  }
+  return args;
+}
+
+function cdsToProjectRoot(command, cwd, root) {
+  const resolvedRoot = resolve(root);
+  let simulated = cwd;
+  for (const arg of extractCdArgs(command)) {
+    if (!arg || arg === '-') continue;
+    const target = resolveCdTarget(simulated, arg);
+    if (target === resolvedRoot) return true;
+    simulated = target;
+  }
+  return false;
 }
 
 function stripQuotesAndHeredoc(command) {
@@ -186,13 +267,11 @@ function tokenize(segment) {
 function firstCommandToken(segment) {
   let s = segment.trim();
   if (!s) return '';
-  // 先頭の環境変数代入を落とす: FOO=bar BAZ=1 cmd
   while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(s)) {
     const sp = s.search(/\s/);
     if (sp === -1) return '';
     s = s.slice(sp).trim();
   }
-  // sudo / command / time の軽いラッパを飛ばす
   const parts = tokenize(s);
   let i = 0;
   while (
@@ -206,7 +285,6 @@ function firstCommandToken(segment) {
   return cmd.toLowerCase();
 }
 
-/** git / gh のグローバルオプションを飛ばしてトークン列を返す */
 function tokensAfterCommand(segment, commandName) {
   const parts = tokenize(segment);
   let i = 0;
@@ -216,7 +294,6 @@ function tokensAfterCommand(segment, commandName) {
   ) {
     i += 1;
   }
-  // 環境変数代入
   while (i < parts.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(parts[i])) i += 1;
 
   let cmd = parts[i] || '';
@@ -224,7 +301,6 @@ function tokensAfterCommand(segment, commandName) {
   if (cmd.toLowerCase() !== commandName) return [];
   i += 1;
 
-  // git グローバルオプション
   if (commandName === 'git') {
     while (i < parts.length) {
       const p = parts[i];
@@ -240,7 +316,6 @@ function tokensAfterCommand(segment, commandName) {
     }
   }
 
-  // gh グローバルオプション（値付き）
   if (commandName === 'gh') {
     while (i < parts.length) {
       const p = parts[i];
@@ -269,17 +344,15 @@ function tokensAfterCommand(segment, commandName) {
 
 function isGitReadOnly(segment) {
   const args = tokensAfterCommand(segment, 'git');
-  if (args.length === 0) return true; // bare `git` → help
+  if (args.length === 0) return true;
   const sub = args[0].toLowerCase();
   if (!GIT_READ_SUBS.has(sub)) return false;
   const rest = args.slice(1);
 
   if (sub === 'branch') {
-    // 削除・改名・強制などは不可。位置引数あり＝作成扱い。
     if (rest.some((a) => /^(-[dDmc]|--delete|--move|--copy|-f|--force)/.test(a))) return false;
     const positionals = rest.filter((a) => !a.startsWith('-'));
     if (positionals.length === 0) return true;
-    // `--list` / `-l` / `-a` / `-r` 付きのパターンは一覧
     if (rest.some((a) => /^(-l|--list|-a|--all|-r|--remotes|-v|-vv|--verbose)$/.test(a))) {
       return true;
     }
@@ -290,7 +363,7 @@ function isGitReadOnly(segment) {
     if (rest.length === 0) return true;
     const action = rest[0].toLowerCase();
     if (action === 'show' || action === 'get-url') return true;
-    if (rest.every((a) => a.startsWith('-'))) return true; // -v など
+    if (rest.every((a) => a.startsWith('-'))) return true;
     return false;
   }
 
@@ -299,14 +372,13 @@ function isGitReadOnly(segment) {
     if (rest.some((a) => /^(-d|--delete|-f|--force|-u|--sign|-s|--annotate|-a|-m)$/.test(a))) {
       return false;
     }
-    // -l / --list またはフラグのみ
     if (rest.some((a) => a === '-l' || a === '--list')) return true;
     if (rest.every((a) => a.startsWith('-'))) return true;
-    return false; // `git tag v1` は作成
+    return false;
   }
 
   if (sub === 'stash') {
-    if (rest.length === 0) return false; // bare stash = push
+    if (rest.length === 0) return false;
     const action = rest[0].toLowerCase();
     return action === 'list' || action === 'show';
   }
@@ -319,10 +391,8 @@ function isGitReadOnly(segment) {
 }
 
 function isGhApiReadOnly(rest) {
-  // `gh api …` — GET 相当のみ。-X POST 等や明示メソッドは不可。
   if (rest.some((a) => a === '-X' || a === '--method')) return false;
   if (rest.some((a) => /^(POST|PUT|PATCH|DELETE)$/i.test(a))) return false;
-  // フィールド送信は mutation 扱い
   if (rest.some((a) => a === '-f' || a === '-F' || a === '--raw-field' || a === '--input')) {
     return false;
   }
@@ -340,7 +410,6 @@ function isGhReadOnly(segment) {
   const allowedSubs = GH_READ.get(command);
   if (allowedSubs === null) return true;
 
-  // サブコマンドを探す（フラグを飛ばす）
   let i = 1;
   while (i < args.length && args[i].startsWith('-')) i += 1;
   const sub = (args[i] || '').toLowerCase();
@@ -353,10 +422,6 @@ function mentionsStateDir(root, command) {
   return String(command).includes('.cursor/hooks/state') || String(command).includes(abs);
 }
 
-/**
- * state 配下への書き込みっぽい Shell か。
- * `2>/dev/null` のようなリダイレクトは書き込み扱いしない。
- */
 function isShellWriteToState(root, command) {
   const cmd = String(command ?? '');
   if (!mentionsStateDir(root, cmd)) return false;
@@ -373,11 +438,6 @@ function isShellWriteToState(root, command) {
   return false;
 }
 
-/**
- * コード未解禁時の Shell 許可。
- * - discussion: 読み取り系 + gh/git read のみ
- * - 作業フェーズ: 読み取り系 + gh/git 全許可
- */
 function isAllowedWithoutCodeUnlock(command, inWorkPhase) {
   const cleaned = stripQuotesAndHeredoc(String(command ?? ''));
   const segments = cleaned
@@ -395,35 +455,58 @@ function isAllowedWithoutCodeUnlock(command, inWorkPhase) {
   });
 }
 
+function denyOutsidePathsInCommand(root, command) {
+  for (const p of extractPathsFromCommand(command)) {
+    const err = checkPathOutsideRoot(root, p);
+    if (err) return err;
+  }
+  return null;
+}
+
+function handleShell(payload, root, state, unlocked, inWorkPhase) {
+  const command = String(payload.command ?? payload.tool_input?.command ?? '');
+
+  if (isShellWriteToState(root, command)) return deny(DENY_STATE);
+  if (isShellWriteToBootstrapMarker(root, command)) return deny(DENY_BOOTSTRAP);
+  if (isBootstrapActive(root)) return allow();
+
+  const cwd = shellCwd(payload, root);
+  if (cdsToProjectRoot(command, cwd, root)) return deny(DENY_CD_ROOT);
+
+  const outsideErr = denyOutsidePathsInCommand(root, command);
+  if (outsideErr) return deny(outsideErr);
+
+  if (commandIncludesGitCommit(command) && isReviewBlocking(state)) {
+    return deny(DENY_REVIEW);
+  }
+
+  if (unlocked) return allow();
+  if (isAllowedWithoutCodeUnlock(command, inWorkPhase)) return allow();
+  return deny(DENY_SHELL);
+}
+
 async function main() {
   const payload = await readStdinJson();
   const root = workspaceRoot(payload);
-  const id = conversationId(payload);
-  const state = loadState(root, id);
+  const state = loadState(root, conversationId(payload));
   const unlocked = isUnlocked(state);
   const inWorkPhase = WORK_PHASES.has(state.phase);
   const event = payload.hook_event_name ?? '';
   const toolName = payload.tool_name ?? '';
 
-  // Shell 判定はイベント／ツール名のみ（payload.command の有無では見ない — Write 誤判定を防ぐ）
   const isShellEvent =
     event === 'beforeShellExecution' || toolName === 'Shell' || toolName === 'Bash';
 
   if (isShellEvent) {
-    const command = String(payload.command ?? payload.tool_input?.command ?? '');
-    if (isShellWriteToState(root, command)) {
-      return deny(DENY_STATE);
-    }
-    if (isShellWriteToBootstrapMarker(root, command)) {
-      return deny(DENY_BOOTSTRAP);
-    }
-    if (isBootstrapActive(root)) return allow();
-    if (unlocked) return allow();
-    if (isAllowedWithoutCodeUnlock(command, inWorkPhase)) return allow();
-    return deny(DENY_SHELL);
+    return handleShell(payload, root, state, unlocked, inWorkPhase);
   }
 
-  // ファイル変更系: state / bootstrap マーカーは常時 deny
+  if (event === 'beforeReadFile') {
+    const err = checkPathOutsideRoot(root, payload.file_path);
+    if (err) return deny(err);
+    return allow();
+  }
+
   const toolInput = payload.tool_input ?? {};
   const fileArg = fileArgFromToolInput(toolInput) ?? payload.file_path;
   if (fileArg) {
@@ -432,6 +515,14 @@ async function main() {
     );
     if (isUnderStateDir(root, abs)) return deny(DENY_STATE);
     if (isBootstrapMarkerPath(root, abs)) return deny(DENY_BOOTSTRAP);
+    const outsideErr = checkPathOutsideRoot(root, String(fileArg));
+    if (outsideErr) return deny(outsideErr);
+  }
+
+  if (toolName === 'Shell' || toolName === 'Bash') {
+    const command = String(toolInput.command ?? '');
+    const outsideErr = denyOutsidePathsInCommand(root, command);
+    if (outsideErr) return deny(outsideErr);
   }
 
   if (isBootstrapActive(root)) return allow();

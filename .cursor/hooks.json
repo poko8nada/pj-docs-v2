@@ -15,55 +15,52 @@
     ],
     "beforeSubmitPrompt": [
       {
-        "command": "node .cursor/hooks/track-phase.mjs",
+        "command": "node .cursor/hooks/track.mjs",
         "failClosed": false
       }
     ],
     "beforeShellExecution": [
       {
-        "command": "node .cursor/hooks/gate-code.mjs",
-        "failClosed": true
-      },
-      {
-        "command": "node .cursor/hooks/restrict-root.mjs",
-        "failClosed": true
-      },
-      {
-        "command": "node .cursor/hooks/reject-cd-root.mjs",
+        "command": "node .cursor/hooks/gate.mjs",
         "failClosed": true
       }
     ],
     "preToolUse": [
       {
-        "command": "node .cursor/hooks/track-implement.mjs",
+        "command": "node .cursor/hooks/track.mjs",
         "matcher": "Read|ReadFile",
         "failClosed": false
       },
       {
-        "command": "node .cursor/hooks/gate-code.mjs",
-        "matcher": "Write|StrReplace|Delete|EditNotebook",
-        "failClosed": true
+        "command": "node .cursor/hooks/track.mjs",
+        "matcher": "Task",
+        "failClosed": false
       },
       {
-        "command": "node .cursor/hooks/restrict-root.mjs",
+        "command": "node .cursor/hooks/gate.mjs",
         "matcher": "Write|StrReplace|Read|Delete|EditNotebook",
         "failClosed": true
       }
     ],
     "postToolUse": [
       {
-        "command": "node .cursor/hooks/track-implement.mjs",
+        "command": "node .cursor/hooks/track.mjs",
         "matcher": "Read|ReadFile",
+        "failClosed": false
+      },
+      {
+        "command": "node .cursor/hooks/track.mjs",
+        "matcher": "Write|StrReplace|Delete|EditNotebook",
         "failClosed": false
       }
     ],
     "beforeReadFile": [
       {
-        "command": "node .cursor/hooks/track-implement.mjs",
+        "command": "node .cursor/hooks/track.mjs",
         "failClosed": false
       },
       {
-        "command": "node .cursor/hooks/restrict-root.mjs",
+        "command": "node .cursor/hooks/gate.mjs",
         "failClosed": true
       }
     ]

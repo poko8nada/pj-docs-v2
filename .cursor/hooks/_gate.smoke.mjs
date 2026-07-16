@@ -112,9 +112,14 @@ try {
       ctx0.includes('Shell cwd') && ctx0.includes('git -C'),
       'shell section missing',
     );
+    assert(
+      'inject includes pre-commit review',
+      ctx0.includes('Pre-commit review') && ctx0.includes('/pre-commit-reviewer'),
+      'review section missing',
+    );
     assert('inject still no file', findStateFileName(root, id) === null);
 
-    const outGate = run('gate-code.mjs', {
+    const outGate = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
@@ -123,7 +128,7 @@ try {
     assert('gate deny without state file', outGate.permission === 'deny', JSON.stringify(outGate));
     assert('gate does not create file', findStateFileName(root, id) === null);
 
-    run('track-phase.mjs', { ...base, prompt: 'hello, just discussing' });
+    run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: 'hello, just discussing' });
     const name = findStateFileName(root, id);
     assert(
       'first prompt creates JST-dated file',
@@ -141,7 +146,7 @@ try {
 
   // 1. locked Write deny
   {
-    const out = run('gate-code.mjs', {
+    const out = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
@@ -152,7 +157,7 @@ try {
 
   // 2. root md allow while locked
   {
-    const out = run('gate-code.mjs', {
+    const out = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
@@ -163,7 +168,7 @@ try {
 
   // 3. locked nested md deny
   {
-    const out = run('gate-code.mjs', {
+    const out = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
@@ -174,7 +179,7 @@ try {
 
   // 4. discussion: gh/git read allow, write deny
   {
-    const outList = run('gate-code.mjs', {
+    const outList = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'gh issue list',
@@ -185,7 +190,7 @@ try {
       JSON.stringify(outList),
     );
 
-    const outCreate = run('gate-code.mjs', {
+    const outCreate = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'gh issue create --title t --body b',
@@ -196,7 +201,7 @@ try {
       JSON.stringify(outCreate),
     );
 
-    const outStatus = run('gate-code.mjs', {
+    const outStatus = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'git status',
@@ -207,7 +212,7 @@ try {
       JSON.stringify(outStatus),
     );
 
-    const outCommit = run('gate-code.mjs', {
+    const outCommit = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'git commit -m msg',
@@ -221,7 +226,7 @@ try {
 
   // 5. pnpm deny while locked
   {
-    const out = run('gate-code.mjs', {
+    const out = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'pnpm test:run',
@@ -232,8 +237,9 @@ try {
   // 6. track phase — 既存 discussion を forge に更新（新規ファイルは増やさない）
   {
     const nameBefore = findStateFileName(root, id);
-    const out = run('track-phase.mjs', {
+    const out = run('track.mjs', {
       ...base,
+      hook_event_name: 'beforeSubmitPrompt',
       prompt: '/forge lock plan',
     });
     assert('track-phase continue', out.continue === true, JSON.stringify(out));
@@ -248,7 +254,7 @@ try {
 
   // 7. still deny Write after phase only — but gh/git writes unlock
   {
-    const out = run('gate-code.mjs', {
+    const out = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
@@ -256,21 +262,21 @@ try {
     });
     assert('phase-only Write deny', out.permission === 'deny', JSON.stringify(out));
 
-    const outGh = run('gate-code.mjs', {
+    const outGh = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'gh issue create --title t --body b',
     });
     assert('phase unlocks gh write', outGh.permission === 'allow', JSON.stringify(outGh));
 
-    const outGit = run('gate-code.mjs', {
+    const outGit = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'git commit -m msg',
     });
     assert('phase unlocks git write', outGit.permission === 'allow', JSON.stringify(outGit));
 
-    const outPnpm = run('gate-code.mjs', {
+    const outPnpm = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'pnpm test:run',
@@ -280,8 +286,8 @@ try {
 
   // 8. discussion 中の implement Read はフラグを立てない／Write 不可
   {
-    run('track-phase.mjs', { ...base, prompt: '/discussion step back' });
-    const out = run('track-implement.mjs', {
+    run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/discussion step back' });
+    const out = run('track.mjs', {
       ...base,
       hook_event_name: 'beforeReadFile',
       file_path: join(root, '.cursor/skills/implement/SKILL.md'),
@@ -293,7 +299,7 @@ try {
       st.phase === 'discussion' && st.implement === null,
       JSON.stringify(st),
     );
-    const out2 = run('gate-code.mjs', {
+    const out2 = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
@@ -301,7 +307,7 @@ try {
     });
     assert('discussion Write still deny', out2.permission === 'deny', JSON.stringify(out2));
 
-    const outGh = run('gate-code.mjs', {
+    const outGh = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'gh issue create --title t --body b',
@@ -329,14 +335,14 @@ try {
 
   // 8b. forge のあと implement Read で解禁
   {
-    run('track-phase.mjs', { ...base, prompt: '/forge go' });
-    const out = run('track-implement.mjs', {
+    run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/forge go' });
+    const out = run('track.mjs', {
       ...base,
       hook_event_name: 'beforeReadFile',
       file_path: join(root, '.cursor/skills/implement/SKILL.md'),
     });
     assert('forge track-implement allow', out.permission === 'allow', JSON.stringify(out));
-    const out2 = run('gate-code.mjs', {
+    const out2 = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
@@ -347,7 +353,7 @@ try {
 
   // 9. unlocked でも state 編集は deny
   {
-    const out = run('gate-code.mjs', {
+    const out = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
@@ -358,7 +364,7 @@ try {
 
   // 9b. ls …/state/ 2>/dev/null は allow（> の誤検知防止）
   {
-    const out = run('gate-code.mjs', {
+    const out = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'ls .cursor/hooks/state/ 2>/dev/null',
@@ -368,7 +374,7 @@ try {
 
   // 9c. state へリダイレクトは deny
   {
-    const out = run('gate-code.mjs', {
+    const out = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'echo x > .cursor/hooks/state/evil.json',
@@ -378,7 +384,7 @@ try {
 
   // 10. phase switch resets implement
   {
-    run('track-phase.mjs', { ...base, prompt: '/chore typo' });
+    run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore typo' });
     const st = readState();
     assert(
       'phase switch resets implement',
@@ -476,7 +482,7 @@ try {
         '\n',
     );
 
-    const out = run('gate-code.mjs', {
+    const out = run('gate.mjs', {
       workspace_roots: [root],
       cwd: root,
       transcript_path: transcriptPath,
@@ -490,8 +496,8 @@ try {
   {
     const readId = 'pretooluse-read-id';
     const readBase = { conversation_id: readId, workspace_roots: [root], cwd: root };
-    run('track-phase.mjs', { ...readBase, prompt: '/forge go' });
-    const out = run('track-implement.mjs', {
+    run('track.mjs', { ...readBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/forge go' });
+    const out = run('track.mjs', {
       ...readBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Read',
@@ -514,8 +520,8 @@ try {
   {
     const readId = 'pretooluse-readfile-id';
     const readBase = { conversation_id: readId, workspace_roots: [root], cwd: root };
-    run('track-phase.mjs', { ...readBase, prompt: '/chore go' });
-    run('track-implement.mjs', {
+    run('track.mjs', { ...readBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore go' });
+    run('track.mjs', {
       ...readBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
@@ -540,7 +546,7 @@ try {
         JSON.stringify({ phase: 'chore', implement: false, updatedAt: formatJstIso() }, null, 2) +
           '\n',
       );
-      run('track-implement.mjs', {
+      run('track.mjs', {
         workspace_roots: [root],
         cwd: root,
         hook_event_name: 'preToolUse',
@@ -568,7 +574,7 @@ try {
     const implementPath = join(root, '.cursor/skills/implement/SKILL.md');
     const probePath = join(root, '.cursor/hooks/_integration-probe.txt');
 
-    run('track-phase.mjs', { ...withId, prompt: '/chore integration' });
+    run('track.mjs', { ...withId, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore integration' });
     let st = loadState(root, realId);
     assert(
       'integration starts chore locked',
@@ -576,7 +582,7 @@ try {
       JSON.stringify(st),
     );
 
-    run('track-implement.mjs', {
+    run('track.mjs', {
       ...noId,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
@@ -594,7 +600,7 @@ try {
 
     const envOnly = { [GATE_CONVERSATION_ENV]: realId };
     run(
-      'track-implement.mjs',
+      'track.mjs',
       {
         ...noId,
         hook_event_name: 'preToolUse',
@@ -607,7 +613,7 @@ try {
     assert('integration env unlocks implement', st.implement === true, JSON.stringify(st));
 
     const outWrite = run(
-      'gate-code.mjs',
+      'gate.mjs',
       {
         ...noId,
         hook_event_name: 'preToolUse',
@@ -628,13 +634,13 @@ try {
   {
     enableBootstrap(root);
     assert('bootstrap marker active', isBootstrapActive(root));
-    const out = run('gate-code.mjs', {
+    const out = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'node -e 1',
     });
     assert('bootstrap allows node shell', out.permission === 'allow', JSON.stringify(out));
-    const outWrite = run('gate-code.mjs', {
+    const outWrite = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
@@ -650,7 +656,7 @@ try {
     } catch {
       // 無ければ無視
     }
-    const outMarker = run('gate-code.mjs', {
+    const outMarker = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
@@ -670,7 +676,7 @@ try {
         2,
       ) + '\n',
     );
-    const outLocked = run('gate-code.mjs', {
+    const outLocked = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'node -e 1',
@@ -680,10 +686,10 @@ try {
 
   // 18. track-phase: /bootstrap と /bootstrap off
   {
-    const outOn = run('track-phase.mjs', { ...base, prompt: '/bootstrap harness rescue' });
+    const outOn = run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/bootstrap harness rescue' });
     assert('track-phase bootstrap on', outOn.continue === true, JSON.stringify(outOn));
     assert('track-phase created marker', isBootstrapActive(root));
-    const outOff = run('track-phase.mjs', { ...base, prompt: '/bootstrap off thanks' });
+    const outOff = run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/bootstrap off thanks' });
     assert('track-phase bootstrap off', outOff.continue === true, JSON.stringify(outOff));
     assert('track-phase removed marker', !isBootstrapActive(root));
   }
@@ -695,49 +701,126 @@ try {
     assert('sessionEnd removes bootstrap marker', !isBootstrapActive(root));
   }
 
-  // 20. reject-cd-root: root への cd は拒否（restrict-root とは別枠）
+  // 20. gate: root への cd は拒否
   {
-    const denyAbs = run('reject-cd-root.mjs', {
-      ...base,
+    const cdId = 'cd-root-test-id';
+    const cdBase = { conversation_id: cdId, workspace_roots: [root], cwd: root };
+    run('track.mjs', { ...cdBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore cd test' });
+    run('track.mjs', {
+      ...cdBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+    });
+    const stCd = loadState(root, cdId);
+    assert(
+      'cd test conversation unlocked',
+      stCd.phase === 'chore' && stCd.implement === true,
+      JSON.stringify(stCd),
+    );
+
+    const denyAbs = run('gate.mjs', {
+      ...cdBase,
       hook_event_name: 'beforeShellExecution',
       command: `cd ${root} && pnpm test`,
     });
     assert('reject cd to workspace root', denyAbs.permission === 'deny', JSON.stringify(denyAbs));
 
-    const denyDot = run('reject-cd-root.mjs', {
-      ...base,
+    const denyDot = run('gate.mjs', {
+      ...cdBase,
       hook_event_name: 'beforeShellExecution',
       command: 'cd . && pnpm test',
     });
     assert('reject cd . at root', denyDot.permission === 'deny', JSON.stringify(denyDot));
 
-    const denyChain = run('reject-cd-root.mjs', {
-      ...base,
+    const denyChain = run('gate.mjs', {
+      ...cdBase,
       hook_event_name: 'beforeShellExecution',
       command: 'cd utils && cd ..',
     });
     assert('reject cd utils then cd ..', denyChain.permission === 'deny', JSON.stringify(denyChain));
 
-    const allowSub = run('reject-cd-root.mjs', {
-      ...base,
+    const allowSub = run('gate.mjs', {
+      ...cdBase,
       hook_event_name: 'beforeShellExecution',
       command: 'cd utils && pnpm test',
     });
     assert('allow cd into subdir', allowSub.permission === 'allow', JSON.stringify(allowSub));
 
-    const allowPlain = run('reject-cd-root.mjs', {
-      ...base,
+    const allowPlain = run('gate.mjs', {
+      ...cdBase,
       hook_event_name: 'beforeShellExecution',
       command: 'pnpm test',
     });
     assert('allow command without cd', allowPlain.permission === 'allow', JSON.stringify(allowPlain));
 
-    const allowParent = run('reject-cd-root.mjs', {
-      ...base,
+    const allowParent = run('gate.mjs', {
+      ...cdBase,
       hook_event_name: 'beforeShellExecution',
       command: 'cd ..',
     });
     assert('allow cd .. from root', allowParent.permission === 'allow', JSON.stringify(allowParent));
+  }
+
+  // 21. review gate: dirty → commit deny → preToolUse Task → commit allow
+  {
+    const reviewId = 'review-gate-id';
+    const reviewBase = { conversation_id: reviewId, workspace_roots: [root], cwd: root };
+    run('track.mjs', { ...reviewBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore review test' });
+    run('track.mjs', {
+      ...reviewBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+    });
+    run('track.mjs', {
+      ...reviewBase,
+      hook_event_name: 'postToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/_review-probe.ts') },
+    });
+    const stDirty = loadState(root, reviewId);
+    assert(
+      'review dirty after product write',
+      stDirty.review?.required === true && stDirty.review?.done === false,
+      JSON.stringify(stDirty),
+    );
+
+    const denyCommit = run('gate.mjs', {
+      ...reviewBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git commit -m test',
+    });
+    assert('review blocks git commit', denyCommit.permission === 'deny', JSON.stringify(denyCommit));
+
+    run('track.mjs', {
+      ...reviewBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Task',
+      tool_input: { subagent_type: 'pre-commit-reviewer', description: 'review before commit' },
+    });
+    const stDone = loadState(root, reviewId);
+    assert('preToolUse Task sets review done', stDone.review?.done === true, JSON.stringify(stDone));
+
+    const allowCommit = run('gate.mjs', {
+      ...reviewBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git commit -m test',
+    });
+    assert('review allows git commit after done', allowCommit.permission === 'allow', JSON.stringify(allowCommit));
+
+    run('track.mjs', {
+      ...reviewBase,
+      hook_event_name: 'postToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/_review-probe.ts') },
+    });
+    const stRedirty = loadState(root, reviewId);
+    assert(
+      're-edit resets review done',
+      stRedirty.review?.required === true && stRedirty.review?.done === false,
+      JSON.stringify(stRedirty),
+    );
   }
 } finally {
   rmSync(stateTmp, { recursive: true, force: true });

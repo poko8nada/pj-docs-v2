@@ -134,12 +134,22 @@ function readShell() {
   ].join('\n');
 }
 
+function readReview() {
+  return [
+    'After editing product/test sources, harness sets `review.required` until `/pre-commit-reviewer` is invoked once.',
+    '`git commit` is blocked while `review.required && !review.done` (agent shell only — lefthook covers human paths).',
+    'Before commit: `notes` Commit check → `/pre-commit-reviewer` → read output → fix GAPS if any → `git commit`.',
+    'Reviewer is readonly — harness does not re-review after GAPS; main agent fixes then commits.',
+  ].join('\n');
+}
+
 function readGateState(stateFileRel) {
   return [
     `Your gate state (read-only for you; hooks write it): \`${stateFileRel}\``,
     'Created on the first user prompt as `discussion` (not at CLI startup). Work phases update the same file.',
-    'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `updatedAt` (JST `+09:00`).',
+    'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `review`, `updatedAt` (JST `+09:00`).',
     '`implement`: `null` in `discussion` (N/A); `false` = work phase, handshake pending; `true` = code edits allowed.',
+    '`review`: `required` + `done` — commit blocked when `required && !done`. `done` is set when `/pre-commit-reviewer` Task is invoked.',
     'If the glob has no match yet, no prompt has been sent in this conversation. Never edit state files.',
     'State survives CLI resume for the same conversation_id; stale files older than 7 days are purged on sessionStart.',
   ].join('\n');
@@ -154,6 +164,7 @@ function buildSectionDefs(stateFileRel) {
     { id: 'prior', title: 'Prior phases', level: 2, source: readPrior },
     { id: 'phase', title: 'Phase entry rules', level: 2, source: readPhase },
     { id: 'shell', title: 'Shell cwd', level: 2, source: readShell },
+    { id: 'review', title: 'Pre-commit review', level: 2, source: readReview },
     {
       id: 'gate',
       title: 'Gate state',

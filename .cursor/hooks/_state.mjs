@@ -13,7 +13,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const hooksDir = fileURLToPath(new URL('.', import.meta.url));
@@ -139,11 +139,34 @@ export function statePathRelative(root, id) {
   return `.cursor/hooks/state/*__${sanitizeConversationId(id)}.json`;
 }
 
-/** @returns {{ phase: string, implement: boolean | null, updatedAt: string }} */
+/** @returns {{ required: boolean, done: boolean, files: string[] }} */
+export function defaultReview() {
+  return { required: false, done: true, files: [] };
+}
+
+export function normalizeReview(review) {
+  if (!review || typeof review !== 'object') return defaultReview();
+  const files = Array.isArray(review.files)
+    ? [...new Set(review.files.map((f) => String(f)).filter(Boolean))]
+    : [];
+  const required = review.required === true;
+  let done;
+  if (typeof review.done === 'boolean') {
+    done = review.done;
+  } else if (typeof review.cleared === 'boolean') {
+    done = review.cleared;
+  } else {
+    done = !required;
+  }
+  return { required, done, files };
+}
+
+/** @returns {{ phase: string, implement: boolean | null, review: ReturnType<typeof defaultReview>, updatedAt: string }} */
 export function defaultState() {
   return {
     phase: PHASE_DISCUSSION,
     implement: null,
+    review: defaultReview(),
     updatedAt: formatJstIso(),
   };
 }
@@ -169,6 +192,7 @@ export function loadState(root, id) {
     return {
       phase,
       implement: normalizeImplement(phase, raw.implement),
+      review: normalizeReview(raw.review),
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : defaultState().updatedAt,
     };
   } catch {
@@ -179,16 +203,42 @@ export function loadState(root, id) {
 export function saveState(root, id, state) {
   const dir = stateDir(root);
   mkdirSync(dir, { recursive: true });
-  // 既存があれば同じファイルを更新。無ければ作成時スタンプで新規。
   const path = statePath(root, id);
-  const phase = normalizePhase(state.phase ?? PHASE_DISCUSSION);
+  const prev = loadState(root, id);
+  const phase = normalizePhase(state.phase ?? prev.phase);
   const next = {
     phase,
-    implement: normalizeImplement(phase, state.implement),
+    implement: normalizeImplement(phase, state.implement ?? prev.implement),
+    review: normalizeReview(state.review ?? prev.review),
     updatedAt: formatJstIso(),
   };
   writeFileSync(path, JSON.stringify(next, null, 2) + '\n', 'utf8');
   return next;
+}
+
+export function isReviewBlocking(state) {
+  const review = normalizeReview(state?.review);
+  return review.required && !review.done;
+}
+
+/** implement 解禁後の reviewable 編集を記録 */
+export function markReviewDirty(root, id, filePath) {
+  const prev = loadState(root, id);
+  const abs = resolve(filePath);
+  const rel = relative(root, abs).split(sep).join('/');
+  const review = normalizeReview(prev.review);
+  review.required = true;
+  review.done = false;
+  if (rel && !review.files.includes(rel)) review.files.push(rel);
+  return saveState(root, id, { phase: prev.phase, implement: prev.implement, review });
+}
+
+/** preToolUse Task で /pre-commit-reviewer が呼ばれたとき */
+export function markReviewDone(root, id) {
+  const prev = loadState(root, id);
+  const review = normalizeReview(prev.review);
+  review.done = true;
+  return saveState(root, id, { phase: prev.phase, implement: prev.implement, review });
 }
 
 /**

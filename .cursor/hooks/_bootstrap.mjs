@@ -1,6 +1,6 @@
 /**
  * ゲート非常口（bootstrap）— state とは別のマーカーファイルのみ。
- * オン: ユーザー `/bootstrap`（track-phase）または CURSOR_GATE_BOOTSTRAP=1
+ * オン: ユーザー `/bootstrap`（track.mjs）または CURSOR_GATE_BOOTSTRAP=1
  * オフ: `/bootstrap off` または sessionEnd
  */
 import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
