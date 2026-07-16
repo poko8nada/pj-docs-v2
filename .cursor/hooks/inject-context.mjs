@@ -1,18 +1,16 @@
 #!/usr/bin/env node
 /**
  * sessionStart でプロジェクト context を additional_context として注入する。
- * 対象: AGENTS.md / Spec / Open issues / prior・phase 入場ルール（短文）
+ * 対象: AGENTS.md / Spec / Open issues / prior / phase・gate state（短文）
+ * state ファイルはここでは作らない（TTL 掃除のみ）。作成は初回ユーザー発話（beforeSubmitPrompt）。
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { conversationId, onSessionStart, statePathRelative, workspaceRoot } from './state.mjs';
 
 // null = 無制限 / 数値 = 文字数で機械カット
 const MAX_CONTEXT_CHARS = 16000;
-
-const hooksDir = fileURLToPath(new URL('.', import.meta.url));
-const projectRootFallback = resolve(hooksDir, '../..');
 
 async function readStdinJson() {
   const chunks = [];
@@ -24,13 +22,6 @@ async function readStdinJson() {
 
 function respond(payload) {
   process.stdout.write(JSON.stringify(payload) + '\n');
-}
-
-function workspaceRoot(payload) {
-  const roots = payload.workspace_roots;
-  if (Array.isArray(roots) && roots[0]) return resolve(roots[0]);
-  if (payload.cwd) return resolve(payload.cwd);
-  return projectRootFallback;
 }
 
 function sanitize(text) {
@@ -120,21 +111,40 @@ function readPrior() {
 
 function readPhase() {
   return [
-    'Phase changes only when the user explicitly invokes `/spec`, `/design`, `/forge`, `/refine`, or `/chore`.',
-    'Do not self-invoke phase skills or assume a phase is active without that invocation.',
-    'With no phase: discuss, research, edit root-level md, use gh/git — no product/harness code edits.',
-    'Code edits require an active phase AND having Read `.cursor/skills/implement/SKILL.md` first, then follow the `implement` skill.',
+    'Default phase is `discussion`: discuss, research, edit root-level md, use gh/git — no product/harness code edits.',
+    'Work phases start only when the user explicitly invokes `/spec`, `/design`, `/forge`, `/refine`, or `/chore`.',
+    'Do not self-invoke phase skills or treat a work phase as active without that invocation.',
+    'Code edits require a work phase (/spec|/design|/forge|/refine|/chore) first, then Read of `.cursor/skills/implement/SKILL.md`. Reading implement during `discussion` does not unlock.',
+    'Phase how-to lives in each phase skill — not here.',
+  ].join('\n');
+}
+
+function readGateState(stateFileRel) {
+  return [
+    `Your gate state (read-only for you; hooks write it): \`${stateFileRel}\``,
+    'Created on the first user prompt as `discussion` (not at CLI startup). Work phases update the same file.',
+    'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `updatedAt` (JST `+09:00`).',
+    'If the glob has no match yet, no prompt has been sent in this conversation. Never edit state files.',
+    'State survives CLI resume for the same conversation_id; stale files older than 7 days are purged on sessionStart.',
   ].join('\n');
 }
 
 /** SECTION_DEFS が injected context の唯一の source of truth */
-const SECTION_DEFS = [
-  { id: 'agents', title: 'AGENTS.md', level: 1, codeblock: true, source: readAgents },
-  { id: 'spec', title: 'Product Design', level: 1, source: readSpec },
-  { id: 'issues', title: 'Open GitHub Issues', level: 2, codeblock: true, source: readIssues },
-  { id: 'prior', title: 'Prior phases', level: 2, source: readPrior },
-  { id: 'phase', title: 'Phase entry rules', level: 2, source: readPhase },
-];
+function buildSectionDefs(stateFileRel) {
+  return [
+    { id: 'agents', title: 'AGENTS.md', level: 1, codeblock: true, source: readAgents },
+    { id: 'spec', title: 'Product Design', level: 1, source: readSpec },
+    { id: 'issues', title: 'Open GitHub Issues', level: 2, codeblock: true, source: readIssues },
+    { id: 'prior', title: 'Prior phases', level: 2, source: readPrior },
+    { id: 'phase', title: 'Phase entry rules', level: 2, source: readPhase },
+    {
+      id: 'gate',
+      title: 'Gate state',
+      level: 2,
+      source: () => readGateState(stateFileRel),
+    },
+  ];
+}
 
 function renderSection(section) {
   const heading = '#'.repeat(section.level) + ' ' + section.title;
@@ -142,9 +152,9 @@ function renderSection(section) {
   return `${heading}\n\n${body}`;
 }
 
-function buildContext(worktree) {
+function buildContext(worktree, stateFileRel) {
   const rendered = [];
-  for (const def of SECTION_DEFS) {
+  for (const def of buildSectionDefs(stateFileRel)) {
     const body = def.source(worktree);
     if (!body?.trim()) continue;
     rendered.push(renderSection({ ...def, body }));
@@ -162,7 +172,11 @@ async function main() {
   }
 
   const root = workspaceRoot(payload);
-  const ctx = buildContext(root);
+  const id = conversationId(payload);
+  onSessionStart(root);
+  const stateFileRel = statePathRelative(root, id);
+
+  const ctx = buildContext(root, stateFileRel);
   if (!ctx.trim()) return respond({});
 
   return respond({ additional_context: ctx });

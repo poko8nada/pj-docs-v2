@@ -9,7 +9,7 @@ description: >-
 
 Build exactly the unit the caller already agreed with the user. The plan (or chore scope) is source of truth — do not reopen settled questions, do not expand scope.
 
-**Read this file before editing product/harness code** — that Read is the permission handshake required by phase skills (and by the gate when enabled).
+**Read this file before editing product/harness code** — that Read is the permission handshake required by phase skills (and by the gate when enabled). Default gate phase is `discussion` (no code) until the user invokes a work phase.
 
 ## What you own
 
