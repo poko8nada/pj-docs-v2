@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * beforeReadFile — 作業フェーズ中に implement/SKILL.md を読んだら implement: true。
- * discussion 中は何もしない（フラグもファイルも触らない）。
+ * discussion 中は何もしない（implement は null のまま）。
  */
 import { isAbsolute, join, normalize, resolve } from 'node:path';
 import { conversationId, loadState, saveState, WORK_PHASES, workspaceRoot } from './state.mjs';

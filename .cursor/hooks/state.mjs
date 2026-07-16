@@ -116,11 +116,11 @@ export function statePathRelative(root, id) {
   return `.cursor/hooks/state/*__${sanitizeConversationId(id)}.json`;
 }
 
-/** @returns {{ phase: string, implement: boolean, updatedAt: string }} */
+/** @returns {{ phase: string, implement: boolean | null, updatedAt: string }} */
 export function defaultState() {
   return {
     phase: PHASE_DISCUSSION,
-    implement: false,
+    implement: null,
     updatedAt: formatJstIso(),
   };
 }
@@ -130,14 +130,22 @@ function normalizePhase(phase) {
   return PHASE_DISCUSSION;
 }
 
+/** discussion → null。作業フェーズ → true/false のみ */
+export function normalizeImplement(phase, implement) {
+  const p = normalizePhase(phase);
+  if (p === PHASE_DISCUSSION) return null;
+  return implement === true;
+}
+
 export function loadState(root, id) {
   const name = findStateFileName(root, id);
   if (!name) return defaultState();
   try {
     const raw = JSON.parse(readFileSync(join(stateDir(root), name), 'utf8'));
+    const phase = normalizePhase(typeof raw.phase === 'string' ? raw.phase : PHASE_DISCUSSION);
     return {
-      phase: normalizePhase(typeof raw.phase === 'string' ? raw.phase : PHASE_DISCUSSION),
-      implement: Boolean(raw.implement),
+      phase,
+      implement: normalizeImplement(phase, raw.implement),
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : defaultState().updatedAt,
     };
   } catch {
@@ -150,9 +158,10 @@ export function saveState(root, id, state) {
   mkdirSync(dir, { recursive: true });
   // 既存があれば同じファイルを更新。無ければ作成時スタンプで新規。
   const path = statePath(root, id);
+  const phase = normalizePhase(state.phase ?? PHASE_DISCUSSION);
   const next = {
-    phase: normalizePhase(state.phase ?? PHASE_DISCUSSION),
-    implement: Boolean(state.implement),
+    phase,
+    implement: normalizeImplement(phase, state.implement),
     updatedAt: formatJstIso(),
   };
   writeFileSync(path, JSON.stringify(next, null, 2) + '\n', 'utf8');
@@ -200,7 +209,7 @@ export function purgeStaleStates(root, now = Date.now()) {
 
 export function isUnlocked(state) {
   const phase = normalizePhase(state?.phase);
-  return WORK_PHASES.has(phase) && Boolean(state?.implement);
+  return WORK_PHASES.has(phase) && state?.implement === true;
 }
 
 /** パスがゲート state 配下か（エージェント編集禁止用） */

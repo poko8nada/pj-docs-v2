@@ -111,10 +111,10 @@ function readPrior() {
 
 function readPhase() {
   return [
-    'Default phase is `discussion`: discuss, research, edit root-level md, use gh/git — no product/harness code edits.',
-    'Work phases start only when the user explicitly invokes `/spec`, `/design`, `/forge`, `/refine`, or `/chore`.',
+    'Default phase is `discussion` (first user prompt). How-to: `.cursor/skills/discussion/SKILL.md`. User may invoke `/discussion` to return from a work phase.',
+    'Work phases start only when the user explicitly invokes `/spec`, `/design`, `/forge`, `/refine`, or `/chore`. That unlocks full gh/git (issue writes, commits, etc.).',
     'Do not self-invoke phase skills or treat a work phase as active without that invocation.',
-    'Code edits require a work phase (/spec|/design|/forge|/refine|/chore) first, then Read of `.cursor/skills/implement/SKILL.md`. Reading implement during `discussion` does not unlock.',
+    'Code edits require a work phase first, then Read of `.cursor/skills/implement/SKILL.md` (`implement: true`). In `discussion`, `implement` is `null` — not applicable.',
     'Phase how-to lives in each phase skill — not here.',
   ].join('\n');
 }
@@ -124,6 +124,7 @@ function readGateState(stateFileRel) {
     `Your gate state (read-only for you; hooks write it): \`${stateFileRel}\``,
     'Created on the first user prompt as `discussion` (not at CLI startup). Work phases update the same file.',
     'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `updatedAt` (JST `+09:00`).',
+    '`implement`: `null` in `discussion` (N/A); `false` = work phase, handshake pending; `true` = code edits allowed.',
     'If the glob has no match yet, no prompt has been sent in this conversation. Never edit state files.',
     'State survives CLI resume for the same conversation_id; stale files older than 7 days are purged on sessionStart.',
   ].join('\n');

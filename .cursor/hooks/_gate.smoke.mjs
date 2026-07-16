@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * ゲート hooks のスモークテスト（Cursor 実行時なし）。
- * 使い方: node .cursor/hooks/test-gate.mjs
+ * 使い方: node .cursor/hooks/_gate.smoke.mjs
  */
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,7 +14,6 @@ import {
   loadState,
   onSessionStart,
   purgeStaleStates,
-  saveState,
   STATE_TTL_DAYS,
 } from './state.mjs';
 
@@ -101,7 +100,7 @@ process.env.CURSOR_GATE_STATE_DIR = stateTmp;
   const st = readState();
   assert(
     'first prompt is discussion',
-    st.phase === 'discussion' && st.implement === false,
+    st.phase === 'discussion' && st.implement === null,
     JSON.stringify(st),
   );
   assert('updatedAt is JST offset', st.updatedAt.endsWith('+09:00'), st.updatedAt);
@@ -140,14 +139,43 @@ process.env.CURSOR_GATE_STATE_DIR = stateTmp;
   assert('locked nested md deny', out.permission === 'deny', JSON.stringify(out));
 }
 
-// 4. gh allow while locked
+// 4. discussion: gh/git read allow, write deny
 {
-  const out = run('gate-code.mjs', {
+  const outList = run('gate-code.mjs', {
     ...base,
     hook_event_name: 'beforeShellExecution',
     command: 'gh issue list',
   });
-  assert('locked gh allow', out.permission === 'allow', JSON.stringify(out));
+  assert('discussion gh issue list allow', outList.permission === 'allow', JSON.stringify(outList));
+
+  const outCreate = run('gate-code.mjs', {
+    ...base,
+    hook_event_name: 'beforeShellExecution',
+    command: 'gh issue create --title t --body b',
+  });
+  assert(
+    'discussion gh issue create deny',
+    outCreate.permission === 'deny',
+    JSON.stringify(outCreate),
+  );
+
+  const outStatus = run('gate-code.mjs', {
+    ...base,
+    hook_event_name: 'beforeShellExecution',
+    command: 'git status',
+  });
+  assert(
+    'discussion git status allow',
+    outStatus.permission === 'allow',
+    JSON.stringify(outStatus),
+  );
+
+  const outCommit = run('gate-code.mjs', {
+    ...base,
+    hook_event_name: 'beforeShellExecution',
+    command: 'git commit -m msg',
+  });
+  assert('discussion git commit deny', outCommit.permission === 'deny', JSON.stringify(outCommit));
 }
 
 // 5. pnpm deny while locked
@@ -177,7 +205,7 @@ process.env.CURSOR_GATE_STATE_DIR = stateTmp;
   assert('phase is forge', st.phase === 'forge' && st.implement === false, JSON.stringify(st));
 }
 
-// 7. still deny Write after phase only
+// 7. still deny Write after phase only — but gh/git writes unlock
 {
   const out = run('gate-code.mjs', {
     ...base,
@@ -186,12 +214,33 @@ process.env.CURSOR_GATE_STATE_DIR = stateTmp;
     tool_input: { path: join(root, 'utils/foo.ts') },
   });
   assert('phase-only Write deny', out.permission === 'deny', JSON.stringify(out));
+
+  const outGh = run('gate-code.mjs', {
+    ...base,
+    hook_event_name: 'beforeShellExecution',
+    command: 'gh issue create --title t --body b',
+  });
+  assert('phase unlocks gh write', outGh.permission === 'allow', JSON.stringify(outGh));
+
+  const outGit = run('gate-code.mjs', {
+    ...base,
+    hook_event_name: 'beforeShellExecution',
+    command: 'git commit -m msg',
+  });
+  assert('phase unlocks git write', outGit.permission === 'allow', JSON.stringify(outGit));
+
+  const outPnpm = run('gate-code.mjs', {
+    ...base,
+    hook_event_name: 'beforeShellExecution',
+    command: 'pnpm test:run',
+  });
+  assert('phase-only pnpm still deny', outPnpm.permission === 'deny', JSON.stringify(outPnpm));
 }
 
 // 8. discussion 中の implement Read はフラグを立てない／Write 不可
 {
-  // discussion に戻す
-  saveState(root, id, { phase: 'discussion', implement: false });
+  // discussion に戻す（/discussion 相当）
+  run('track-phase.mjs', { ...base, prompt: '/discussion step back' });
   const out = run('track-implement.mjs', {
     ...base,
     hook_event_name: 'beforeReadFile',
@@ -200,8 +249,8 @@ process.env.CURSOR_GATE_STATE_DIR = stateTmp;
   assert('discussion implement-read allow file', out.permission === 'allow', JSON.stringify(out));
   const st = readState();
   assert(
-    'discussion implement stays false',
-    st.phase === 'discussion' && st.implement === false,
+    'discussion implement stays null',
+    st.phase === 'discussion' && st.implement === null,
     JSON.stringify(st),
   );
   const out2 = run('gate-code.mjs', {
@@ -211,6 +260,31 @@ process.env.CURSOR_GATE_STATE_DIR = stateTmp;
     tool_input: { path: join(root, 'utils/foo.ts') },
   });
   assert('discussion Write still deny', out2.permission === 'deny', JSON.stringify(out2));
+
+  const outGh = run('gate-code.mjs', {
+    ...base,
+    hook_event_name: 'beforeShellExecution',
+    command: 'gh issue create --title t --body b',
+  });
+  assert(
+    'discussion after /discussion denies gh write',
+    outGh.permission === 'deny',
+    JSON.stringify(outGh),
+  );
+}
+
+// 8a. 旧 state（discussion + false）は読み込み時に null へ正規化
+{
+  writeFileSync(
+    stateAbs(),
+    JSON.stringify({ phase: 'discussion', implement: false, updatedAt: formatJstIso() }, null, 2),
+  );
+  const st = loadState(root, id);
+  assert(
+    'legacy discussion false normalizes to null',
+    st.phase === 'discussion' && st.implement === null,
+    JSON.stringify(st),
+  );
 }
 
 // 8b. forge のあと implement Read で解禁
@@ -303,7 +377,7 @@ process.env.CURSOR_GATE_STATE_DIR = stateTmp;
   writeFileSync(
     oldPath,
     JSON.stringify(
-      { phase: 'discussion', implement: false, updatedAt: formatJstIso(oldDate) },
+      { phase: 'discussion', implement: null, updatedAt: formatJstIso(oldDate) },
       null,
       2,
     ),
@@ -326,7 +400,7 @@ process.env.CURSOR_GATE_STATE_DIR = stateTmp;
   assert('inject mentions dated state path', Boolean(name && ctx.includes(name)), name);
   assert('inject mentions discussion', ctx.includes('discussion'), '');
   assert('inject mentions JST naming', ctx.includes('+0900'), '');
-  assert('inject mentions first prompt', ctx.includes('first user prompt'), '');
+  assert('inject mentions implement null semantics', ctx.includes('`null`'), '');
 }
 
 // 14. ディレクトリ一覧が日付順（ファイル名ソート）

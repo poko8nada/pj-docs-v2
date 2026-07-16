@@ -2,7 +2,10 @@
 /**
  * phase + implement Read まで、プロダクト／ハーネスのコード編集を止める。
  * 対象: preToolUse（Write|StrReplace|Delete|EditNotebook）、beforeShellExecution。
- * ルート直下 *.md は常時許可。未解禁の Shell は gh / git / 読み取り系のみ。
+ * ルート直下 *.md は常時許可。
+ * Shell:
+ *   - discussion → 読み取り系 + gh/git の read サブコマンドのみ
+ *   - 作業フェーズ入場後 → gh/git は解放（implement 不要）。その他は implement まで制限
  * `.cursor/hooks/state/**` は解禁後も常時編集禁止（Read は可）。
  */
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
@@ -12,6 +15,7 @@ import {
   isUnlocked,
   loadState,
   stateDir,
+  WORK_PHASES,
   workspaceRoot,
 } from './state.mjs';
 
@@ -19,7 +23,7 @@ const DENY_CODE =
   '[gate] Code edits require a work phase (/spec|/design|/forge|/refine|/chore) and Read of .cursor/skills/implement/SKILL.md. Default phase is discussion (no code).';
 
 const DENY_SHELL =
-  '[gate] This shell command requires a work phase + implement Read. Without unlock: gh, git, and read-only commands only.';
+  '[gate] Shell blocked. In discussion: read-only commands + read-only gh/git only. After a work phase: gh/git are allowed; other commands need implement Read.';
 
 const DENY_STATE =
   '[gate] Gate state files are hooks-only. Read is allowed; do not edit `.cursor/hooks/state/**`.';
@@ -59,6 +63,61 @@ const READONLY_CMDS = new Set([
   'uname',
   'whoami',
   'id',
+]);
+
+/** discussion 中に許可する git サブコマンド（読み取り） */
+const GIT_READ_SUBS = new Set([
+  'status',
+  'log',
+  'diff',
+  'show',
+  'rev-parse',
+  'ls-files',
+  'ls-tree',
+  'cat-file',
+  'blame',
+  'describe',
+  'shortlog',
+  'name-rev',
+  'symbolic-ref',
+  'reflog',
+  'rev-list',
+  'merge-base',
+  'check-ignore',
+  'check-attr',
+  'version',
+  'help',
+  'for-each-ref',
+  'whatchanged',
+  'grep',
+  'range-diff',
+  'var',
+  'count-objects',
+  'branch', // 作成・削除は isGitReadOnly で除外
+  'remote', // 変更系は isGitReadOnly で除外
+  'tag', // 一覧のみ
+  'stash', // list / show のみ
+  'config', // --get / --list のみ
+]);
+
+/**
+ * discussion 中に許可する gh の (command → subcommands)。
+ * subcommands が null ならその command 配下をすべて許可（例: search）。
+ */
+const GH_READ = new Map([
+  ['issue', new Set(['list', 'view', 'status'])],
+  ['pr', new Set(['list', 'view', 'status', 'checks', 'diff'])],
+  ['run', new Set(['list', 'view', 'watch'])],
+  ['release', new Set(['list', 'view', 'download'])],
+  ['repo', new Set(['view', 'list'])],
+  ['label', new Set(['list'])],
+  ['project', new Set(['list', 'view', 'item-list', 'field-list'])],
+  ['gist', new Set(['list', 'view'])],
+  ['search', null],
+  ['status', null],
+  ['browse', null],
+  ['auth', new Set(['status'])],
+  ['config', new Set(['get', 'list'])],
 ]);
 
 async function readStdinJson() {
@@ -111,6 +170,10 @@ function stripQuotesAndHeredoc(command) {
   return cleaned;
 }
 
+function tokenize(segment) {
+  return segment.trim().split(/\s+/).filter(Boolean);
+}
+
 function firstCommandToken(segment) {
   let s = segment.trim();
   if (!s) return '';
@@ -121,7 +184,7 @@ function firstCommandToken(segment) {
     s = s.slice(sp).trim();
   }
   // sudo / command / time の軽いラッパを飛ばす
-  const parts = s.split(/\s+/).filter(Boolean);
+  const parts = tokenize(s);
   let i = 0;
   while (
     i < parts.length &&
@@ -132,6 +195,148 @@ function firstCommandToken(segment) {
   let cmd = parts[i] || '';
   if (cmd.includes('/')) cmd = basename(cmd);
   return cmd.toLowerCase();
+}
+
+/** git / gh のグローバルオプションを飛ばしてトークン列を返す */
+function tokensAfterCommand(segment, commandName) {
+  const parts = tokenize(segment);
+  let i = 0;
+  while (
+    i < parts.length &&
+    (parts[i] === 'sudo' || parts[i] === 'command' || parts[i] === 'time')
+  ) {
+    i += 1;
+  }
+  // 環境変数代入
+  while (i < parts.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(parts[i])) i += 1;
+
+  let cmd = parts[i] || '';
+  if (cmd.includes('/')) cmd = basename(cmd);
+  if (cmd.toLowerCase() !== commandName) return [];
+  i += 1;
+
+  // git グローバルオプション
+  if (commandName === 'git') {
+    while (i < parts.length) {
+      const p = parts[i];
+      if (p === '-C' || p === '--git-dir' || p === '--work-tree' || p === '-c') {
+        i += 2;
+        continue;
+      }
+      if (p.startsWith('-')) {
+        i += 1;
+        continue;
+      }
+      break;
+    }
+  }
+
+  // gh グローバルオプション（値付き）
+  if (commandName === 'gh') {
+    while (i < parts.length) {
+      const p = parts[i];
+      if (
+        p === '--repo' ||
+        p === '-R' ||
+        p === '--hostname' ||
+        p === '--jq' ||
+        p === '-q' ||
+        p === '--template' ||
+        p === '-t'
+      ) {
+        i += 2;
+        continue;
+      }
+      if (p.startsWith('-')) {
+        i += 1;
+        continue;
+      }
+      break;
+    }
+  }
+
+  return parts.slice(i);
+}
+
+function isGitReadOnly(segment) {
+  const args = tokensAfterCommand(segment, 'git');
+  if (args.length === 0) return true; // bare `git` → help
+  const sub = args[0].toLowerCase();
+  if (!GIT_READ_SUBS.has(sub)) return false;
+  const rest = args.slice(1);
+
+  if (sub === 'branch') {
+    // 削除・改名・強制などは不可。位置引数あり＝作成扱い。
+    if (rest.some((a) => /^(-[dDmc]|--delete|--move|--copy|-f|--force)/.test(a))) return false;
+    const positionals = rest.filter((a) => !a.startsWith('-'));
+    if (positionals.length === 0) return true;
+    // `--list` / `-l` / `-a` / `-r` 付きのパターンは一覧
+    if (rest.some((a) => /^(-l|--list|-a|--all|-r|--remotes|-v|-vv|--verbose)$/.test(a))) {
+      return true;
+    }
+    return false;
+  }
+
+  if (sub === 'remote') {
+    if (rest.length === 0) return true;
+    const action = rest[0].toLowerCase();
+    if (action === 'show' || action === 'get-url') return true;
+    if (rest.every((a) => a.startsWith('-'))) return true; // -v など
+    return false;
+  }
+
+  if (sub === 'tag') {
+    if (rest.length === 0) return true;
+    if (rest.some((a) => /^(-d|--delete|-f|--force|-u|--sign|-s|--annotate|-a|-m)$/.test(a))) {
+      return false;
+    }
+    // -l / --list またはフラグのみ
+    if (rest.some((a) => a === '-l' || a === '--list')) return true;
+    if (rest.every((a) => a.startsWith('-'))) return true;
+    return false; // `git tag v1` は作成
+  }
+
+  if (sub === 'stash') {
+    if (rest.length === 0) return false; // bare stash = push
+    const action = rest[0].toLowerCase();
+    return action === 'list' || action === 'show';
+  }
+
+  if (sub === 'config') {
+    return rest.some((a) => a === '--get' || a === '--list' || a === '-l' || a === '--get-regexp');
+  }
+
+  return true;
+}
+
+function isGhApiReadOnly(rest) {
+  // `gh api …` — GET 相当のみ。-X POST 等や明示メソッドは不可。
+  if (rest.some((a) => a === '-X' || a === '--method')) return false;
+  if (rest.some((a) => /^(POST|PUT|PATCH|DELETE)$/i.test(a))) return false;
+  // フィールド送信は mutation 扱い
+  if (rest.some((a) => a === '-f' || a === '-F' || a === '--raw-field' || a === '--input')) {
+    return false;
+  }
+  return true;
+}
+
+function isGhReadOnly(segment) {
+  const args = tokensAfterCommand(segment, 'gh');
+  if (args.length === 0) return true;
+  const command = args[0].toLowerCase();
+
+  if (command === 'api') return isGhApiReadOnly(args.slice(1));
+
+  if (!GH_READ.has(command)) return false;
+  const allowedSubs = GH_READ.get(command);
+  if (allowedSubs === null) return true;
+
+  // サブコマンドを探す（フラグを飛ばす）
+  let i = 1;
+  while (i < args.length && args[i].startsWith('-')) i += 1;
+  const sub = (args[i] || '').toLowerCase();
+  if (!sub) return false;
+  return allowedSubs.has(sub);
 }
 
 function mentionsStateDir(root, command) {
@@ -159,7 +364,12 @@ function isShellWriteToState(root, command) {
   return false;
 }
 
-function isAllowedWithoutUnlock(command) {
+/**
+ * コード未解禁時の Shell 許可。
+ * - discussion: 読み取り系 + gh/git read のみ
+ * - 作業フェーズ: 読み取り系 + gh/git 全許可
+ */
+function isAllowedWithoutCodeUnlock(command, inWorkPhase) {
   const cleaned = stripQuotesAndHeredoc(String(command ?? ''));
   const segments = cleaned
     .split(/&&|\|\||;|\n|\|/)
@@ -169,8 +379,9 @@ function isAllowedWithoutUnlock(command) {
   return segments.every((seg) => {
     const cmd = firstCommandToken(seg);
     if (!cmd) return true;
-    if (cmd === 'gh' || cmd === 'git') return true;
     if (READONLY_CMDS.has(cmd)) return true;
+    if (cmd === 'git') return inWorkPhase || isGitReadOnly(seg);
+    if (cmd === 'gh') return inWorkPhase || isGhReadOnly(seg);
     return false;
   });
 }
@@ -181,6 +392,7 @@ async function main() {
   const id = conversationId(payload);
   const state = loadState(root, id);
   const unlocked = isUnlocked(state);
+  const inWorkPhase = WORK_PHASES.has(state.phase);
   const event = payload.hook_event_name ?? '';
   const toolName = payload.tool_name ?? '';
 
@@ -194,7 +406,7 @@ async function main() {
       return deny(DENY_STATE);
     }
     if (unlocked) return allow();
-    if (isAllowedWithoutUnlock(command)) return allow();
+    if (isAllowedWithoutCodeUnlock(command, inWorkPhase)) return allow();
     return deny(DENY_SHELL);
   }
 

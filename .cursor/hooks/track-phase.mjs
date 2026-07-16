@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 /**
  * beforeSubmitPrompt
- * - この会話で初めての発話 → 無ければ discussion state を作成
- * - /spec|/design|/forge|/refine|/chore があれば phase を更新
+ * - この会話で初めての発話 → 無ければ discussion state を作成（implement: null）
+ * - /discussion → discussion に戻す（implement: null）
+ * - /spec|/design|/forge|/refine|/chore → 作業フェーズ（implement: false または維持）
  */
 import {
   conversationId,
   findStateFileName,
   loadState,
+  normalizeImplement,
   PHASE_DISCUSSION,
   saveState,
   workspaceRoot,
 } from './state.mjs';
 
-const PHASE_RE = /(?:^|[\s`])\/(spec|design|forge|refine|chore)(?=[\s`/]|$)/i;
+const PHASE_RE = /(?:^|[\s`])\/(discussion|spec|design|forge|refine|chore)(?=[\s`/]|$)/i;
 
 async function readStdinJson() {
   const chunks = [];
@@ -35,15 +37,21 @@ async function main() {
 
   // 初回発話で discussion を実体化（起動だけ／未発話の resume 捨て打ちでは作らない）
   if (!findStateFileName(root, id)) {
-    saveState(root, id, { phase: PHASE_DISCUSSION, implement: false });
+    saveState(root, id, { phase: PHASE_DISCUSSION, implement: null });
   }
 
   const match = prompt.match(PHASE_RE);
   if (match) {
     const phase = match[1].toLowerCase();
     const prev = loadState(root, id);
-    // フェーズ切替時のみ implement をリセット（同フェーズ再入場は維持）
-    const implement = prev.phase === phase ? prev.implement : false;
+    let implement;
+    if (phase === PHASE_DISCUSSION) {
+      implement = null;
+    } else if (prev.phase === phase) {
+      implement = normalizeImplement(phase, prev.implement);
+    } else {
+      implement = false;
+    }
     saveState(root, id, { phase, implement });
   }
 
