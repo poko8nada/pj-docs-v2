@@ -31,7 +31,7 @@ The project is driven by design → build → refine as one loop.
 - Build is based on the design.
 - Refine is performed based on the build.
 
-Project phases and states are managed by issues. Especially, the \`[Spec]\` issue is the definition of a project. Here is the definition of each phase.
+Project phases and states are managed by issues. Especially, the [Spec] issue is the definition of a project. Here is the definition of each phase.
 
 | phase  | overview                                           |
 | ------ | -------------------------------------------------- |
@@ -46,34 +46,34 @@ Every session starts in **open-discussion.** You CANNOT execute tools (edit, wri
 
 To execute tools, ALL of these conditions must be met:
 
-1. Phase set via user's \`[setup]\` command. This is a LITERAL custom command — the user types \`[setup] design\` exactly. Question tool answers do NOT set phase.
+1. Phase set via user's [setup] command. This is a LITERAL custom command — the user types [setup] design exactly. Question tool answers do NOT set phase.
 2. Required skills loaded IN ORDER — do not skip:
    - design / build / refine → feasibility → prepare → execution skill
    - chore → execution skill
-3. User types \`[run]\` or \`[run] all\` on a new line. NOT inferred.
-   - \`[run]\` (default) — the agent MUST use the question tool to ask scope (which slice/phase of the agreed plan) before execution. Execution is limited to the chosen scope; the next \`[run]\` continues.
-   - \`[run] all\` — executes the entire plan in one go, up to and including verification (typecheck / lint / format). No commits, no pushes.
-   - Question tool "yes/no" answers do NOT count as \`[run]\`.
-4. \`STOP\` (on its own line) interrupts a running \`[run] all\` and closes the execution gate. Phase and skills are preserved.
+3. User types [run] or [run] all on a new line. NOT inferred.
+   - [run] (default) — the agent MUST use the question tool to ask scope (which slice/phase of the agreed plan) before execution. Execution is limited to the chosen scope; the next [run] continues.
+   - [run] all — executes the entire plan in one go, up to and including verification (typecheck / lint / format). No commits, no pushes.
+   - Question tool "yes/no" answers do NOT count as [run].
+4. STOP (on its own line) interrupts a running [run] all and closes the execution gate. Phase and skills are preserved.
 
 Phase-specific behavior:
 
-- **open_discussion** — Discuss freely. Create \`.md\` files anywhere outside \`.opencode/\`. Manage issues via \`gh\` (Spec / Design / Build / Refine) as long as the \`issue\` skill is triggered and the corresponding template is read. Code implementation requires \`[setup] design / build / refine / chore\`.
-- **design** — Build prototype → discuss → expand to full scope. The plan is the 7 stages (project setup, components, default screen, component comments, discuss/iterate, update issue body, hand off). The spec (Style Guide, matrices) is written to the [Design] issue body in one shot at run stage 6.
-- **build** — PLAN then IMPLEMENT. The plan's slice list is written to the # Build Progress section of the [Build] issue body at prepare time; each [run] updates the Stages checkboxes and appends to the ## Notes section at completion (or STOP).
-- **refine** — ANALYZE then IMPROVE. The plan's tier-grouped slice list is written to the # Refine Progress section of the [Refine] issue body at prepare time; each [run] updates the Stages checkboxes and appends to the ## Notes section at completion (or STOP).
+- **open_discussion** — Discuss freely. Create .md files anywhere outside .opencode/. Manage issues via gh (Spec / Design / Build / Refine) as long as the issue skill is triggered and the corresponding template is read. Code implementation requires [setup] design / build / refine / chore.
+- **design** — Prepare (5 steps: Analyze, Identify slices, Display, Agree, Write to body) outputs the slice list and initial spec (Style Guide + Component/Section Matrix) to the body. Run executes the slices (code changes only, no body update). At a break point, [body] updates the spec (Style Guide, Component/Section Matrix, Implementation Matrix, Page Structure for web) and the slice checkboxes.
+- **build** — Prepare (5 steps) outputs the slice list to the # Build Progress section of the [Build] issue body. Run executes the slices (code changes only, no body update). At a break point, [body] updates the slice checkboxes and Notes.
+- **refine** — Same as build, with slices grouped by impact tier (High / Medium / Low / Risky). [body] updates the # Refine Progress section.
 - **chore** — EXECUTE directly. Minor changes, harness, typos only.
 
-The agent proposes next steps. The user controls flow with trigger words (\`[run]\`, \`[run] all\`, \`STOP\`, \`RESET\`, \`STATE\`).
+The agent proposes next steps. The user controls flow with trigger words ([run], [run] all, [body], STOP, RESET, STATE).
 `;
 
 const RULES_MD = `The execution gate separates three concerns:
 
 - **Read-only tools** (read, grep, glob, websearch, webfetch, question, todowrite): always allowed.
-- **\`.md\` files outside \`.opencode/\`** (edit / write / patch): always allowed in any phase — use freely for notes, design docs, spec drafts.
-- **\`bash gh\` (write)**: gated by \`issue\` skill trigger + corresponding template read. **Phase-agnostic** — Spec / Design / Build / Refine issues are operable in any phase as long as the gate is satisfied.
-- **\`bash\` read-only / \`gh\` read-only** (ls, cat, \`gh issue list\`, \`gh search\`, etc.): always allowed.
-- **\`.opencode/*\` or non-md files** (edit / write / patch) and **other working \`bash\`**: requires phase ≠ \`open_discussion\` + execution skill + \`[run]\`.
+- **.md files outside .opencode/** (edit / write / patch): always allowed in any phase — use freely for notes, design docs, spec drafts.
+- **bash gh (write)**: gated by issue skill trigger + corresponding template read. **Phase-agnostic** — Spec / Design / Build / Refine issues are operable in any phase as long as the gate is satisfied.
+- **bash read-only / gh read-only** (ls, cat, gh issue list, gh search, etc.): always allowed.
+- **.opencode/* or non-md files** (edit / write / patch) and **other working bash**: requires phase ≠ open_discussion + execution skill + [run].
 
 **Phase gates code implementation, not issue management.**
 `;
@@ -174,7 +174,7 @@ function renderSection(s: {
   codeblock?: boolean;
 }): string {
   const heading = '#'.repeat(s.level) + ' ' + s.title;
-  const body = s.codeblock ? `\`\`\`text\n${s.body}\n\`\`\`` : s.body;
+  const body = s.codeblock ? `text\n${s.body}\n` : s.body;
   return `${heading}\n\n${body}`;
 }
 

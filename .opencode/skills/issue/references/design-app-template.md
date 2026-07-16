@@ -43,26 +43,27 @@ Use this template for the Design (app) issue body. Reference the Spec issue's bo
 
 ## Slices
 
-- [ ] 
-- [ ] 
-- [ ] 
+- [ ]
+- [ ]
+- [ ]
 
 ## Notes
 
 ---
 
 # Wireframe (default screen)
-
 ```
+
 +----------------------+
-|                      |
+| |
 +----------------------+
-|                      |
-|                      |
-|                      |
+| |
+| |
+| |
 +----------------------+
-|                      |
+| |
 +----------------------+
+
 ```
 
 ---

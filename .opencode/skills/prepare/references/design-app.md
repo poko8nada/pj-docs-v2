@@ -1,39 +1,129 @@
 # design-app
 
-**These are the rules and protocol one should be aware of before beginning implementaion on the session.**
+**These are plans that must be prepared prior to implementation, requiring the creation of specific deliverables.  
+They also represent rules and procedures that must be understood before implementation begins.**
 
 Build a realistic default screen using production-ready components to align on design direction and clarify what needs to be built. The screen is the discussion tool. The real deliverable is the spec that comes out of the conversation, stored in the [Design] issue body.
 
 ## Principle
 
-The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. One screen: default. The conversation around the screen produces the real output: a component matrix and a minimal style guide in the [Design] issue body.
-
-`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not the design spec (which lives in the [Design] issue body), not the default screen. Delete `prototype/` when the product can speak for itself.
-
----
-
-## Step 1 — Build the default screen
-
-Without asking for further input, make reasonable design decisions and build the default screen.
-
-### What "default" means
-
-The default screen is the standard loaded state a typical user sees after the app has data. It is not a demo screen and not a best-case scenario — it is a realistic, slightly messy snapshot of the app in normal use.
+The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. The conversation around the screen produces the real output: a component matrix and a minimal style guide in the [Design] issue body.
 
 - Data is realistic and covers edge cases: very long strings, very short strings, missing optional fields, zero counts, mixed statuses, special characters
 - CSS hover/focus/active styles are included as normal — these are part of the component, not separate states
 - Interactive behavior (clicks, modals opening, drag-and-drop) is not implemented — the screen is static. **Except for what CSS can does.**
 - The goal is to see the layout, hierarchy, typography, spacing, and component structure in a realistic condition
 
-### Stack detection
+`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not the design spec (which lives in the [Design] issue body), not the default screen. Delete `prototype/` when the product can speak for itself.
 
-Read `package.json` and config files. Then:
+---
+
+## Prepare
+
+The prepare workflow consists of 5 steps.
+
+### Step 1: Analyze
+
+Read `package.json` and config files. Determine the prototype location and the components directory.
 
 **File-routing frameworks** (Next.js App Router, SvelteKit, Nuxt, Remix, etc.)
 → `prototype/index.tsx` inside the routing root (e.g., `app/prototype/index.tsx` for App Router).
 
 **Non-routing setups** (Vite + React, Vite + Vue, plain HTML, etc.)
 → `src/prototype/index.tsx` or `prototype/index.html` at project root
+
+Components live in the appropriate components directory (e.g., `components/`, `src/components/`).
+
+### Step 2: Identify slices
+
+Think about what the user sees on the default screen. Group related components into slices by user-facing concern.
+
+**Example (task app):**
+
+- Slice 1: Chrome (Header + Footer + index.tsx placeholder)
+- Slice 2: Browse tasks (TaskList + TaskItem + EmptyState)
+- Slice 3: Add task (AddTaskModal)
+
+**Common slice groupings:**
+
+- View concern: list + items + empty state
+- Create concern: form + modal + submit button
+- Edit/delete concern: edit mode + confirm dialog
+- Detail concern: detail panel or drawer
+
+### Step 3: Display
+
+Show the proposed slice list in chat. Also show the initial Style Guide values and Component Matrix (with placeholder states/variants) for the user to review.
+
+### Step 4: User agreement
+
+Use the `question` tool to surface a yes / edit / no decision on the plan.
+
+- **yes** — the plan is locked. Proceed to Step 5.
+- **edit** — the user provides specific edits. Update the plan and ask again.
+- **no** — the plan is rejected. Return to Step 2 with the user's feedback.
+
+### Step 5: Write to body
+
+After the user agrees, write the plan and initial spec to the issue body.
+
+**Filled in Step 5:**
+
+- `## Slices` section (plan): the slice list as checkboxes (all `[ ]`)
+- `## Style Guide` (under `# Design Spec`): initial values (Color, Typography, Spacing)
+- `## Component Matrix`: components for the default screen, placeholder states/variants
+
+**NOT filled in Step 5 (left as `(none)` or empty):**
+
+- `## Implementation Matrix`: filled when discussed during run (hook/API decisions often emerge from discussing the design)
+
+The body structure after Step 5:
+
+```markdown
+... existing plan sections (Goal, Reference, What, Constraints) ...
+
+## Slices
+
+- [ ] Slice 1: Chrome
+- [ ] Slice 2: Browse tasks
+- [ ] Slice 3: Add task
+
+---
+
+# Design Spec (app)
+
+## Style Guide
+
+| Token | Value | Use |
+| Brand | #3B82F6 | app theme, primary CTA |
+| ... (initial values)
+
+## Component Matrix
+
+| File | Default | States | Variants |
+| header.tsx | ✓ | default | — |
+| ... (placeholder states for default screen components)
+
+## Implementation Matrix
+
+(none — to be filled after discuss / slices)
+
+---
+
+# Design Progress
+
+## Slices
+
+- [ ] Slice 1: Chrome
+- [ ] Slice 2: Browse tasks
+- [ ] Slice 3: Add task
+
+## Notes
+```
+
+See `issue/references/commands.md` for the exact `gh issue edit` invocation.
+
+## Design protocol
 
 ### Components
 
@@ -43,7 +133,7 @@ Write components in their production location from the start — not under `prot
 
 **Greenfield project** — create in the appropriate components directory. The prototype imports them from there.
 
-### Writing the default screen
+### Default screen
 
 Write the screen exactly as it would look in production. Keep the DOM structure as close to production as possible — no extra wrapper divs.
 
@@ -151,149 +241,3 @@ Every component file gets a structured comment block at the top. Do not skip or 
 //     - design: キャンセル動作は ESC キーでも可能にする
 //   該当なければ「なし」と書く
 ```
-
----
-
-## Step 2 — Discuss and iterate
-
-Ask the user to open the screen in the browser. Then discuss freely — design, layout, components, data, anything. Edit the screen based on feedback.
-
-Refer to components by their `data-component` name. If feedback is ambiguous, ask which component it applies to.
-
-Continue until the screen feels right.
-
----
-
-## Step 3 — Identify missing components and logic
-
-After the default screen is aligned, identify what's missing in two layers. Present as a chat list with reasoning — do not use question tools.
-
-### Components
-
-UI files (`components/*.tsx`) absent from the default screen.
-
-Use this list as a thinking prompt. Not all will apply — propose only what makes sense for this app.
-
-**Data states**
-
-- Empty state — no items; layout and call-to-action differ significantly from default
-- Error state — fetch failed; error message replaces content
-- Offline state — no connection
-
-**Surfaces triggered by interaction**
-
-- Creation modal or form
-- Edit mode — inline or full form
-- Delete confirmation dialog
-- Detail panel or drawer
-
-**Structural variants**
-
-- Collapsed / expanded sections
-- Search results — especially zero-results
-- Filtered view — if structure changes significantly
-- Multi-selection mode — bulk action toolbar
-
-**Access and permission states**
-
-- Guest / unauthenticated view
-- Read-only view
-- No permission screen
-
-**Onboarding**
-
-- First-run experience
-
-### Logic
-
-Non-component files (hooks, API routes, services) that the components depend on. For each, identify:
-
-- **File path** — full path from project root (e.g., `hooks/useTasks.ts`, `api/tasks/[id]/route.ts`)
-- **Functions** — what the file exports (hooks, route handlers, service methods)
-- **API** — what endpoints or DB queries the file handles
-
-Use this list as a thinking prompt. Not all will apply — propose only what makes sense for this app.
-
-**Hooks** (client-side data fetching)
-
-- `useTasks` — list, create, update, delete
-- `useUser` — current user
-
-**API routes** (server-side handlers)
-
-- `GET /tasks` — list tasks
-- `POST /tasks` — create task
-- `PATCH /tasks/:id` — update task
-- `DELETE /tasks/:id` — delete task
-
-These populate the **Component Matrix** and **Implementation Matrix** in the [Design] issue body — they are not built as additional screens.
-
----
-
-## Step 4 — Update [Design] issue body
-
-The design spec lives in the [Design] issue body — not in a local file. The body is written **in one shot at run stage 6** (`Update the [Design] issue body`). Stages 1–5 of the run (project setup, components, default screen, component comments, discuss/iterate) do not touch the body — the prototype and the chat discussion are the working surface during those stages.
-
-### Body structure (app)
-
-```markdown
-# Design Spec
-
-Generated from app-design-align session.
-
-## Style Guide
-
-| Token      | Value   | Use                         |
-| ---------- | ------- | --------------------------- |
-| Brand      | #3B82F6 | app theme, primary CTA      |
-| Background | #F9FAFB | app background              |
-| Surface    | #FFFFFF | cards, sheets               |
-| Text       | #111827 | foreground                  |
-| Muted      | #6B7280 | secondary text, placeholder |
-| Border     | #E5E7EB | dividers, input borders     |
-| Success    | #10B981 | success states, badges      |
-| Warning    | #F59E0B | warning states, alerts      |
-| Error      | #EF4444 | error states, validation    |
-| Info       | #3B82F6 | info states, hints          |
-
-## Component Matrix
-
-| File             | Default | States                   | Variants                      |
-| ---------------- | ------- | ------------------------ | ----------------------------- |
-| header.tsx       | ✓       | default, guest           | —                             |
-| footer.tsx       | ✓       | —                        | —                             |
-| task-list.tsx    | ✓       | default, empty, loading  | —                             |
-| task-item.tsx    | ✓       | todo, in-progress, done  | —                             |
-| create-modal.tsx | —       | open, error              | —                             |
-| empty-state.tsx  | —       | —                        | —                             |
-| button.tsx       | ✓       | default, hover, disabled | primary, secondary, danger    |
-| input.tsx        | —       | default, focus, error    | text, password                |
-| badge.tsx        | ✓       | —                        | success, warning, error, info |
-| toast.tsx        | —       | visible, hidden          | success, warning, error, info |
-
-## Implementation Matrix
-
-| File                      | Functions              | API                      |
-| ------------------------- | ---------------------- | ------------------------ |
-| `hooks/useTasks.ts`       | useTasks               | GET /tasks               |
-| `hooks/useUser.ts`        | useUser                | GET /me                  |
-| `api/tasks/route.ts`      | listTasks, createTask  | GET, POST /tasks         |
-| `api/tasks/[id]/route.ts` | updateTask, deleteTask | PATCH, DELETE /tasks/:id |
-```
-
-### Update procedure
-
-1. Compose the full body in a heredoc and pass via `gh issue edit <design_number> --body "$(cat <<'EOF' ... EOF)"`.
-2. Do not skip sections. Every section in the structure above must be present in the final body, even with `(none)` for empty entries.
-
-See `issue/references/commands.md` for the exact `gh` invocation.
-
----
-
-## Step 5 — Hand off
-
-`prototype/` stays in the repo as an alignment snapshot for the duration of the early build phase.
-
-**If a significant design change comes up during the build** — delete `prototype/` and run app-design-align again from scratch. Do not version or accumulate screens inside `prototype/`. Each run is disposable and self-contained.
-
-**If a small change comes up** — modify the product directly. Update the [Design] issue body by hand if it still matters. Do not re-run app-design-align for minor adjustments.

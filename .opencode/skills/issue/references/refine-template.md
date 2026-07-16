@@ -50,31 +50,31 @@ Use this template for the Refine issue body. Reference the Build issue's body an
 ### High
 
 - [ ] **Slice 1: <one-line description>**
-  - Test: 
-  - App: 
+  - Test:
+  - App:
 
 ### Medium
 
 - [ ] **Slice 2: <one-line description>**
-  - Test: 
-  - App: 
+  - Test:
+  - App:
 
 ### Low
 
 - [ ] **Slice 3: <one-line description>**
-  - Test: 
-  - App: 
+  - Test:
+  - App:
 
 ### Risky
 
 - [ ] **Slice 4: <one-line description>**
-  - Test: 
-  - App: 
+  - Test:
+  - App:
 
 ## File changes
 
-| Path | Type | Detail |
-| --- | --- | --- |
+| Path                  | Type | Detail       |
+| --------------------- | ---- | ------------ |
 | `path/to/existing.ts` | edit | what changes |
 
 ## Rationale

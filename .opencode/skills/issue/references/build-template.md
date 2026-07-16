@@ -52,13 +52,13 @@ Use this template for the Build issue body. Reference the Design issue's body an
   - App: `<app command>` → <what user does> → <expected outcome>
 
 - [ ] **Slice 2: <one-line description>**
-  - Test: 
-  - App: 
+  - Test:
+  - App:
 
 ## File changes
 
-| Path | Type | Detail |
-| --- | --- | --- |
+| Path              | Type            | Detail       |
+| ----------------- | --------------- | ------------ |
 | `path/to/file.ts` | new/edit/delete | what changes |
 
 ## Rationale

@@ -208,7 +208,7 @@ The plan is not final until the user agrees. Use the `question` tool to surface 
 
 After the user agrees (Step 4 = yes), the plan is locked. Write the slice list to the `# Refine Progress` section of the Refine issue body. The list is grouped by impact tier (High / Medium / Low / Risky) — the order in `Order & Verify` already follows this grouping, so re-apply the tier label as a checkbox prefix.
 
-The body already contains the empty `# Refine Progress` section from the issue template. Use `gh issue edit` to populate the Stages checklist. Preserve all existing body content (Goal, Reference, What, Risks, Order, Verify) above the `# Refine Progress` section — only the Stages list is added here.
+The body already contains the empty `# Refine Progress` section from the issue template. Use `gh issue edit` to populate the Slices checklist. Preserve all existing body content (Goal, Reference, What, Risks, Order, Verify) above the `# Refine Progress` section — only the Slices list is added here.
 
 ```bash
 gh issue edit <refine_number> --body "$(cat <<'EOF'
@@ -216,7 +216,7 @@ gh issue edit <refine_number> --body "$(cat <<'EOF'
 
 # Refine Progress
 
-## Stages (by impact tier)
+## Slices (by impact tier)
 
 - [ ] **High**: <Order & Verify の High slice を 1 行で>
 - [ ] **High**: <...>
@@ -230,4 +230,4 @@ EOF
 )"
 ```
 
-The Notes section is left empty here. Subsequent `[run]` invocations update the body with stage check-offs (`[x]`) and Notes entries — that is the run command's responsibility, not prepare's.
+The Notes section is left empty here. The plan is locked.

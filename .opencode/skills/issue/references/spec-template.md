@@ -31,13 +31,13 @@ Use this template for the Spec issue body. The Spec is the root of every downstr
 
 ## Features
 
-- 
-- 
+-
+-
 
 ## Non-goals
 
-- 
-- 
+-
+-
 
 ## Stack
 
@@ -47,11 +47,11 @@ Use this template for the Spec issue body. The Spec is the root of every downstr
 
 ## Roadmap
 
-- **v1**: 
-- **v2**: 
+- **v1**:
+- **v2**:
 
 ## Open Questions
 
-- [ ] 
-- [ ] 
+- [ ]
+- [ ]
 ```
