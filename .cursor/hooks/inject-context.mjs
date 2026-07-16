@@ -144,13 +144,24 @@ function readReview() {
   ].join('\n');
 }
 
+function readCheck() {
+  return [
+    'After editing `*.{js,jsx,ts,tsx}` product sources, harness accumulates paths in `check.pending`.',
+    'When the agent stops, harness runs `pnpm format`, `pnpm lint`, and `pnpm typecheck:staged` on pending files (same as lefthook pre-commit).',
+    'On failure, `stop` returns `followup_message` so the agent auto-continues to fix (max 1 follow-up per turn via in-hook `loop_count`).',
+    'If `stop` is skipped after a follow-up turn, `beforeSubmitPrompt` flushes leftover `pending` (blocks send on failure).',
+    'After a run or an allowed `git commit`, `check.pending` is cleared. Re-edits accumulate again.',
+  ].join('\n');
+}
+
 function readGateState(stateFileRel) {
   return [
     `Your gate state (read-only for you; hooks write it): \`${stateFileRel}\``,
     'Created on the first user prompt as `discussion` (not at CLI startup). Work phases update the same file.',
-    'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `review`, `updatedAt` (JST `+09:00`).',
+    'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `review`, `check`, `updatedAt` (JST `+09:00`).',
     '`implement`: `null` in `discussion` (N/A); `false` = work phase, handshake pending; `true` = code edits allowed.',
     '`review`: `required` + `done` — commit blocked when `required && !done`. `done` is set when `/pre-commit-reviewer` Task is invoked.',
+    '`check`: `pending` — relative paths queued for format/lint/typecheck on agent `stop`.',
     'If the glob has no match yet, no prompt has been sent in this conversation. Never edit state files.',
     'State survives CLI resume for the same conversation_id; stale files older than 7 days are purged on sessionStart.',
   ].join('\n');
@@ -166,6 +177,7 @@ function buildSectionDefs(stateFileRel) {
     { id: 'phase', title: 'Phase entry rules', level: 2, source: readPhase },
     { id: 'shell', title: 'Shell cwd', level: 2, source: readShell },
     { id: 'review', title: 'Pre-commit review', level: 2, source: readReview },
+    { id: 'check', title: 'Post-edit checks', level: 2, source: readCheck },
     {
       id: 'gate',
       title: 'Gate state',

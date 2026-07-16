@@ -17,6 +17,10 @@
       {
         "command": "node .cursor/hooks/track.mjs",
         "failClosed": false
+      },
+      {
+        "command": "node .cursor/hooks/check.mjs",
+        "failClosed": false
       }
     ],
     "beforeShellExecution": [
@@ -72,6 +76,13 @@
       {
         "command": "node .cursor/hooks/gate.mjs",
         "failClosed": true
+      }
+    ],
+    "stop": [
+      {
+        "command": "node .cursor/hooks/check.mjs",
+        "failClosed": false,
+        "timeout": 120
       }
     ]
   }

@@ -6,10 +6,10 @@
  * |--------------------|---------------------------------------------|
  * | beforeSubmitPrompt | phase / bootstrap                           |
  * | Read*              | implement: true on implement/SKILL.md Read  |
- * | postToolUse Write* | review.required + review.done=false         |
+ * | postToolUse Write* | review.required + check.pending              |
  * | preToolUse Task         | review.done=true on /pre-commit-reviewer    |
- * | beforeShellExecution    | review reset when git commit is allowed     |
- * | afterShellExecution     | review reset on successful git commit (IDE) |
+ * | beforeShellExecution    | review/check reset when git commit allowed  |
+ * | afterShellExecution     | review/check reset on successful git commit (IDE) |
  */
 import { realpathSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
@@ -19,17 +19,21 @@ import {
   isPreCommitReviewerContext,
   isReviewablePath,
 } from './_review.mjs';
+import { isCheckablePath } from './_check.mjs';
 import {
   conversationId,
   defaultReview,
   findStateFileName,
   isReviewBlocking,
   loadState,
+  markCheckPending,
   markReviewDirty,
   markReviewDone,
   normalizeImplement,
   normalizeReview,
+  normalizeCheck,
   PHASE_DISCUSSION,
+  resetCheck,
   resetReview,
   saveState,
   WORK_PHASES,
@@ -132,6 +136,18 @@ function handleBeforeSubmitPrompt(root, payload) {
   return respond({ continue: true });
 }
 
+function maybeMarkCheckPending(root, payload) {
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  if (!WORK_PHASES.has(state.phase) || state.implement !== true) return;
+
+  const filePath = filePathFromPayload(payload);
+  if (!filePath || !isCheckablePath(root, String(filePath))) return;
+
+  const abs = resolve(isAbsolute(String(filePath)) ? String(filePath) : resolve(root, String(filePath)));
+  markCheckPending(root, id, abs);
+}
+
 function maybeMarkReviewDirty(root, payload) {
   const id = conversationId(payload);
   const state = loadState(root, id);
@@ -164,16 +180,20 @@ function shellSucceeded(payload) {
   return true;
 }
 
-function maybeResetReviewAfterCommit(root, payload) {
+function maybeResetAfterCommit(root, payload) {
   const command = shellCommand(payload);
   if (!commandIncludesGitCommit(command)) return empty();
 
   const id = conversationId(payload);
   const state = loadState(root, id);
   if (isReviewBlocking(state)) return empty();
-  if (!normalizeReview(state.review).required) return empty();
 
-  resetReview(root, id);
+  const review = normalizeReview(state.review);
+  const hadReview = review.required;
+  const hadCheck = normalizeCheck(state.check).pending.length > 0;
+
+  if (hadReview) resetReview(root, id);
+  if (hadCheck) resetCheck(root, id);
   return empty();
 }
 
@@ -183,9 +203,11 @@ function handleAfterShellExecution(root, payload) {
 
   const id = conversationId(payload);
   const state = loadState(root, id);
-  if (!normalizeReview(state.review).required) return empty();
+  const review = normalizeReview(state.review);
+  const hadCheck = normalizeCheck(state.check).pending.length > 0;
 
-  resetReview(root, id);
+  if (review.required) resetReview(root, id);
+  if (hadCheck) resetCheck(root, id);
   return empty();
 }
 
@@ -204,7 +226,7 @@ async function main() {
   }
 
   if (event === 'beforeShellExecution') {
-    return maybeResetReviewAfterCommit(root, payload);
+    return maybeResetAfterCommit(root, payload);
   }
 
   if (event === 'preToolUse' && toolName === 'Task') {
@@ -224,6 +246,7 @@ async function main() {
 
   if (event === 'postToolUse' && WRITE_TOOLS.has(toolName)) {
     maybeMarkReviewDirty(root, payload);
+    maybeMarkCheckPending(root, payload);
     return empty();
   }
 

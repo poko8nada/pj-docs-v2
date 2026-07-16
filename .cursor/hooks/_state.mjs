@@ -144,6 +144,19 @@ export function defaultReview() {
   return { required: false, done: true, files: [] };
 }
 
+/** @returns {{ pending: string[] }} */
+export function defaultCheck() {
+  return { pending: [] };
+}
+
+export function normalizeCheck(check) {
+  if (!check || typeof check !== 'object') return defaultCheck();
+  const pending = Array.isArray(check.pending)
+    ? [...new Set(check.pending.map((f) => String(f)).filter(Boolean))]
+    : [];
+  return { pending };
+}
+
 export function normalizeReview(review) {
   if (!review || typeof review !== 'object') return defaultReview();
   const files = Array.isArray(review.files)
@@ -161,12 +174,13 @@ export function normalizeReview(review) {
   return { required, done, files };
 }
 
-/** @returns {{ phase: string, implement: boolean | null, review: ReturnType<typeof defaultReview>, updatedAt: string }} */
+/** @returns {{ phase: string, implement: boolean | null, review: ReturnType<typeof defaultReview>, check: ReturnType<typeof defaultCheck>, updatedAt: string }} */
 export function defaultState() {
   return {
     phase: PHASE_DISCUSSION,
     implement: null,
     review: defaultReview(),
+    check: defaultCheck(),
     updatedAt: formatJstIso(),
   };
 }
@@ -193,6 +207,7 @@ export function loadState(root, id) {
       phase,
       implement: normalizeImplement(phase, raw.implement),
       review: normalizeReview(raw.review),
+      check: normalizeCheck(raw.check),
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : defaultState().updatedAt,
     };
   } catch {
@@ -210,6 +225,7 @@ export function saveState(root, id, state) {
     phase,
     implement: normalizeImplement(phase, state.implement ?? prev.implement),
     review: normalizeReview(state.review ?? prev.review),
+    check: normalizeCheck(state.check ?? prev.check),
     updatedAt: formatJstIso(),
   };
   writeFileSync(path, JSON.stringify(next, null, 2) + '\n', 'utf8');
@@ -245,6 +261,22 @@ export function markReviewDone(root, id) {
 export function resetReview(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, { phase: prev.phase, implement: prev.implement, review: defaultReview() });
+}
+
+/** implement 解禁後の checkable 編集を溜める（stop で一括 format/lint/typecheck） */
+export function markCheckPending(root, id, filePath) {
+  const prev = loadState(root, id);
+  const abs = resolve(filePath);
+  const rel = relative(root, abs).split(sep).join('/');
+  const check = normalizeCheck(prev.check);
+  if (rel && !check.pending.includes(rel)) check.pending.push(rel);
+  return saveState(root, id, { phase: prev.phase, implement: prev.implement, review: prev.review, check });
+}
+
+/** stop 実行後 or 許可された git commit 後に pending を空にする */
+export function resetCheck(root, id) {
+  const prev = loadState(root, id);
+  return saveState(root, id, { phase: prev.phase, implement: prev.implement, review: prev.review, check: defaultCheck() });
 }
 
 /**
