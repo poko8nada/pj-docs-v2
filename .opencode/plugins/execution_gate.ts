@@ -1,4 +1,5 @@
 import type { Plugin } from '@opencode-ai/plugin';
+import * as path from 'path';
 
 // phase → load の対応
 const PHASE_LOADS = {
@@ -15,12 +16,21 @@ type Skills = {
   [K in PhaseType]: { type: K; load: (typeof PHASE_LOADS)[K] };
 }[PhaseType];
 
+// テスタビリティのため export
+export type { Skills };
+
 interface SessionState {
   phase: PhaseType;
   skills: Skills;
-  excutionSkillTriggered: boolean;
+  executionSkillTriggered: boolean;
 
-  userTriggered: boolean;
+  // [run] コマンドの状態
+  runMode: 'normal' | 'all' | null;
+  // [run] (no all) のスコープ確認を question ツールで待っているか
+  awaitingScopeAnswer: boolean;
+  // STOP トリガー検出済み (runMode クリア用)
+  isStopTriggered: boolean;
+
   pendingOutputTool: string | null;
   lastEvent: string | null;
   // ユーザー message の messageID (part filtering 用)
@@ -30,9 +40,10 @@ interface SessionState {
   // gh 実行系の issue スキルゲート
   issueSkillTurnsRemaining: number;
   readFiles: Set<string>;
-  // GO 以降に実行ツールを使ったか
-  toolsExecutedSinceGo: boolean;
 }
+
+// テスタビリティのため export。tests で state オブジェクトを構築する
+export type { SessionState };
 
 function defaultState(): SessionState {
   return {
@@ -41,23 +52,21 @@ function defaultState(): SessionState {
       type: 'open_discussion',
       load: null,
     },
-    excutionSkillTriggered: false,
-    userTriggered: false,
+    executionSkillTriggered: false,
+    runMode: null,
+    awaitingScopeAnswer: false,
+    isStopTriggered: false,
     pendingOutputTool: null,
     lastEvent: null,
     userMessageIDs: new Set(),
     processedPartIDs: new Set(),
     issueSkillTurnsRemaining: 0,
     readFiles: new Set(),
-    toolsExecutedSinceGo: false,
   };
 }
 
 // モジュール変数: RESET トリガーでのみクリア
 let isHarnessReleased = false;
-
-// モデル切替検知用
-let lastModelId: string | null = null;
 
 const sessions = new Map<string, SessionState>();
 
@@ -79,12 +88,15 @@ const EXECUTION_SKILLS = ['implement', 'debug', 'image-search', 'readme'];
 // issue スキルの有効ターン数 (ユーザーメッセージを跨いで生存)
 const ISSUE_SKILL_TURNS = 2;
 
-// タイトルプレフィックス → 対応リファレンス
-const PREFIX_REFERENCES: Record<string, string> = {
-  '[Spec]': '.opencode/skills/issue/references/spec-template.md',
-  '[Design]': '.opencode/skills/issue/references/design-template.md',
-  '[Build]': '.opencode/skills/issue/references/build-template.md',
-  '[Refine]': '.opencode/skills/issue/references/refine-template.md',
+// タイトルプレフィックス → 対応リファレンス（複数可）
+const PREFIX_REFERENCES: Record<string, string[]> = {
+  '[Spec]': ['.opencode/skills/issue/references/spec-template.md'],
+  '[Design]': [
+    '.opencode/skills/issue/references/design-app-template.md',
+    '.opencode/skills/issue/references/design-web-template.md',
+  ],
+  '[Build]': ['.opencode/skills/issue/references/build-template.md'],
+  '[Refine]': ['.opencode/skills/issue/references/refine-template.md'],
 };
 
 // allowlist: tools that BYPASS the gate (read-only / workflow helpers / MCP ツール)
@@ -163,15 +175,26 @@ function isBashReadOnly(command: string): boolean {
   );
 }
 
+// path 正規化: 相対/絶対を worktree からの絶対パスに揃える
+// - 絶対パスはそのまま返す（worktree 配下前提）
+// - 相対パスは worktree 起点で解決
+// - "./" や "../" も path.resolve が吸収
+export function canonicalPath(p: string, worktree: string): string {
+  return path.resolve(worktree, p);
+}
+
 // trigger words — first line, exact match (case sensitive)
 // 規約: trigger は文頭かつ完全一致。コンテンツを続けたい場合は改行で区切る。
-const EXECUTE_TRIGGERS = /^\s*(GO)\s*$/;
+const SETUP_TRIGGER = /^\s*\[setup\]\s+(design|build|refine|chore)\s*$/;
+export const HARNESS_TRIGGER = /^\s*\[release-harness\]\s*$/;
+export const RUN_TRIGGER = /^\s*\[run\]\s*(.*)$/;
+const STOP_TRIGGERS = /^\s*(STOP)\s*$/;
 const RESET_TRIGGERS = /^\s*(RESET)\s*$/;
 const STATE_TRIGGER = /^\s*(STATE)\s*$/;
 
 // md ファイル (.opencode 配下以外) は gate バイパス
 // docs/, README.md, 任意の *.md など user/project content は
-// セットアップ/feasibility/プラン/GO/execution skill を要求せず自由に作成更新可
+// セットアップ/feasibility/プラン/[run]/execution skill を要求せず自由に作成更新可
 // .opencode/ 配下の md は system なので通常 gate 適用
 function isFreeMarkdownPath(filePath: string): boolean {
   if (!filePath.endsWith('.md')) return false;
@@ -195,9 +218,11 @@ export function detectPrefix(title: string): string | null {
 }
 
 // gh 実行系コマンドのバリデーション。null なら許可、文字列ならブロック理由
-export function validateGhCommand(
+// フェーズに依存しない: どの phase でも issue スキルが効いてれば通る
+export function checkIssueGate(
   state: { issueSkillTurnsRemaining: number; readFiles: Set<string> },
   command: string,
+  worktree: string,
 ): string | null {
   if (state.issueSkillTurnsRemaining <= 0) {
     return 'issue skill not triggered (or turns expired)';
@@ -206,17 +231,106 @@ export function validateGhCommand(
   if (title) {
     const prefix = detectPrefix(title);
     if (prefix) {
-      const refFile = PREFIX_REFERENCES[prefix];
-      if (!state.readFiles.has(refFile)) {
-        return `reference not read: ${refFile}`;
+      const refRels = PREFIX_REFERENCES[prefix];
+      if (refRels) {
+        // 複数候補のいずれかが読まれていれば OK（例: Design は app/web どちらか）
+        const anyRead = refRels.some((rel) => state.readFiles.has(canonicalPath(rel, worktree)));
+        if (!anyRead) {
+          return `reference not read: ${refRels.join(' or ')}`;
+        }
       }
     }
   }
   return null;
 }
 
-function formatState(state: SessionState): string {
-  if (isHarnessReleased) return '## Execution Gate State\n- Harness released';
+// ── canonical state machine ────────────────────────────────────────────────────
+// LLM に提示する "Next" を 1 箇所で計算。formatState / checkCodeGate / throw は
+// 全てこれを参照する。文字列の散らかりと system prompt ↔ throw の矛盾を防ぐ。
+
+export type NextAction =
+  | { kind: 'discuss' }
+  | { kind: 'trigger_skill'; skill: string }
+  | { kind: 'trigger_execution' }
+  | { kind: 'await_run' }
+  | { kind: 'await_scope' }
+  | { kind: 'execute' }
+  | { kind: 'released' };
+
+const ACTION_MESSAGES: {
+  [K in NextAction['kind']]: (a: Extract<NextAction, { kind: K }>) => string;
+} = {
+  discuss: () =>
+    'Discuss, create .md files, or manage issues via `gh`. Run [setup] only when code implementation is needed.',
+  trigger_skill: (a) => `Trigger the '${a.skill}' skill`,
+  trigger_execution: () => 'Trigger an execution skill (implement, debug, image-search, readme)',
+  await_run: () =>
+    "User must type '[run]' on a new line (or '[run] all' to skip stage confirmation)",
+  await_scope: () => 'Agent must use the question tool to ask scope before execution',
+  execute: () => 'All conditions met. Execute.',
+  released: () => 'Harness released — no gate',
+};
+
+export function actionMessage(action: NextAction): string {
+  return ACTION_MESSAGES[action.kind](action as never);
+}
+
+// state → NextAction の純粋関数。SessionState の構造的部分型を受け取る
+// (テスタビリティのため)
+export function nextAction(
+  state: {
+    phase: string;
+    skills: { load: Record<string, boolean> | null };
+    executionSkillTriggered: boolean;
+    runMode: 'normal' | 'all' | null;
+    awaitingScopeAnswer: boolean;
+  },
+  harnessReleased: boolean,
+): NextAction {
+  if (harnessReleased) return { kind: 'released' };
+  if (state.phase === 'open_discussion') return { kind: 'discuss' };
+  if (state.phase === 'chore') {
+    return state.runMode ? { kind: 'execute' } : { kind: 'await_run' };
+  }
+  // design / build / refine
+  const load = state.skills.load;
+  if (load) {
+    const missing = Object.entries(load)
+      .filter(([, ok]) => !ok)
+      .map(([s]) => s);
+    if (missing.length > 0) return { kind: 'trigger_skill', skill: missing[0] };
+  }
+  if (!state.executionSkillTriggered) return { kind: 'trigger_execution' };
+  if (state.runMode === null) return { kind: 'await_run' };
+  if (state.runMode === 'normal' && state.awaitingScopeAnswer) {
+    return { kind: 'await_scope' };
+  }
+  return { kind: 'execute' };
+}
+
+// コード実装ゲート: phase + execution skill + run mode を要求
+// gh / .md outside .opencode/ / read-only はこのゲートを通らない
+// nextAction() の結果で pass/block を判定。メッセージは actionMessage() から取得
+// (throw 文と formatState の Next: が同じソースを使うことを保証)
+export function checkCodeGate(
+  state: {
+    phase: string;
+    skills: { load: Record<string, boolean> | null };
+    executionSkillTriggered: boolean;
+    runMode: 'normal' | 'all' | null;
+    awaitingScopeAnswer: boolean;
+  },
+  harnessReleased: boolean,
+): { ok: boolean; message: string } {
+  const action = nextAction(state, harnessReleased);
+  const ok = action.kind === 'execute' || action.kind === 'released';
+  return { ok, message: actionMessage(action) };
+}
+
+// system prompt / toast 用の state 文字列。
+// Next: 行は nextAction() + actionMessage() から生成し、throw メッセージと
+// 同じソースを使う (released ケースも含む)。formatState 自体は export (テスタビリティ)
+export function formatState(state: SessionState, harnessReleased: boolean): string {
   const phase = state.phase;
   const load = state.skills?.load;
 
@@ -233,52 +347,37 @@ function formatState(state: SessionState): string {
       .join('\n');
   }
 
-  const excution = state.excutionSkillTriggered;
-  const userReady = state.userTriggered;
+  const execution = state.executionSkillTriggered;
+  const runMode = state.runMode;
+  const awaitingScope = state.awaitingScopeAnswer;
   const issueTurns = state.issueSkillTurnsRemaining;
 
-  // 次に何をすべきか
-  let next = '';
-  if (phase === 'open_discussion') {
-    next = 'Say [setup] design/build/refine/chore to begin';
-  } else if (missing.length > 0) {
-    next = `Trigger: ${missing.join(' → ')}`;
-  } else if (!excution) {
-    next = 'Trigger an execution skill (implement, debug, etc.)';
-  } else if (!userReady) {
-    next = "Say 'GO' to unlock execution tools";
-  } else {
-    next = 'All conditions met. Execute.';
-  }
+  // Next: は nextAction() + actionMessage() から取得。throw と system prompt の
+  // メッセージが同じソースを使うことを保証
+  const next = actionMessage(
+    nextAction(
+      {
+        phase,
+        skills: { load: load as Record<string, boolean> | null },
+        executionSkillTriggered: execution,
+        runMode,
+        awaitingScopeAnswer: awaitingScope,
+      },
+      harnessReleased,
+    ),
+  );
 
   return `## Execution Gate State
   - Phase: ${phase}
   - Skills: ${skillsLoad || '(none required)'}
-  - Execution Skill: ${excution ? '✓' : '✗'}
-  - User Ready: ${userReady ? '✓' : '✗'}
+  - Execution Skill: ${execution ? '✓' : '✗'}
+  - Run Mode: ${runMode ?? 'none'}
+  - Awaiting Scope: ${awaitingScope ? '✓' : '✗'}
   - Issue Turns: ${issueTurns}
   - Next: ${next}`;
 }
 
-// フェーズに応じた行動制約
-function phaseDirective(phase: string): string {
-  switch (phase) {
-    case 'open_discussion':
-      return 'You are in open-discussion. DISCUSS and PROPOSE only. You CANNOT write code or edit files.';
-    case 'design':
-      return 'You are in design phase. Build prototype, discuss, expand to full scope, produce design spec (Style Guide, matrices). Use feasibility → prepare → implement skills. GO resets after each execution turn. Do NOT implement production code.';
-    case 'build':
-      return 'You are in build phase. PLAN then IMPLEMENT. Use feasibility → prepare → implement skills. GO resets after each execution turn.';
-    case 'refine':
-      return 'You are in refine phase. ANALYZE then IMPROVE. Use feasibility → prepare → implement skills. GO resets after each execution turn.';
-    case 'chore':
-      return 'You are in chore phase. Minor changes only — harness, typos, config.';
-    default:
-      return '';
-  }
-}
-
-export const ExecutionGatePlugin: Plugin = async ({ client }) => {
+export const ExecutionGatePlugin: Plugin = async ({ client, worktree }) => {
   // subagent session は gate 状態不要 (inject_context と同じ判断)
   const subagentSessions = new Set<string>();
 
@@ -326,13 +425,14 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         if (state.processedPartIDs.has(part.id)) return;
         state.processedPartIDs.add(part.id);
 
-        // ユーザーターン消費: issue スキルの有効ターンをデクリメント + GO を消費（実行があった場合のみ）
+        // ユーザーターン消費: issue スキルの有効ターンをデクリメント + runMode 消費
         if (state.issueSkillTurnsRemaining > 0) {
           state.issueSkillTurnsRemaining--;
         }
-        if (state.toolsExecutedSinceGo) {
-          state.userTriggered = false;
-          state.toolsExecutedSinceGo = false;
+        // runMode = 'normal' は1ターンで消費、'all' は消費しない
+        if (state.runMode === 'normal') {
+          state.runMode = null;
+          state.awaitingScopeAnswer = false;
         }
 
         const text = part.text;
@@ -352,7 +452,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           await client.tui.showToast({
             body: {
               title: 'Execution Gate',
-              message: formatState(state),
+              message: formatState(state, isHarnessReleased),
               variant: 'info',
               duration: 10000, // 10s — state 全体を読むのに十分な時間
             },
@@ -360,30 +460,31 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           return;
         }
 
-        if (text.includes('[release-harness]')) {
+        if (HARNESS_TRIGGER.test(firstLine)) {
           isHarnessReleased = true;
           // formatState は isHarnessReleased=true で "Harness released" を返す
           await client.tui.showToast({
             body: {
               title: 'Execution Gate',
-              message: formatState(state),
+              message: formatState(state, isHarnessReleased),
               variant: 'info',
               duration: 10000,
             },
           });
+          return;
         }
 
-        if (text.includes('[setup]')) {
+        const setupMatch = firstLine.match(SETUP_TRIGGER);
+        if (setupMatch) {
           isHarnessReleased = false;
-          const phaseMatch = text.match(/\[setup\]\s+(design|build|refine|chore)/);
-          const phase = (phaseMatch ? phaseMatch[1] : 'open_discussion') as PhaseType;
+          const phase = setupMatch[1] as PhaseType;
           state.phase = phase;
           state.skills = { type: phase, load: PHASE_LOADS[phase] } as Skills;
           state.lastEvent = `phase set to ${phase}`;
           await client.tui.showToast({
             body: {
               title: 'Execution Gate',
-              message: formatState(state),
+              message: formatState(state, isHarnessReleased),
               variant: 'info',
               duration: 10000,
             },
@@ -399,7 +500,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           await client.tui.showToast({
             body: {
               title: 'Execution Gate',
-              message: formatState(s),
+              message: formatState(s, isHarnessReleased),
               variant: 'info',
               duration: 10000,
             },
@@ -407,17 +508,45 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           return;
         }
 
-        if (EXECUTE_TRIGGERS.test(firstLine)) {
-          state.userTriggered = true;
-          state.lastEvent = 'user trigger GO — gate opened, proceed with implementation';
+        if (STOP_TRIGGERS.test(firstLine)) {
+          if (state.runMode !== null) {
+            state.runMode = null;
+            state.awaitingScopeAnswer = false;
+            state.lastEvent = 'STOP — run gate closed, phase preserved';
+            await client.tui.showToast({
+              body: {
+                title: 'Execution Gate',
+                message: formatState(state, isHarnessReleased),
+                variant: 'info',
+                duration: 10000,
+              },
+            });
+          }
+          return;
+        }
+
+        const runMatch = firstLine.match(RUN_TRIGGER);
+        if (runMatch) {
+          isHarnessReleased = false;
+          const args = runMatch[1].trim();
+          if (args === 'all') {
+            state.runMode = 'all';
+            state.awaitingScopeAnswer = false;
+            state.lastEvent = '[run] all — gate open, run the whole plan';
+          } else {
+            state.runMode = 'normal';
+            state.awaitingScopeAnswer = true;
+            state.lastEvent = '[run] default — stage confirmation required via question tool';
+          }
           await client.tui.showToast({
             body: {
               title: 'Execution Gate',
-              message: formatState(state),
+              message: formatState(state, isHarnessReleased),
               variant: 'info',
               duration: 10000,
             },
           });
+          return;
         }
       }
 
@@ -439,30 +568,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
       const state = getState(input.sessionID);
       if (!state) return;
 
-      // モデル切替検知: 前回と異なるモデルIDなら要約を注入 + トースト
-      const currentModelId = input.model?.id;
-      if (currentModelId && currentModelId !== lastModelId) {
-        const switched = lastModelId !== null;
-        lastModelId = currentModelId;
-        if (switched) {
-          await client.tui.showToast({
-            body: {
-              title: 'Execution Gate',
-              message: formatState(state),
-              variant: 'info',
-              duration: 10000,
-            },
-          });
-          output.system.push(
-            `[Model switched to ${currentModelId}]\nSession context is preserved. Current state:\n${formatState(state)}`,
-          );
-          output.system.push(phaseDirective(state.phase));
-          return;
-        }
-      }
-
-      output.system.push(formatState(state));
-      output.system.push(phaseDirective(state.phase));
+      output.system.push(formatState(state, isHarnessReleased));
     },
 
     /* COMMENTED OUT: chat.message フック (OpenCode v1.17.1 で発火しない)
@@ -561,6 +667,11 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
         const name = args?.name;
         if (!name) return;
 
+        // open_discussion では gate state を更新しない(skill 自体は実行OK)
+        if (state.phase === 'open_discussion') {
+          return;
+        }
+
         // issue スキル: gh 実行系ゲートの有効ターンをリセット
         if (name === 'issue') {
           state.issueSkillTurnsRemaining = ISSUE_SKILL_TURNS;
@@ -568,7 +679,7 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           await client.tui.showToast({
             body: {
               title: 'Execution Gate',
-              message: formatState(state),
+              message: formatState(state, isHarnessReleased),
               variant: 'info',
               duration: 10000,
             },
@@ -576,9 +687,15 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
           return;
         }
 
+        let stateChanged = false;
+
+        if (EXECUTION_SKILLS.includes(name)) {
+          state.executionSkillTriggered = true;
+          stateChanged = true;
+        }
+
         const load = state.skills.load;
         if (load) {
-          let stateChanged = false;
           if (name in load) {
             state.skills = {
               ...state.skills,
@@ -586,36 +703,47 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
             };
             stateChanged = true;
           }
-          if (EXECUTION_SKILLS.includes(name)) {
-            state.excutionSkillTriggered = true;
-            stateChanged = true;
-          }
-          if (stateChanged) {
-            await client.tui.showToast({
-              body: {
-                title: 'Execution Gate',
-                message: formatState(state),
-                variant: 'info',
-                duration: 10000,
-              },
-            });
-          }
+        }
+
+        if (stateChanged) {
+          await client.tui.showToast({
+            body: {
+              title: 'Execution Gate',
+              message: formatState(state, isHarnessReleased),
+              variant: 'info',
+              duration: 10000,
+            },
+          });
         }
 
         return;
       }
 
       // read ツールの追跡 (issue リファレンス read 検知用)
+      // path は canonicalPath で正規化: 相対/絶対混在を吸収して PREFIX_REFERENCES と比較可能にする
       if (input.tool === 'read') {
         const filePath = input.args?.filePath as string | undefined;
         if (filePath) {
-          state.readFiles.add(filePath);
+          state.readFiles.add(canonicalPath(filePath, worktree));
         }
       }
 
-      // 実行ツール使用フラグ (GO 消費判定用)
-      if (!isAllowedTool(input.tool)) {
-        state.toolsExecutedSinceGo = true;
+      // question ツール: [run] (normal) のスコープ確認として使用された場合、
+      // awaitingScopeAnswer を false にして次の実行ターンを gate 開放する
+      if (input.tool === 'question') {
+        if (state.runMode === 'normal' && state.awaitingScopeAnswer) {
+          state.awaitingScopeAnswer = false;
+          state.lastEvent = 'scope question asked — gate open for execution turn';
+          await client.tui.showToast({
+            body: {
+              title: 'Execution Gate',
+              message: formatState(state, isHarnessReleased),
+              variant: 'info',
+              duration: 10000,
+            },
+          });
+        }
+        return;
       }
     },
 
@@ -647,17 +775,10 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
 
         // working gh check: issue スキルゲート + プレフィックス検証
         // read-only gh は前段の isBashReadOnly で bypass 済み
+        // gh は phase とは独立: issue スキルが効いてれば open_discussion でも通る
         const trimmed = bashCommand.trimStart();
         if (/^\s*gh\s+/.test(trimmed)) {
-          if (state.phase === 'open_discussion') {
-            throw new Error(
-              `[execution-gate] Blocked — gh commands require a phase.\n` +
-                `Next step: Say '[setup] design' (or build/refine/chore)`,
-            );
-          }
-
-          // issue スキルゲート: 有効ターン内か + プレフィックス検証
-          const ghError = validateGhCommand(state, trimmed);
+          const ghError = checkIssueGate(state, trimmed, worktree);
           if (ghError) {
             throw new Error(
               `[execution-gate] Blocked — ${ghError}.\n` +
@@ -665,48 +786,16 @@ export const ExecutionGatePlugin: Plugin = async ({ client }) => {
             );
           }
 
-          return; // gh は専用ゲート通過で許可
+          return; // gh は issue ゲート通過で許可
         }
       }
 
-      // open discussion なら全ブロック (phase チェック)
-      if (state.phase === 'open_discussion') {
-        throw new Error(
-          `[execution-gate] Blocked — open discussion phase.\n` +
-            `Next step: Ask user to set a phase with [setup] design/build/refine/chore`,
-        );
-      }
-
-      const missing: string[] = [];
-      const steps: string[] = [];
-
-      const load = state.skills.load;
-      if (load) {
-        for (const skill of Object.keys(load)) {
-          if (!load[skill as keyof typeof load]) {
-            missing.push(skill);
-          }
-        }
-      }
-
-      if (missing.length > 0) {
-        steps.push(`1. Trigger: ${missing.join(' → ')}`);
-      }
-
-      if (!state.excutionSkillTriggered) {
-        steps.push(
-          `${steps.length + 1}. Trigger an execution skill (${EXECUTION_SKILLS.join(', ')})`,
-        );
-      }
-
-      if (!state.userTriggered) {
-        steps.push(
-          `${steps.length + 1}. Say 'GO' (GO alone is not enough — all steps above must be done first)`,
-        );
-      }
-
-      if (steps.length > 0) {
-        throw new Error(`[execution-gate] Blocked. Complete these steps:\n${steps.join('\n')}`);
+      // コード実装ゲート: phase + execution skill + run mode
+      // gh / .md outside .opencode/ / read-only はすでに上で return 済み
+      // メッセージは nextAction() + actionMessage() 由来。formatState の Next: と一致する
+      const codeResult = checkCodeGate(state, isHarnessReleased);
+      if (!codeResult.ok) {
+        throw new Error(`[execution-gate] Blocked — ${codeResult.message}`);
       }
     },
   };

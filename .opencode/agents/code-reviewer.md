@@ -2,7 +2,7 @@
 description: Reviews staged changes against project rules before commit
 mode: subagent
 temperature: 0.1
-model: opencode-go/mimo-v2.5
+model: opencode/mimo-v2.5-free
 reasoningEffort: low
 steps: 8
 permission:

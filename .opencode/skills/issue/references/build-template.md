@@ -1,6 +1,6 @@
 # Build Template
 
-Use this template for the Build issue body. Reference the Design issue's body and all comments when creating.
+Use this template for the Build issue body. Reference the Design issue's body and all comments when creating. 1 Build issue is open at a time during the build phase.
 
 ```markdown
 <!-- FOR AGENT — do not edit. Operating instructions. -->
@@ -9,20 +9,19 @@ Use this template for the Build issue body. Reference the Design issue's body an
 
 ### Principles
 
-- Build turns a Design into working code. The deliverable is a 5-section plan, locked by explicit user agreement, then a vertical-slice implementation.
-- The plan must reconcile research with the actual codebase before any slice is written.
-- Slices are vertical, not horizontal — one slice per concern (R / C / U / D, draft → harden), each verifiable in one sitting. Bundled slices are forbidden.
-- Reference `prototype/_design-spec.md` and the Design issue for component structure, Props, and TODOs.
+- Build turns a Design into working code. The deliverable is the code; the body holds the Plan.
+- The Plan (Slices) is in the body. Slices are vertical, draft-first: one slice per concern (R / C / U / D, draft → harden), each verifiable in one sitting. Bundled slices are forbidden.
+- The Plan format (What, How, Order & Verify, File changes, Rationale) is defined by this template. Prepare fills in the content; the agent marks slices done in Order & Verify and updates Notes at natural break points.
+- The Design Spec is the source for component structure, Props, and TODOs. Fetch with `gh issue view <design_number> --json body | jq -r '.body'`.
 
 ### Success Criteria
 
-- All five plan sections are concrete: file paths, function names, library APIs from Step 1 reconciliation.
-- Slices split by concern (R / C / U / D), each with Test + App verification. Test policy decided per slice.
+- All Plan sections are concrete: file paths, function names, library APIs from Step 1 reconciliation.
+- Slices split by concern, each with Test + App verification. Test policy decided per slice.
 - User has approved the plan via `question` before any code is written.
 
 ### Common Failure Modes
 
-- Plan without Step 1 reconciliation — claims that contradict the actual code.
 - Bundled slices ("Add X CRUD", "Build the auth feature"). Draft-first, grow slice by slice.
 - Ad-hoc tests or no Test policy decision per slice.
 - Treating user agreement as implied.
@@ -31,29 +30,38 @@ Use this template for the Build issue body. Reference the Design issue's body an
 
 ---
 
-## Goal
-
-<このユニットで何を構築するか>
-
 ## Reference
 
+- Spec: #<spec_number>
 - Design: #<design_number>
 - Design outputs: <summary of design deliverables>
 - Codebase: <relevant files/patterns identified>
 
-## What
+---
 
-<何を実装するか>
+# Plan
+
+## What
 
 ## How
 
-<どうやって実装するか>
+## Order & Verify
 
-## Order
+- [ ] **Slice 1: <one-line description>**
+  - Test: `<test command>` or `N/A` (per Test policy)
+  - App: `<app command>` → <what user does> → <expected outcome>
 
-<どの順に実装するか — 垂直スライスで叩き台から>
+- [ ] **Slice 2: <one-line description>**
+  - Test:
+  - App:
 
-## Verify
+## File changes
 
-<どう検証するか — test pass + ユーザーがアプリ動かして確認>
+| Path              | Type            | Detail       |
+| ----------------- | --------------- | ------------ |
+| `path/to/file.ts` | new/edit/delete | what changes |
+
+## Rationale
+
+## Notes
 ```

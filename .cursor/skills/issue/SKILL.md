@@ -1,79 +1,86 @@
 ---
 name: issue
-description: Manages GitHub Issues using gh CLI — creation, decomposition, update, and close. Load when asked to create a new issue, break down a large task into issues, update issue status, or close an issue after a PR is merged. The user ultimately decides whether to create an issue. The agent handles all gh CLI operations.
+description: >-
+  Create, update, transition, or close Spec / Design / Forge / Refine issues.
+  Use when a phase skill (or the user) needs issue persistence — templates and lifecycle live here.
 ---
 
-# Issue Management
+# issue
 
-## Preparation
+Persist Spec-flow issues. Phase skills decide _when_ and _what content_; this skill owns **templates, titles, comments, create / update / close**.
 
-- Reload `.cursor/rules/project-meta.mdc` and incorporate it into the context for this skill execution.
-- Understand the overall project context, current architecture, and existing code style before proposing or creating issues.
+Do **not** invent phase work or re-argue the plan here. If the caller already has user agreement and body content, apply the template and write.
 
-## Principle
+## When called
 
-- The user decides whether to create an issue. The agent handles creation, updates, and closing via gh CLI.
-- Prioritize meaningful scope over strict "1 issue = 1 PR". One issue should represent a coherent piece of work that feels natural to complete in one (or a small number of) PR(s).
-- Avoid over-decomposition. If a task is too large to finish comfortably in one PR, propose a reasonable breakdown first and ask for user approval before creating multiple issues.
-- Issues serve as session-to-session memory and future reference. Always reference the issue number in commits and PR descriptions (e.g., Closes #123 or #123).
+**From a phase skill (usual):** agreement and content are already settled. Skip Context / Understanding / Proposal. Read the matching template → create or update → post the required lifecycle comment.
 
-## Granularity Guide
+**Standalone / unclear:** present **Context / Understanding / Proposal** in one message (what issue, why now, title). Revise until agreed, then proceed.
 
-**Good scope (recommended for most cases)**
+**Chore:** no Spec-flow issue is required. Only create/update when the user asks or a small lifecycle note is clearly needed — do not open Design / Forge / Refine for typo or harness tweaks.
 
-- Add or improve a specific feature / component with related changes and tests
-- Fix a specific bug (including reproduction steps and verification)
-- Refactor a specific module or area without changing behavior
-- Update documentation or configuration for one clear purpose
+## What you own
 
-**Too large — propose decomposition first**
+- Title convention
+- Body shape via templates under `references/`
+- Lifecycle comments (table below)
+- `gh` create / edit / comment / close / list / view (use `gh-cli` skill for command shape when unsure)
 
-- "Implement full authentication" → break into login flow, session management, token handling, error cases, etc.
-- "Redesign the entire dashboard" → break into UI components, data fetching, state management, responsiveness, etc.
+## What you do not own
 
-When the requested task is clearly large, list the proposed decomposed issues for user confirmation before creating them.
+- Phase entry, mode choice (①/②), or “should we Spec?” — that is the phase skill
+- How to write a Forge/Refine plan — `.cursor/skills/forge|refine/references/plan.md`
+- How to build the Design thinking surface — `design/references/app.md` / `web.md`
+- Product code — never; hand that to `implement` via the phase skill
 
-## Commands
+## Principles
 
-Use the existing `gh-cli` skill (available at user/global level) for all operations: creating, updating, closing, and linking issues.
+- **Spec** — thick product design (Goal / Scope / Architecture / decisions). One per project or version. Update body only when those shift; record why in a Spec comment.
+- **Phase issues** — Design / Forge / Refine are just-in-time; close when the phase work for that issue is done. Reference prior phase issue(s) and the codebase in the body.
+- **Create thin, fill as you go** — on create, body is the template with empty sections. Content is filled as the phase agrees (Design Spec sections, Forge/Refine Plan, slice checkboxes).
+- **Body is source of truth** for the phase’s durable output. Drift between body and agreed work is a failure mode.
+- **Comments** — living work log for lifecycle and material updates (see table). Issues are session-to-session memory; cite issue numbers in commits / PRs.
 
-### Adding issues to the Project after creation
+## Comment rules (required)
 
-After creating an issue, **always** add it to Project #1 immediately — no need to confirm with the user.
+| Event           | Target       | Comment format                            |
+| --------------- | ------------ | ----------------------------------------- |
+| Spec created    | —            | (no comment — creation body is enough)    |
+| Spec updated    | Spec         | `## 更新: <what changed>\n<why>`          |
+| Design created  | Spec         | `## Design作成: <title>\n<what>`          |
+| Design updated  | Design issue | `## 更新: <what changed>\n<why>`          |
+| Design complete | Spec         | `## Design完了: <title>\n<what was done>` |
+| Forge created   | Spec         | `## Forge作成: <title>\n<what>`           |
+| Forge updated   | Forge issue  | `## 更新: <what changed>\n<why>`          |
+| Forge complete  | Spec         | `## Forge完了: <title>\n<what was done>`  |
+| Refine created  | Spec         | `## Refine作成: <title>\n<what>`          |
+| Refine updated  | Refine issue | `## 更新: <what changed>\n<why>`          |
+| Refine complete | Spec         | `## Refine完了: <title>\n<what was done>` |
 
-```bash
-# Capture the URL at creation time
-ISSUE_URL=$(gh issue create --title "..." --body "..." --json url -q .url)
+When creating a phase issue, the body must reference:
 
-# Add to Project #1 (get the owner username from project-meta.mdc)
-gh project item-add 1 --owner <username> --url $ISSUE_URL
-```
+- Prior phase issue body (and material comments when relevant)
+- Current codebase state (paths / patterns that matter)
 
-- Always pass `--json url -q .url` to `gh issue create` to capture the URL into a variable.
-- Run `gh project item-add` right after creation, without asking the user.
-- Retrieve the `--owner` value from `project-meta.mdc`.
+## Title convention
 
-## Format
+- Spec: `[Spec] <product / feature area name>`
+- Design: `[Design] <what this design achieves>`
+- Forge: `[Forge] <what this forge achieves>`
+- Refine: `[Refine] <what this refine achieves>`
 
-Use the following Markdown template when creating or suggesting a new issue. Write the content in **natural Japanese**.
+## Flow
 
-```Markdown
-## 背景・目的 (why)
+1. Know the operation: create / update body / lifecycle comment / close.
+2. Pick the template (Design: app vs web from project type — caller usually already chose).
+3. Apply agreed content into the template shape. Do not rewrite a locked Forge/Refine plan into a different structure.
+4. Run `gh`. On create of Design / Forge / Refine, also comment on Spec per the table. On phase complete, close the phase issue and comment on Spec.
+5. Return issue number + what changed to the caller.
 
-<briefly describe the reasons and background for this change in 1 to 3 sentences.>
+## References
 
-## やること (what)
-
-<list the specific tasks to be performed in this issue (and the corresponding PR) in bullet points.You may include relevant files and considerations.Summarize the scope so that it fits naturally within a single PR.>
-
-## 受け入れ条件 (Acceptance Criteria)
-
-- [ ] <confirmed that it works as expected>
-- [ ] <related tests have passed (if applicable)>
-- [ ] <edge cases and error handling have been taken into account>
-- [ ] <the user have reviewed it himself and confirmed that it is in good working order>
-
-## Notes
-
-<Feel free to note any design decisions, items to review later, related issues, or points to keep in mind. (If there is nothing to note, leave this section blank.)>
-```
+- `references/spec-template.md`
+- `references/design-app-template.md`
+- `references/design-web-template.md`
+- `references/forge-template.md`
+- `references/refine-template.md`

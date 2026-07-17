@@ -4,6 +4,9 @@ import { createHash } from 'crypto';
 // git commit チェーン検出: 単一、または && / ; / | で連結された git commit
 const GIT_COMMIT_CHAIN = /(?:^|[&;|]\s*)git\s+commit/;
 
+// trigger detection — execution_gate.ts と統一（先頭空白許容の regex）
+const HARNESS_TRIGGER = /^\s*\[release-harness\]\s*$/;
+const SETUP_TRIGGER = /^\s*\[setup\](\s|$)/; // "[setup] design" または "[setup]" 単独の両方を許容
 const RESET_TRIGGERS = /^\s*(RESET)\s*$/;
 
 let isHarnessReleased = false;
@@ -93,18 +96,17 @@ export const ForceReviewPlugin: Plugin = async ({ $ }) => {
         const text = part.text;
         if (!text.trim()) return;
 
-        if (text.includes('[release-harness]')) {
+        // trigger は firstLine 基準で統一 (execution_gate.ts と一貫)
+        const firstLine =
+          text
+            .split('\n')
+            .map((l) => l.trim())
+            .find((l) => l.length > 0) ?? '';
+
+        if (HARNESS_TRIGGER.test(firstLine)) {
           isHarnessReleased = true;
         }
-        if (
-          text.includes('[setup]') ||
-          RESET_TRIGGERS.test(
-            text
-              .split('\n')
-              .map((l) => l.trim())
-              .find((l) => l.length > 0) ?? '',
-          )
-        ) {
+        if (SETUP_TRIGGER.test(firstLine) || RESET_TRIGGERS.test(firstLine)) {
           isHarnessReleased = false;
         }
         return;

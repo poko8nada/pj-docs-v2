@@ -1,6 +1,6 @@
 # Refine Template
 
-Use this template for the Refine issue body. Reference the Build issue's body and all comments when creating.
+Use this template for the Refine issue body. Reference the Build issue's body and all comments when creating. 1 Refine issue is open at a time during the refine phase.
 
 ```markdown
 <!-- FOR AGENT — do not edit. Operating instructions. -->
@@ -9,16 +9,15 @@ Use this template for the Refine issue body. Reference the Build issue's body an
 
 ### Principles
 
-- Refine improves existing code. The deliverable is a 5-section plan grounded in actual code analysis, locked by explicit user agreement, then a vertical-slice implementation.
-- Improvements are prioritized by impact (High / Medium / Low / Risky). Hypothetical cleanups are not targets.
-- Slices are vertical, not horizontal — one slice per concern (Extract / Dedup / Simplify, etc.), each verifiable in one sitting. Bundled refactors are forbidden.
-- If a refinement changes user-facing behavior, the Spec is updated before the code.
+- Refine improves existing code. The deliverable is the code; the body holds the Plan.
+- The Plan (Slices) is in the body. Slices are tier-grouped by impact on user experience, data correctness, security, or maintainability: High / Medium / Low / Risky.
+- The Plan format (What, How, Order & Verify, File changes, Rationale) is defined by this template. Prepare fills in the content; the agent marks slices done in Order & Verify and updates Notes at natural break points.
+- Hypothetical cleanups are not targets. Improvements are grounded in actual code analysis.
 
 ### Success Criteria
 
-- All five plan sections are concrete: file paths, function names, line numbers from Step 1 analysis.
-- Improvements ranked by impact tier in the Rationale section.
-- Slices split by concern, each with Test + App verification.
+- All Plan sections are concrete: file paths, function names, line numbers from Step 1 analysis.
+- Slices ranked by impact tier in Order & Verify.
 - User has approved the plan via `question` before any code is written.
 
 ### Common Failure Modes
@@ -26,36 +25,59 @@ Use this template for the Refine issue body. Reference the Build issue's body an
 - Improvements not grounded in actual code — hypothetical cleanups.
 - Unprioritized list of improvements. Refactoring "the entire module" or "all auth code".
 - New tests added ad-hoc across slices, or no test regression check before/after each slice.
-- Treating user agreement as implied.
 
 <!-- FOR AGENT — do not edit. Operating instructions. -->
 
 ---
 
-## Goal
-
-<このユニットで何を改善するか>
-
 ## Reference
 
+- Spec: #<spec_number>
 - Build: #<build_number>
 - Build outputs: <summary of build deliverables>
 - Codebase: <current state after build>
 
+---
+
+# Plan
+
 ## What
 
-<何を改善するか — コード品質、エラーハンドリング、パフォーマンス等>
+## How
 
-## Risks
+## Order & Verify (by impact tier)
 
-- <リスク1 — 既存機能が壊れる可能性>
-- <リスク2>
+### High
 
-## Order
+- [ ] **Slice 1: <one-line description>**
+  - Test:
+  - App:
 
-<どの順に改善するか — 垂直スライスで>
+### Medium
 
-## Verify
+- [ ] **Slice 2: <one-line description>**
+  - Test:
+  - App:
 
-<どう検証するか — 既存テストが通ること + 改善効果の確認>
+### Low
+
+- [ ] **Slice 3: <one-line description>**
+  - Test:
+  - App:
+
+### Risky
+
+- [ ] **Slice 4: <one-line description>**
+  - Test:
+  - App:
+
+## File changes
+
+| Path                  | Type | Detail       |
+| --------------------- | ---- | ------------ |
+| `path/to/existing.ts` | edit | what changes |
+
+## Rationale
+
+## Notes
 ```

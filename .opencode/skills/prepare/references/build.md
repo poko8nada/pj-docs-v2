@@ -212,3 +212,29 @@ The plan is not final until the user agrees. Use the `question` tool to surface 
 - **yes** — the plan is locked. Proceed to the next skill.
 - **edit** — the user provides specific edits. If the change is structural, then ask again.
 - **no** — the plan is rejected. Return to Step 1 or Step 2 with the user's feedback.
+
+## Step 5: Write the plan to the issue body
+
+After the user agrees (Step 4 = yes), the plan is locked. Write the slice list to the `# Build Progress` section of the Build issue body. This makes the plan durable across sessions — the next session reads the body and resumes from the last completed slice.
+
+The body already contains the empty `# Build Progress` section from the issue template. Use `gh issue edit` to populate the Slices checklist. Preserve all existing body content (Goal, Reference, What, How, Order, Verify) above the `# Build Progress` section — only the Slices list is added here.
+
+```bash
+gh issue edit <build_number> --body "$(cat <<'EOF'
+... existing body content ...
+
+# Build Progress
+
+## Slices
+
+- [ ] Slice 1: <Order & Verify の slice 1 を 1 行で>
+- [ ] Slice 2: <Order & Verify の slice 2 を 1 行で>
+- [ ] Slice 3: <...>
+
+## Notes
+
+EOF
+)"
+```
+
+The Notes section is left empty here. The plan is locked.

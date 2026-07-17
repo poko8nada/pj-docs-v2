@@ -1,21 +1,5 @@
 pre-commit:
   jobs:
-    - name: cleanup-uo
-      run: |
-        files=$(grep -rEln 'UO\[[0-9]+\]\[done\]' . --exclude-dir={node_modules,.git,dist})
-        if [ -n "$files" ]; then
-          echo "$files" | xargs sed -E -i '' '/UO\[[0-9]+\]\[done\]/d'
-          echo "$files" | xargs sed -E -i '' '/^$/N;/^\n$/d'
-          echo "☑︎ Removed [done] UO comments from: $files"
-          git add $files
-        fi
-        an_files=$(grep -rEln 'AN\[[a-z]+\]\[[0-9]+\]\[done\]' . --exclude-dir={node_modules,.git,dist})
-        if [ -n "$an_files" ]; then
-          echo "$an_files" | xargs sed -E -i '' '/AN\[[a-z]+\]\[[0-9]+\]\[done\]/d'
-          echo "$an_files" | xargs sed -E -i '' '/^$/N;/^\n$/d'
-          echo "☑︎ Removed [done] AN comments from: $an_files"
-          git add $an_files
-        fi
     - name: checks
       group:
         parallel: true
@@ -36,20 +20,15 @@ pre-commit:
 
 pre-push:
   commands:
-    check-uo:
+    pending-notes:
       run: |
-        if grep -rEn 'UO\[[0-9]+\]:' . --exclude-dir={node_modules,.git,dist} > /dev/null 2>&1; then
-          echo "× UO comments found:"
-          grep -rEn 'UO\[[0-9]+\]:' . --exclude-dir={node_modules,.git,dist}
+        if rg -n '^[[:space:]]*(//|#|/\*)[[:space:]]*NOTE:' . \
+          --glob '!node_modules/**' --glob '!.git/**' --glob '!dist/**' \
+          --glob '!.cursor/skills/**' --glob '!lefthook.yaml' --glob '!.opencode/**'; then
+          echo "× Pending NOTE comments:"
           exit 1
         fi
-      fail_text: 'All UO comments must be resolved before pushing.'
+      fail_text: 'Resolve or remove all NOTE: comments before pushing.'
     typecheck:
       run: pnpm typecheck
       fail_text: 'Type check failed. Run: pnpm typecheck for details.'
-    # test:
-    #   run: pnpm test:run
-    #   fail_text: 'Tests failed. Fix all failing tests before pushing.'
-    # build:
-    #   run: pnpm run rebuild
-    #   fail_text: 'Build failed. Fix all issues before pushing.'
