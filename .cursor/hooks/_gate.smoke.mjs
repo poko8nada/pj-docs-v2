@@ -719,7 +719,7 @@ try {
 
   // 17b. entry: core が壊れても bootstrap 中は allow（entry 救命胴衣）
   {
-    const brokenCore = join(smokeTmpRoot, 'broken-core.mjs');
+    const brokenCore = join(stateTmp, 'broken-core.mjs');
     writeFileSync(
       brokenCore,
       'export async function handleGate() { throw new Error("core-boom"); }\n',
@@ -760,7 +760,7 @@ try {
       JSON.stringify(outDeny),
     );
 
-    const brokenImport = join(smokeTmpRoot, 'broken-import.mjs');
+    const brokenImport = join(stateTmp, 'broken-import.mjs');
     writeFileSync(brokenImport, 'export async function handleGate() {\n');
     enableBootstrap(root);
     const outImportAllow = run(
@@ -1042,9 +1042,15 @@ try {
 } finally {
   rmSync(stateTmp, { recursive: true, force: true });
   disableBootstrap(root);
-  if (existsSync(smokeTmpRoot) && readdirSync(smokeTmpRoot).length === 0) {
-    rmSync(smokeTmpRoot, { recursive: true, force: true });
-  }
+  // state 以外の一時物も含め、ルートごと消す（空判定に頼らない）
+  rmSync(smokeTmpRoot, { recursive: true, force: true });
+}
+
+if (existsSync(smokeTmpRoot)) {
+  failed += 1;
+  process.stderr.write('FAIL - smoke-tmp cleaned up\n');
+} else {
+  process.stdout.write('ok  - smoke-tmp cleaned up\n');
 }
 
 if (failed > 0) {

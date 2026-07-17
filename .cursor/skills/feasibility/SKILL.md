@@ -66,19 +66,19 @@ For each topic, run **three roles**. Optional: track with TodoWrite (`Topic A: O
 ### Role 1 — Official: what the spec says
 
 - **Source:** official docs, language spec, RFC, library reference, maintainer guides
-- **Tools:** Context7 MCP (`resolve-library-id` → `query-docs`) first; if missing, `WebSearch` + `WebFetch` for the official URL
+- **Tools:** Context7 MCP (`resolve-library-id` → `query-docs`) first; if missing, MCP `web_search_exa` then `WebFetch` for the official URL (on Exa 429, fall back to built-in `WebSearch`)
 - **Question:** “What does the canonical authority say?”
 
 ### Role 2 — Practice: how it’s used in the wild
 
 - **Source:** engineering blogs of major projects, recognized maintainers, conference talks, open-source codebases
-- **Tools:** `WebSearch` to discover, `WebFetch` to read
+- **Tools:** MCP `web_search_exa` to discover, built-in `WebFetch` to read (on Exa 429, fall back to `WebSearch`)
 - **Question:** “How do production projects actually do this?”
 
 ### Role 3 — Failure: what goes wrong
 
 - **Source:** issue trackers, postmortems, gotcha / pitfall writeups
-- **Tools:** `WebSearch` with “issue”, “bug”, “gotcha”, “pitfall”; `WebFetch` to read
+- **Tools:** MCP `web_search_exa` with “issue”, “bug”, “gotcha”, “pitfall”; built-in `WebFetch` to read (on Exa 429, fall back to `WebSearch`)
 - **Question:** “What are the known failure modes?”
 
 One source is not evidence. Three sources with **different roles** is the minimum.
