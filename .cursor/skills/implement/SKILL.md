@@ -83,4 +83,4 @@ rg -n 'NOTE:' <changed files>
 After `git add`, before `git commit`:
 
 1. Run **`notes` skill — Commit check** (`.cursor/skills/notes/scripts/list-removed.mjs`). Do not commit until the user OKs any removed NOTE lines.
-2. Run **`/pre-commit-reviewer`** once on changed files. Harness blocks `git commit` until the reviewer Task is invoked (`review.done`). Read the output; if `REVIEW: GAPS`, fix in main agent (harness does not require a second review).
+2. Run **`/pre-commit-reviewer`**. Do not combine `git add && git commit` while `pending` — run `git add <paths>` alone first (this also unions explicit paths into `review.files`), then the reviewer, then `git commit` alone. Harness blocks `git commit` while `pending`. The hook injects `review.files` into the Task prompt (no git diff). Launching the reviewer sets `reviewed` and clears `files`. Re-edits return to `pending`. Only a successful commit resets to `idle` (empty commit attempts do not).

@@ -6,18 +6,20 @@
  * |--------------------|---------------------------------------------|
  * | beforeSubmitPrompt | phase / bootstrap                           |
  * | Read*              | implement: true on implement/SKILL.md Read  |
- * | postToolUse Write* | review.required + check.pending              |
- * | preToolUse Task         | review.done=true on /pre-commit-reviewer    |
- * | beforeShellExecution    | review/check reset when git commit allowed  |
- * | afterShellExecution     | review/check reset on successful git commit (IDE) |
+ * | postToolUse Write* | review.pending + check.pending              |
+ * | preToolUse Task         | inject review.files → reviewed on reviewer    |
+ * | afterShellExecution     | git add → files 合流 / git commit 成功 → reset |
  */
 import { realpathSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { disableBootstrap, enableBootstrap } from './_bootstrap.mjs';
 import {
+  commandIncludesGitAdd,
   commandIncludesGitCommit,
+  injectReviewFilesIntoTaskInput,
   isPreCommitReviewerContext,
   isReviewablePath,
+  pathsFromGitAddCommand,
 } from './_review.mjs';
 import { isCheckablePath } from './_check.mjs';
 import {
@@ -28,13 +30,14 @@ import {
   loadState,
   markCheckPending,
   markReviewDirty,
-  markReviewDone,
+  markReviewed,
   normalizeImplement,
   normalizeReview,
   normalizeCheck,
   PHASE_DISCUSSION,
   resetCheck,
   resetReview,
+  REVIEW_IDLE,
   saveState,
   WORK_PHASES,
   workspaceRoot,
@@ -144,7 +147,9 @@ function maybeMarkCheckPending(root, payload) {
   const filePath = filePathFromPayload(payload);
   if (!filePath || !isCheckablePath(root, String(filePath))) return;
 
-  const abs = resolve(isAbsolute(String(filePath)) ? String(filePath) : resolve(root, String(filePath)));
+  const abs = resolve(
+    isAbsolute(String(filePath)) ? String(filePath) : resolve(root, String(filePath)),
+  );
   markCheckPending(root, id, abs);
 }
 
@@ -156,15 +161,26 @@ function maybeMarkReviewDirty(root, payload) {
   const filePath = filePathFromPayload(payload);
   if (!filePath || !isReviewablePath(root, String(filePath))) return;
 
-  const abs = resolve(isAbsolute(String(filePath)) ? String(filePath) : resolve(root, String(filePath)));
+  const abs = resolve(
+    isAbsolute(String(filePath)) ? String(filePath) : resolve(root, String(filePath)),
+  );
   markReviewDirty(root, id, abs);
 }
 
 function handlePreToolUseTask(root, payload) {
+  if (!isPreCommitReviewerContext(payload)) return allow();
+
   const id = conversationId(payload);
   const state = loadState(root, id);
-  if (isReviewBlocking(state) && isPreCommitReviewerContext(payload)) {
-    markReviewDone(root, id);
+  if (!isReviewBlocking(state)) return allow();
+
+  const files = [...normalizeReview(state.review).files];
+  const toolInput = payload.tool_input ?? {};
+  const updatedInput = injectReviewFilesIntoTaskInput(toolInput, files);
+  markReviewed(root, id);
+
+  if (updatedInput) {
+    return respond({ permission: 'allow', updated_input: updatedInput });
   }
   return allow();
 }
@@ -180,35 +196,41 @@ function shellSucceeded(payload) {
   return true;
 }
 
-function maybeResetAfterCommit(root, payload) {
+/** 成功した git add の明示パスを review.files（と product なら check）へ合流 */
+function maybeEnrichFromGitAdd(root, payload) {
   const command = shellCommand(payload);
-  if (!commandIncludesGitCommit(command)) return empty();
+  if (!commandIncludesGitAdd(command) || commandIncludesGitCommit(command)) return empty();
+  if (!shellSucceeded(payload)) return empty();
 
   const id = conversationId(payload);
   const state = loadState(root, id);
-  if (isReviewBlocking(state)) return empty();
+  if (!WORK_PHASES.has(state.phase) || state.implement !== true) return empty();
 
-  const review = normalizeReview(state.review);
-  const hadReview = review.required;
-  const hadCheck = normalizeCheck(state.check).pending.length > 0;
-
-  if (hadReview) resetReview(root, id);
-  if (hadCheck) resetCheck(root, id);
+  for (const rel of pathsFromGitAddCommand(command)) {
+    const abs = resolve(root, rel);
+    if (isReviewablePath(root, abs)) markReviewDirty(root, id, abs);
+    if (isCheckablePath(root, abs)) markCheckPending(root, id, abs);
+  }
   return empty();
 }
 
+/** 成功した git commit だけ idle / check クリア（試行時点では reset しない） */
 function handleAfterShellExecution(root, payload) {
   const command = shellCommand(payload);
-  if (!commandIncludesGitCommit(command) || !shellSucceeded(payload)) return empty();
+  if (!shellSucceeded(payload)) return empty();
 
-  const id = conversationId(payload);
-  const state = loadState(root, id);
-  const review = normalizeReview(state.review);
-  const hadCheck = normalizeCheck(state.check).pending.length > 0;
+  if (commandIncludesGitCommit(command)) {
+    const id = conversationId(payload);
+    const state = loadState(root, id);
+    const review = normalizeReview(state.review);
+    const hadCheck = normalizeCheck(state.check).pending.length > 0;
 
-  if (review.required) resetReview(root, id);
-  if (hadCheck) resetCheck(root, id);
-  return empty();
+    if (review.status !== REVIEW_IDLE) resetReview(root, id);
+    if (hadCheck) resetCheck(root, id);
+    return empty();
+  }
+
+  return maybeEnrichFromGitAdd(root, payload);
 }
 
 async function main() {
@@ -225,8 +247,9 @@ async function main() {
     return handleAfterShellExecution(root, payload);
   }
 
+  // beforeShellExecution: commit 試行では reset しない（空コミットすり抜け防止）
   if (event === 'beforeShellExecution') {
-    return maybeResetAfterCommit(root, payload);
+    return empty();
   }
 
   if (event === 'preToolUse' && toolName === 'Task') {

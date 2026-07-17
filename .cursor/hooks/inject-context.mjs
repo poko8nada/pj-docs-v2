@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   conversationId,
+  loadState,
   onSessionStart,
   statePathRelative,
   workspaceRoot,
@@ -142,39 +143,51 @@ function readWeb() {
 
 function readReview() {
   return [
-    'After editing product/test sources, harness sets `review.required` until `/pre-commit-reviewer` is invoked once.',
-    '`git commit` is blocked while `review.required && !review.done` (agent shell only — lefthook covers human paths).',
-    'Before commit: `notes` Commit check → `/pre-commit-reviewer` → read output → fix GAPS if any → `git commit`.',
-    'Reviewer is readonly — harness does not re-review after GAPS; main agent fixes then commits.',
-    'Successful `git commit` (or an allowed commit attempt) resets `review` to idle (`required: false`).',
+    '`review.status`: `idle` → `pending` (edits or successful `git add` of reviewable paths) → `reviewed` (reviewer Task) → `idle` (successful commit only).',
+    '`git commit` is blocked only while `status === pending`. Do not combine `git add && git commit` — add alone, then reviewer, then commit alone.',
+    'Harness accumulates edited paths in `review.files` (harness + product; state/bootstrap excluded). No git diff.',
+    'Successful `git add <explicit-paths>` also unions those paths into `review.files` (`.` / globs ignored).',
+    'On `/pre-commit-reviewer` Task launch, hook injects `review.files` into the Task prompt, then sets `reviewed` and clears `files`.',
+    'Empty or failed commit attempts do not reset `reviewed` — only a successful `git commit` returns to `idle`.',
+    'Re-edits after review go back to `pending` with a new `files` batch — review again.',
   ].join('\n');
 }
 
 function readCheck() {
   return [
-    'After editing `*.{js,jsx,ts,tsx}` product sources, harness accumulates paths in `check.pending`.',
-    'When the agent stops, harness runs `pnpm format`, `pnpm lint`, and `pnpm typecheck:staged` on pending files (same as lefthook pre-commit).',
+    'After editing `*.{js,jsx,ts,tsx,mjs,cjs}` (harness included; state/bootstrap excluded), harness accumulates paths in `check.pending`.',
+    'On agent stop: `pnpm format` + `pnpm lint` on those files; `pnpm typecheck:staged` only on `*.{ts,tsx}` (same split as lefthook pre-commit).',
     'On failure, `stop` returns `followup_message` so the agent auto-continues to fix (max 1 follow-up per turn via in-hook `loop_count`).',
     'If `stop` is skipped after a follow-up turn, `beforeSubmitPrompt` flushes leftover `pending` (blocks send on failure).',
-    'After a run or an allowed `git commit`, `check.pending` is cleared. Re-edits accumulate again.',
+    'After a successful `git commit` (afterShellExecution), `check.pending` is cleared. Re-edits accumulate again.',
   ].join('\n');
 }
 
-function readGateState(stateFileRel) {
+function readGateState(root, id, stateFileRel) {
+  const state = loadState(root, id);
+  const review = state.review ?? { status: 'idle', files: [] };
+  const check = state.check ?? { pending: [] };
   return [
     `Your gate state (read-only for you; hooks write it): \`${stateFileRel}\``,
     'Created on the first user prompt as `discussion` (not at CLI startup). Work phases update the same file.',
     'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `review`, `check`, `updatedAt` (JST `+09:00`).',
     '`implement`: `null` in `discussion` (N/A); `false` = work phase, handshake pending; `true` = code edits allowed.',
-    '`review`: `required` + `done` — commit blocked when `required && !done`. `done` is set when `/pre-commit-reviewer` Task is invoked.',
+    '`review`: `status` (`idle`|`pending`|`reviewed`) + `files` (unreviewed paths while `pending`). Commit blocked when `pending`. Reviewer Task → `reviewed` and clears `files`.',
     '`check`: `pending` — relative paths queued for format/lint/typecheck on agent `stop`.',
     'If the glob has no match yet, no prompt has been sent in this conversation. Never edit state files.',
     'State key prefers transcript UUID, then conversation_id. Stale files older than 7 days are purged on sessionStart.',
+    '',
+    'Current values:',
+    `phase: ${state.phase}`,
+    `implement: ${state.implement}`,
+    `review.status: ${review.status}`,
+    `review.files: ${JSON.stringify(review.files ?? [])}`,
+    `check.pending: ${JSON.stringify(check.pending ?? [])}`,
   ].join('\n');
 }
 
 /** SECTION_DEFS が injected context の唯一の source of truth */
-function buildSectionDefs(stateFileRel) {
+function buildSectionDefs(root, id, stateFileRel) {
   return [
     { id: 'agents', title: 'AGENTS.md', level: 1, codeblock: true, source: readAgents },
     { id: 'spec', title: 'Product Design', level: 1, source: readSpec },
@@ -189,7 +202,7 @@ function buildSectionDefs(stateFileRel) {
       id: 'gate',
       title: 'Gate state',
       level: 2,
-      source: () => readGateState(stateFileRel),
+      source: () => readGateState(root, id, stateFileRel),
     },
   ];
 }
@@ -200,9 +213,9 @@ function renderSection(section) {
   return `${heading}\n\n${body}`;
 }
 
-function buildContext(worktree, stateFileRel) {
+function buildContext(worktree, root, id, stateFileRel) {
   const rendered = [];
-  for (const def of buildSectionDefs(stateFileRel)) {
+  for (const def of buildSectionDefs(root, id, stateFileRel)) {
     const body = def.source(worktree);
     if (!body?.trim()) continue;
     rendered.push(renderSection({ ...def, body }));
@@ -224,7 +237,7 @@ async function main() {
   onSessionStart(root);
   const stateFileRel = statePathRelative(root, id);
 
-  const ctx = buildContext(root, stateFileRel);
+  const ctx = buildContext(root, root, id, stateFileRel);
   if (!ctx.trim()) return respond({});
   return respond({ additional_context: ctx });
 }

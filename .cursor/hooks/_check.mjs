@@ -1,24 +1,44 @@
 /**
- * 編集後チェック — 対象パスと pnpm format/lint 実行。
+ * 編集後チェック — format/lint（広い）と typecheck（ts/tsx のみ）。
  */
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { isReviewablePath } from './_review.mjs';
+import { isExcludedFromReviewTrack } from './_review.mjs';
 
-const CHECKABLE_EXT = /\.(ts|tsx|js|jsx)$/i;
+const FORMAT_LINT_EXT = /\.(ts|tsx|js|jsx|mjs|cjs)$/i;
+const TYPECHECK_EXT = /\.(ts|tsx)$/i;
 
-/** lefthook pre-commit と同じ拡張子（harness 除外は isReviewablePath） */
-export function isCheckablePath(root, filePath) {
-  if (!isReviewablePath(root, filePath)) return false;
+function relPosix(root, filePath) {
+  if (!filePath) return null;
   const abs = resolve(isAbsolute(filePath) ? filePath : resolve(root, String(filePath)));
   const rel = relative(root, abs);
-  const posix = rel.split(sep).join('/');
-  return CHECKABLE_EXT.test(posix);
+  if (!rel || rel.startsWith('..') || rel.includes(`..${sep}`)) return null;
+  return rel.split(sep).join('/');
+}
+
+/** format/lint 対象（harness 含む。state/bootstrap 除外） */
+export function isCheckablePath(root, filePath) {
+  if (isExcludedFromReviewTrack(root, filePath)) return false;
+  const posix = relPosix(root, filePath);
+  if (!posix) return false;
+  return FORMAT_LINT_EXT.test(posix);
+}
+
+/** typecheck 対象（ts/tsx のみ） */
+export function isTypecheckPath(root, filePath) {
+  if (isExcludedFromReviewTrack(root, filePath)) return false;
+  const posix = relPosix(root, filePath);
+  if (!posix) return false;
+  return TYPECHECK_EXT.test(posix);
 }
 
 function existingRelPaths(root, relPaths) {
   return relPaths.filter((rel) => rel && existsSync(join(root, rel)));
+}
+
+function filterByExt(relPaths, extRe) {
+  return relPaths.filter((rel) => extRe.test(rel));
 }
 
 /** @returns {{ ok: boolean, message?: string }} */
@@ -30,39 +50,47 @@ export function runFormatLint(root, relPaths) {
     return { ok: false, message: '[check] dry-run: lint failed' };
   }
 
-  const files = existingRelPaths(root, relPaths);
-  if (files.length === 0) return { ok: true };
+  const existing = existingRelPaths(root, relPaths);
+  const formatLintFiles = filterByExt(existing, FORMAT_LINT_EXT);
+  const typecheckFiles = filterByExt(existing, TYPECHECK_EXT);
+
+  if (formatLintFiles.length === 0 && typecheckFiles.length === 0) return { ok: true };
 
   const parts = [];
-  const format = spawnSync('pnpm', ['format', ...files], {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  if (format.status !== 0) {
-    parts.push(
-      ['format failed:', format.stdout, format.stderr].filter(Boolean).join('\n').trim(),
-    );
+
+  if (formatLintFiles.length > 0) {
+    const format = spawnSync('pnpm', ['format', ...formatLintFiles], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    if (format.status !== 0) {
+      parts.push(
+        ['format failed:', format.stdout, format.stderr].filter(Boolean).join('\n').trim(),
+      );
+    }
+
+    const lint = spawnSync('pnpm', ['lint', ...formatLintFiles], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    if (lint.status !== 0) {
+      parts.push(['lint failed:', lint.stdout, lint.stderr].filter(Boolean).join('\n').trim());
+    }
   }
 
-  const lint = spawnSync('pnpm', ['lint', ...files], {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  if (lint.status !== 0) {
-    parts.push(['lint failed:', lint.stdout, lint.stderr].filter(Boolean).join('\n').trim());
-  }
-
-  const typecheck = spawnSync('pnpm', ['typecheck:staged', ...files], {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  if (typecheck.status !== 0) {
-    parts.push(
-      ['typecheck failed:', typecheck.stdout, typecheck.stderr].filter(Boolean).join('\n').trim(),
-    );
+  if (typecheckFiles.length > 0) {
+    const typecheck = spawnSync('pnpm', ['typecheck:staged', ...typecheckFiles], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    if (typecheck.status !== 0) {
+      parts.push(
+        ['typecheck failed:', typecheck.stdout, typecheck.stderr].filter(Boolean).join('\n').trim(),
+      );
+    }
   }
 
   if (parts.length === 0) return { ok: true };
