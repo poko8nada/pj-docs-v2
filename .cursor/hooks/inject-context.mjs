@@ -155,11 +155,11 @@ function readReview() {
 
 function readCheck() {
   return [
-    'After editing `*.{js,jsx,ts,tsx}` product sources, harness accumulates paths in `check.pending`.',
-    'When the agent stops, harness runs `pnpm format`, `pnpm lint`, and `pnpm typecheck:staged` on pending files (same as lefthook pre-commit).',
+    'After editing `*.{js,jsx,ts,tsx,mjs,cjs}` (harness included; state/bootstrap excluded), harness accumulates paths in `check.pending`.',
+    'On agent stop: `pnpm format` + `pnpm lint` on those files; `pnpm typecheck:staged` only on `*.{ts,tsx}` (same split as lefthook pre-commit).',
     'On failure, `stop` returns `followup_message` so the agent auto-continues to fix (max 1 follow-up per turn via in-hook `loop_count`).',
     'If `stop` is skipped after a follow-up turn, `beforeSubmitPrompt` flushes leftover `pending` (blocks send on failure).',
-    'After a run or an allowed `git commit`, `check.pending` is cleared. Re-edits accumulate again.',
+    'After a successful `git commit` (afterShellExecution), `check.pending` is cleared. Re-edits accumulate again.',
   ].join('\n');
 }
 

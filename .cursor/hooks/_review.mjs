@@ -18,12 +18,7 @@ export function isPreCommitReviewerContext(payload) {
   const input = payload.tool_input ?? {};
   const type = String(payload.subagent_type ?? input.subagent_type ?? input.subagentType ?? '');
   const task = String(
-    payload.task ??
-      payload.description ??
-      input.description ??
-      input.prompt ??
-      input.task ??
-      '',
+    payload.task ?? payload.description ?? input.description ?? input.prompt ?? input.task ?? '',
   );
   return (
     type === 'pre-commit-reviewer' ||
@@ -57,19 +52,6 @@ export function isReviewablePath(root, filePath) {
   if (isExcludedFromReviewTrack(root, filePath)) return false;
   const posix = relPosix(root, filePath);
   if (!posix) return false;
-  return REVIEWABLE_EXT.test(posix);
-}
-
-/** check.pending 用 — product ソースのみ（harness 除外は従来どおり） */
-export function isProductSourcePath(root, filePath) {
-  if (!filePath || isExcludedFromReviewTrack(root, filePath)) return false;
-  const posix = relPosix(root, filePath);
-  if (!posix) return false;
-  if (posix.startsWith('.cursor/hooks/')) return false;
-  if (posix.startsWith('.cursor/skills/')) return false;
-  if (posix.startsWith('.cursor/agents/')) return false;
-  if (posix === 'lefthook.yaml') return false;
-  if (!posix.includes('/') && /\.md$/i.test(posix)) return false;
   return REVIEWABLE_EXT.test(posix);
 }
 

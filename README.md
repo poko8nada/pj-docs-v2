@@ -10,16 +10,6 @@
 ![GitHub last commit](https://img.shields.io/github/last-commit/poko8nada/pj-docs-v2)
 ![GitHub issues](https://img.shields.io/github/issues/poko8nada/pj-docs-v2)
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Getting Started](#getting-started)
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [Contributing](#contributing)
-- [License](#license)
-- [Developer Notes](#developer-notes)
-
 ## Overview
 
 TypeScript ベースのプロジェクトスターターです。oxlint / oxfmt（Lint / Format）、Vitest（Test）、Lefthook（Git hooks）が揃っています。テンプレとして複製し、任意のスタックを追加していく想定です。
@@ -66,24 +56,10 @@ pnpm test:run
 
 ## Contributing
 
-- コミット前に Lefthook（format / lint）、プッシュ前に `tsc --noEmit` が走る。
+- コミット前に Lefthook が staged ファイルへ format / lint を実行する（対象: `*.{js,jsx,ts,tsx,mjs,cjs}`）。typecheck は `*.{ts,tsx}` のみ。
+- プッシュ前に `pnpm typecheck`（全量）と、未解決の `NOTE:` コメントがないことのチェックが走る。
 - 方針の大きな変更は Issue か PR 説明で共有するとよい。
 
 ## License
 
 MIT。
-
-## Developer Notes
-
-### Concept & Goals
-
-- TypeScript を軸に、任意のスタックを載せられる最小限の土台。
-- 仕様書ドリブンな長文ドキュメントは増やさない（必要なら Issue / コード / テストで表現）。
-
-### Stack & Key Decisions
-
-- Language — TypeScript 5.9（strict mode, ESNext target）
-- Quality — oxlint / oxfmt（高速 Lint / Format、Lefthook がコミット時に実行）
-- Test — Vitest（`--passWithNoTests` でスターター段階でも CI しやすい）
-- Package Manager — pnpm（workspace mode）
-- Editor / AI — `.cursor/rules` ほか（プロジェクト単位のルールとスキル。`AGENTS.md` にエージェント向けの期待を記載）

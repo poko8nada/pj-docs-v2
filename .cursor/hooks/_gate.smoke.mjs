@@ -96,11 +96,7 @@ try {
     assert('sessionStart creates no file', findStateFileName(root, id) === null);
     const outInject = run('inject-context.mjs', { ...base, is_background_agent: false });
     const ctx0 = outInject.additional_context || '';
-    assert(
-      'inject does not export gate env',
-      outInject.env == null,
-      JSON.stringify(outInject),
-    );
+    assert('inject does not export gate env', outInject.env == null, JSON.stringify(outInject));
     assert(
       'inject hints glob path',
       ctx0.includes(`*__${id}.json`),
@@ -113,9 +109,7 @@ try {
     );
     assert(
       'inject includes web tools',
-      ctx0.includes('Web tools') &&
-        ctx0.includes('web_search_exa') &&
-        ctx0.includes('WebFetch'),
+      ctx0.includes('Web tools') && ctx0.includes('web_search_exa') && ctx0.includes('WebFetch'),
       'web section missing',
     );
     assert(
@@ -134,7 +128,11 @@ try {
     assert('gate deny without state file', outGate.permission === 'deny', JSON.stringify(outGate));
     assert('gate does not create file', findStateFileName(root, id) === null);
 
-    run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: 'hello, just discussing' });
+    run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: 'hello, just discussing',
+    });
     const name = findStateFileName(root, id);
     assert(
       'first prompt creates JST-dated file',
@@ -292,7 +290,11 @@ try {
 
   // 8. discussion 中の implement Read はフラグを立てない／Write 不可
   {
-    run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/discussion step back' });
+    run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/discussion step back',
+    });
     const out = run('track.mjs', {
       ...base,
       hook_event_name: 'beforeReadFile',
@@ -613,7 +615,11 @@ try {
     const implementPath = join(root, '.cursor/skills/implement/SKILL.md');
     const probePath = join(root, '.cursor/hooks/_integration-probe.txt');
 
-    run('track.mjs', { ...withId, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore integration' });
+    run('track.mjs', {
+      ...withId,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore integration',
+    });
     let st = loadState(root, realId);
     assert(
       'integration starts chore locked',
@@ -628,14 +634,14 @@ try {
       tool_input: { path: implementPath },
     });
     st = loadState(root, realId);
-    assert('integration without id/transcript stays locked', st.implement === false, JSON.stringify(st));
+    assert(
+      'integration without id/transcript stays locked',
+      st.implement === false,
+      JSON.stringify(st),
+    );
 
     const outInject = run('inject-context.mjs', { ...withId });
-    assert(
-      'integration inject has no gate env',
-      outInject.env == null,
-      JSON.stringify(outInject),
-    );
+    assert('integration inject has no gate env', outInject.env == null, JSON.stringify(outInject));
 
     run('track.mjs', {
       ...wrongId,
@@ -784,10 +790,18 @@ try {
 
   // 18. track-phase: /bootstrap と /bootstrap off
   {
-    const outOn = run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/bootstrap harness rescue' });
+    const outOn = run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/bootstrap harness rescue',
+    });
     assert('track-phase bootstrap on', outOn.continue === true, JSON.stringify(outOn));
     assert('track-phase created marker', isBootstrapActive(root));
-    const outOff = run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/bootstrap off thanks' });
+    const outOff = run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/bootstrap off thanks',
+    });
     assert('track-phase bootstrap off', outOff.continue === true, JSON.stringify(outOff));
     assert('track-phase removed marker', !isBootstrapActive(root));
   }
@@ -803,7 +817,11 @@ try {
   {
     const cdId = 'cd-root-test-id';
     const cdBase = { conversation_id: cdId, workspace_roots: [root], cwd: root };
-    run('track.mjs', { ...cdBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore cd test' });
+    run('track.mjs', {
+      ...cdBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore cd test',
+    });
     run('track.mjs', {
       ...cdBase,
       hook_event_name: 'preToolUse',
@@ -836,7 +854,11 @@ try {
       hook_event_name: 'beforeShellExecution',
       command: 'cd utils && cd ..',
     });
-    assert('reject cd utils then cd ..', denyChain.permission === 'deny', JSON.stringify(denyChain));
+    assert(
+      'reject cd utils then cd ..',
+      denyChain.permission === 'deny',
+      JSON.stringify(denyChain),
+    );
 
     const allowSub = run('gate.mjs', {
       ...cdBase,
@@ -850,21 +872,33 @@ try {
       hook_event_name: 'beforeShellExecution',
       command: 'pnpm test',
     });
-    assert('allow command without cd', allowPlain.permission === 'allow', JSON.stringify(allowPlain));
+    assert(
+      'allow command without cd',
+      allowPlain.permission === 'allow',
+      JSON.stringify(allowPlain),
+    );
 
     const allowParent = run('gate.mjs', {
       ...cdBase,
       hook_event_name: 'beforeShellExecution',
       command: 'cd ..',
     });
-    assert('allow cd .. from root', allowParent.permission === 'allow', JSON.stringify(allowParent));
+    assert(
+      'allow cd .. from root',
+      allowParent.permission === 'allow',
+      JSON.stringify(allowParent),
+    );
   }
 
   // 21. review gate: dirty → commit deny → reviewer → files clear → commit allow → re-edit
   {
     const reviewId = 'review-gate-id';
     const reviewBase = { conversation_id: reviewId, workspace_roots: [root], cwd: root };
-    run('track.mjs', { ...reviewBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore review test' });
+    run('track.mjs', {
+      ...reviewBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore review test',
+    });
     run('track.mjs', {
       ...reviewBase,
       hook_event_name: 'preToolUse',
@@ -897,7 +931,11 @@ try {
       hook_event_name: 'beforeShellExecution',
       command: 'git commit -m test',
     });
-    assert('review blocks git commit', denyCommit.permission === 'deny', JSON.stringify(denyCommit));
+    assert(
+      'review blocks git commit',
+      denyCommit.permission === 'deny',
+      JSON.stringify(denyCommit),
+    );
 
     const injectOut = run('track.mjs', {
       ...reviewBase,
@@ -985,7 +1023,8 @@ try {
     const stRedirty = loadState(root, reviewId);
     assert(
       're-edit returns to pending with new files',
-      stRedirty.review?.status === 'pending' && stRedirty.review?.files?.includes('utils/_review-probe.ts'),
+      stRedirty.review?.status === 'pending' &&
+        stRedirty.review?.files?.includes('utils/_review-probe.ts'),
       JSON.stringify(stRedirty),
     );
   }
@@ -994,7 +1033,11 @@ try {
   {
     const checkId = 'check-gate-id';
     const checkBase = { conversation_id: checkId, workspace_roots: [root], cwd: root };
-    run('track.mjs', { ...checkBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore check test' });
+    run('track.mjs', {
+      ...checkBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore check test',
+    });
     run('track.mjs', {
       ...checkBase,
       hook_event_name: 'preToolUse',
@@ -1022,8 +1065,8 @@ try {
     });
     const stHarness = loadState(root, checkId);
     assert(
-      'harness write does not add check pending',
-      !stHarness.check?.pending?.includes('.cursor/hooks/_probe-check.mjs'),
+      'harness write adds check pending',
+      stHarness.check?.pending?.includes('.cursor/hooks/_probe-check.mjs'),
       JSON.stringify(stHarness.check),
     );
 
@@ -1034,7 +1077,11 @@ try {
     );
     assert('stop dry-run succeeds', !outOk.followup_message, JSON.stringify(outOk));
     const stCleared = loadState(root, checkId);
-    assert('stop clears check pending', stCleared.check?.pending?.length === 0, JSON.stringify(stCleared));
+    assert(
+      'stop clears check pending',
+      stCleared.check?.pending?.length === 0,
+      JSON.stringify(stCleared),
+    );
 
     run('track.mjs', {
       ...checkBase,
@@ -1049,7 +1096,8 @@ try {
     );
     assert(
       'stop failure emits followup_message',
-      typeof outFail.followup_message === 'string' && outFail.followup_message.includes('harness-check'),
+      typeof outFail.followup_message === 'string' &&
+        outFail.followup_message.includes('harness-check'),
       JSON.stringify(outFail),
     );
 
@@ -1070,7 +1118,11 @@ try {
       JSON.stringify(outLoop),
     );
     const stLoop = loadState(root, checkId);
-    assert('loop_count stop clears pending', stLoop.check?.pending?.length === 0, JSON.stringify(stLoop));
+    assert(
+      'loop_count stop clears pending',
+      stLoop.check?.pending?.length === 0,
+      JSON.stringify(stLoop),
+    );
 
     run('track.mjs', {
       ...checkBase,
