@@ -39,10 +39,13 @@ If agreement or unit is unclear, stop and return to the caller — do not invent
 
 Read the reference files relevant to the task. Internalize — do not summarize in chat.
 
-- TypeScript: `references/typescript.md`
+- TypeScript (`.ts` / `.tsx` / `.js` / `.jsx`): `references/typescript.md`
 - CSS / Tailwind: `references/css.md`
-- Testing: `references/testing.md`
-- Markdown: `references/markdown.md`
+- Tests (`*.test.ts` / `*.test.tsx`): `references/testing.md` only
+- Markdown (`.md` / `.mdc`): `references/markdown.md`
+- `.mjs` / `.cjs`: no reference required
+
+The harness **blocks** edits to those paths until the matching reference has been Read in the current work unit (`readRefs` in gate state). Deny messages name the file to Read. Any phase trigger (including same-phase re-entry) clears `readRefs` and sets `implement: false`.
 
 ## Step 2 — Build
 
@@ -80,7 +83,7 @@ rg -n 'NOTE:' <changed files>
 
 ## Step 6 — Before commit
 
-After `git add`, before `git commit`:
+When `review.files` is non-empty (harness shows this in gate state):
 
 1. Run **`notes` skill — Commit check** (`.cursor/skills/notes/scripts/list-removed.mjs`). Do not commit until the user OKs any removed NOTE lines.
-2. Run **`/pre-commit-reviewer`**. Do not combine `git add && git commit` while `pending` — run `git add <paths>` alone first (this also unions explicit paths into `review.files`), then the reviewer, then `git commit` alone. Harness blocks `git commit` while `pending`. The hook injects `review.files` into the Task prompt (no git diff). Launching the reviewer sets `reviewed` and clears `files`. Re-edits return to `pending`. Only a successful commit resets to `idle` (empty commit attempts do not).
+2. Run **`/pre-commit-reviewer`**. The hook injects each `review.files` path with `git diff HEAD` (or full content if new/untracked), then clears `files`. The reviewer focuses on that injection (readonly; no git). `git add` order does not matter. Harness blocks `git commit` only while `review.files` is non-empty. Re-edits refill `files`. Only reviewer launch or a successful commit clears `files` (empty commit attempts do not).

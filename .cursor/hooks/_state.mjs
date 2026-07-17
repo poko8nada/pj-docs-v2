@@ -15,6 +15,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normalizeReadRefs } from './_refs.mjs';
 
 const hooksDir = fileURLToPath(new URL('.', import.meta.url));
 const projectRootFallback = resolve(hooksDir, '../..');
@@ -142,15 +143,11 @@ export function statePathRelative(root, id) {
   return `.cursor/hooks/state/*__${sanitizeConversationId(id)}.json`;
 }
 
-/** review.status: idle → pending → reviewed → (commit) → idle */
-export const REVIEW_IDLE = 'idle';
-export const REVIEW_PENDING = 'pending';
-export const REVIEW_REVIEWED = 'reviewed';
-export const REVIEW_STATUSES = new Set([REVIEW_IDLE, REVIEW_PENDING, REVIEW_REVIEWED]);
+/** review は files のみ。空 = commit OK、非空 = 未レビューで commit ブロック */
 
-/** @returns {{ status: string, files: string[] }} */
+/** @returns {{ files: string[] }} */
 export function defaultReview() {
-  return { status: REVIEW_IDLE, files: [] };
+  return { files: [] };
 }
 
 /** @returns {{ pending: string[] }} */
@@ -166,47 +163,23 @@ export function normalizeCheck(check) {
   return { pending };
 }
 
-/** 旧 { required, done } も status へ移行する */
+/** 旧 { status } / { required, done } は無視。files だけ残す */
 export function normalizeReview(review) {
   if (!review || typeof review !== 'object') return defaultReview();
-  let files = Array.isArray(review.files)
+  const files = Array.isArray(review.files)
     ? [...new Set(review.files.map((f) => String(f)).filter(Boolean))]
     : [];
-
-  let status;
-  if (typeof review.status === 'string' && REVIEW_STATUSES.has(review.status)) {
-    status = review.status;
-  } else if ('required' in review || 'done' in review || 'cleared' in review) {
-    // 旧モデル: required && !done → pending / required && done → reviewed / else → idle
-    const required = review.required === true;
-    let done;
-    if (typeof review.done === 'boolean') {
-      done = review.done;
-    } else if (typeof review.cleared === 'boolean') {
-      done = review.cleared;
-    } else {
-      done = !required;
-    }
-    if (!required) status = REVIEW_IDLE;
-    else if (done) status = REVIEW_REVIEWED;
-    else status = REVIEW_PENDING;
-  } else {
-    status = REVIEW_IDLE;
-  }
-
-  // idle / reviewed では files は空（未レビュー変更の蓄積は pending のみ）
-  if (status === REVIEW_IDLE || status === REVIEW_REVIEWED) files = [];
-
-  return { status, files };
+  return { files };
 }
 
-/** @returns {{ phase: string, implement: boolean | null, review: ReturnType<typeof defaultReview>, check: ReturnType<typeof defaultCheck>, updatedAt: string }} */
+/** @returns {{ phase: string, implement: boolean | null, review: ReturnType<typeof defaultReview>, check: ReturnType<typeof defaultCheck>, readRefs: string[], updatedAt: string }} */
 export function defaultState() {
   return {
     phase: PHASE_DISCUSSION,
     implement: null,
     review: defaultReview(),
     check: defaultCheck(),
+    readRefs: [],
     updatedAt: formatJstIso(),
   };
 }
@@ -234,6 +207,7 @@ export function loadState(root, id) {
       implement: normalizeImplement(phase, raw.implement),
       review: normalizeReview(raw.review),
       check: normalizeCheck(raw.check),
+      readRefs: normalizeReadRefs(raw.readRefs),
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : defaultState().updatedAt,
     };
   } catch {
@@ -253,44 +227,75 @@ export function saveState(root, id, state) {
     implement: normalizeImplement(phase, state.implement ?? prev.implement),
     review: normalizeReview(state.review ?? prev.review),
     check: normalizeCheck(state.check ?? prev.check),
+    readRefs: normalizeReadRefs(state.readRefs !== undefined ? state.readRefs : prev.readRefs),
     updatedAt: formatJstIso(),
   };
   writeFileSync(path, JSON.stringify(next, null, 2) + '\n', 'utf8');
   return next;
 }
 
+/** commit ブロック条件: 未レビュー path が残っているか */
 export function isReviewBlocking(state) {
-  return normalizeReview(state?.review).status === REVIEW_PENDING;
+  return normalizeReview(state?.review).files.length > 0;
 }
 
-/** implement 解禁後の reviewable 編集を記録（idle/reviewed からも pending へ） */
+/** implement 解禁後の reviewable 編集を files に積む */
 export function markReviewDirty(root, id, filePath) {
   const prev = loadState(root, id);
   const abs = resolve(filePath);
   const rel = relative(root, abs).split(sep).join('/');
   const review = normalizeReview(prev.review);
-  review.status = REVIEW_PENDING;
   if (rel && !review.files.includes(rel)) review.files.push(rel);
   return saveState(root, id, { phase: prev.phase, implement: prev.implement, review });
 }
 
 /**
  * preToolUse Task で /pre-commit-reviewer が呼ばれたとき。
- * PASS/GAPS は見ない。起動検知のみ → reviewed + files クリア。
+ * PASS/GAPS は見ない。起動検知のみ → files クリア。
  */
-export function markReviewed(root, id) {
+export function clearReviewFiles(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, {
     phase: prev.phase,
     implement: prev.implement,
-    review: { status: REVIEW_REVIEWED, files: [] },
+    review: defaultReview(),
   });
 }
 
-/** git commit 後（または許可された commit 試行）に review を idle へ */
+/** git commit 成功後に review.files を空へ */
 export function resetReview(root, id) {
   const prev = loadState(root, id);
-  return saveState(root, id, { phase: prev.phase, implement: prev.implement, review: defaultReview() });
+  return saveState(root, id, {
+    phase: prev.phase,
+    implement: prev.implement,
+    review: defaultReview(),
+    readRefs: prev.readRefs,
+  });
+}
+
+/** implement/references の Read を記録 */
+export function markReadRef(root, id, refBasename) {
+  const prev = loadState(root, id);
+  const readRefs = normalizeReadRefs([...(prev.readRefs ?? []), refBasename]);
+  return saveState(root, id, {
+    phase: prev.phase,
+    implement: prev.implement,
+    review: prev.review,
+    check: prev.check,
+    readRefs,
+  });
+}
+
+/** フェーズ入場・再入場で reference 既読をクリア */
+export function clearReadRefs(root, id) {
+  const prev = loadState(root, id);
+  return saveState(root, id, {
+    phase: prev.phase,
+    implement: prev.implement,
+    review: prev.review,
+    check: prev.check,
+    readRefs: [],
+  });
 }
 
 /** implement 解禁後の checkable 編集を溜める（stop で一括 format/lint/typecheck） */
@@ -300,13 +305,23 @@ export function markCheckPending(root, id, filePath) {
   const rel = relative(root, abs).split(sep).join('/');
   const check = normalizeCheck(prev.check);
   if (rel && !check.pending.includes(rel)) check.pending.push(rel);
-  return saveState(root, id, { phase: prev.phase, implement: prev.implement, review: prev.review, check });
+  return saveState(root, id, {
+    phase: prev.phase,
+    implement: prev.implement,
+    review: prev.review,
+    check,
+  });
 }
 
 /** stop 実行後 or 許可された git commit 後に pending を空にする */
 export function resetCheck(root, id) {
   const prev = loadState(root, id);
-  return saveState(root, id, { phase: prev.phase, implement: prev.implement, review: prev.review, check: defaultCheck() });
+  return saveState(root, id, {
+    phase: prev.phase,
+    implement: prev.implement,
+    review: prev.review,
+    check: defaultCheck(),
+  });
 }
 
 /**

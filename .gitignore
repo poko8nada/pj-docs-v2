@@ -32,3 +32,6 @@ lerna-debug.log*
 .DS_Store
 
 .playwright-cli
+
+# agent scratch (issue body drafts, etc.)
+.cursor/tmp/

@@ -5,22 +5,21 @@
  * | Event              | Action                                      |
  * |--------------------|---------------------------------------------|
  * | beforeSubmitPrompt | phase / bootstrap                           |
- * | Read*              | implement: true on implement/SKILL.md Read  |
+ * | Read*              | implement unlock + readRefs on references/*.md |
  * | postToolUse Write* | review.pending + check.pending              |
  * | preToolUse Task         | inject review.files → reviewed on reviewer    |
- * | afterShellExecution     | git add → files 合流 / git commit 成功 → reset |
+ * | afterShellExecution     | git commit 成功 → review/check reset          |
  */
 import { realpathSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { disableBootstrap, enableBootstrap } from './_bootstrap.mjs';
 import {
-  commandIncludesGitAdd,
   commandIncludesGitCommit,
   injectReviewFilesIntoTaskInput,
   isPreCommitReviewerContext,
   isReviewablePath,
-  pathsFromGitAddCommand,
 } from './_review.mjs';
+import { implementRefBasename } from './_refs.mjs';
 import { isCheckablePath } from './_check.mjs';
 import {
   conversationId,
@@ -30,14 +29,13 @@ import {
   loadState,
   markCheckPending,
   markReviewDirty,
-  markReviewed,
-  normalizeImplement,
+  markReadRef,
+  clearReviewFiles,
   normalizeReview,
   normalizeCheck,
   PHASE_DISCUSSION,
   resetCheck,
   resetReview,
-  REVIEW_IDLE,
   saveState,
   WORK_PHASES,
   workspaceRoot,
@@ -103,6 +101,17 @@ function maybeUnlockImplement(root, payload) {
   }
 }
 
+/** implement/references/*.md の Read を readRefs に記録（作業フェーズ中） */
+function maybeMarkReadRef(root, payload) {
+  const filePath = filePathFromPayload(payload);
+  const ref = implementRefBasename(root, String(filePath ?? ''));
+  if (!ref) return;
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  if (!WORK_PHASES.has(state.phase)) return;
+  markReadRef(root, id, ref);
+}
+
 function handleBeforeSubmitPrompt(root, payload) {
   const id = conversationId(payload);
   const prompt = String(payload.prompt ?? '');
@@ -124,18 +133,22 @@ function handleBeforeSubmitPrompt(root, payload) {
   const prev = loadState(root, id);
   let implement;
   let review = normalizeReview(prev.review);
+  let readRefs = [...(prev.readRefs ?? [])];
 
   if (phase === PHASE_DISCUSSION) {
     implement = null;
     review = defaultReview();
-  } else if (prev.phase === phase) {
-    implement = normalizeImplement(phase, prev.implement);
+    readRefs = [];
   } else {
+    // 作業フェーズ入場・再入場＝作業単位の境界
     implement = false;
-    review = defaultReview();
+    readRefs = [];
+    if (prev.phase !== phase) {
+      review = defaultReview();
+    }
   }
 
-  saveState(root, id, { phase, implement, review });
+  saveState(root, id, { phase, implement, review, readRefs });
   return respond({ continue: true });
 }
 
@@ -176,8 +189,8 @@ function handlePreToolUseTask(root, payload) {
 
   const files = [...normalizeReview(state.review).files];
   const toolInput = payload.tool_input ?? {};
-  const updatedInput = injectReviewFilesIntoTaskInput(toolInput, files);
-  markReviewed(root, id);
+  const updatedInput = injectReviewFilesIntoTaskInput(toolInput, root, files);
+  clearReviewFiles(root, id);
 
   if (updatedInput) {
     return respond({ permission: 'allow', updated_input: updatedInput });
@@ -196,41 +209,20 @@ function shellSucceeded(payload) {
   return true;
 }
 
-/** 成功した git add の明示パスを review.files（と product なら check）へ合流 */
-function maybeEnrichFromGitAdd(root, payload) {
-  const command = shellCommand(payload);
-  if (!commandIncludesGitAdd(command) || commandIncludesGitCommit(command)) return empty();
-  if (!shellSucceeded(payload)) return empty();
-
-  const id = conversationId(payload);
-  const state = loadState(root, id);
-  if (!WORK_PHASES.has(state.phase) || state.implement !== true) return empty();
-
-  for (const rel of pathsFromGitAddCommand(command)) {
-    const abs = resolve(root, rel);
-    if (isReviewablePath(root, abs)) markReviewDirty(root, id, abs);
-    if (isCheckablePath(root, abs)) markCheckPending(root, id, abs);
-  }
-  return empty();
-}
-
-/** 成功した git commit だけ idle / check クリア（試行時点では reset しない） */
+/** 成功した git commit だけ review/check クリア（試行時点では reset しない） */
 function handleAfterShellExecution(root, payload) {
   const command = shellCommand(payload);
   if (!shellSucceeded(payload)) return empty();
 
-  if (commandIncludesGitCommit(command)) {
-    const id = conversationId(payload);
-    const state = loadState(root, id);
-    const review = normalizeReview(state.review);
-    const hadCheck = normalizeCheck(state.check).pending.length > 0;
+  if (!commandIncludesGitCommit(command)) return empty();
 
-    if (review.status !== REVIEW_IDLE) resetReview(root, id);
-    if (hadCheck) resetCheck(root, id);
-    return empty();
-  }
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  const hadCheck = normalizeCheck(state.check).pending.length > 0;
 
-  return maybeEnrichFromGitAdd(root, payload);
+  resetReview(root, id);
+  if (hadCheck) resetCheck(root, id);
+  return empty();
 }
 
 async function main() {
@@ -263,6 +255,7 @@ async function main() {
 
   if (isReadEvent) {
     maybeUnlockImplement(root, payload);
+    maybeMarkReadRef(root, payload);
     if (event === 'postToolUse') return empty();
     return allow();
   }
