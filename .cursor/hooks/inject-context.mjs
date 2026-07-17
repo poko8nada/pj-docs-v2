@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * sessionStart でプロジェクト context を additional_context として注入する。
- * 対象: AGENTS.md / Spec / Open issues / prior / phase・gate state（短文）
+ * 対象: AGENTS.md / Spec / Open issues / prior / phase・shell・web・gate state（短文）
  * state ファイルはここでは作らない（TTL 掃除のみ）。作成は初回ユーザー発話（beforeSubmitPrompt）。
  */
 import { execFileSync } from 'node:child_process';
@@ -9,7 +9,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   conversationId,
-  GATE_CONVERSATION_ENV,
   onSessionStart,
   statePathRelative,
   workspaceRoot,
@@ -134,6 +133,13 @@ function readShell() {
   ].join('\n');
 }
 
+function readWeb() {
+  return [
+    'Search: prefer MCP `web_search_exa`. On 429 / rate limit, fall back to built-in `WebSearch`.',
+    'Fetch: use built-in `WebFetch` (not `web_fetch_exa`). Library docs: Context7 first.',
+  ].join('\n');
+}
+
 function readReview() {
   return [
     'After editing product/test sources, harness sets `review.required` until `/pre-commit-reviewer` is invoked once.',
@@ -163,7 +169,7 @@ function readGateState(stateFileRel) {
     '`review`: `required` + `done` — commit blocked when `required && !done`. `done` is set when `/pre-commit-reviewer` Task is invoked.',
     '`check`: `pending` — relative paths queued for format/lint/typecheck on agent `stop`.',
     'If the glob has no match yet, no prompt has been sent in this conversation. Never edit state files.',
-    'State survives CLI resume for the same conversation_id; stale files older than 7 days are purged on sessionStart.',
+    'State key prefers transcript UUID, then conversation_id. Stale files older than 7 days are purged on sessionStart.',
   ].join('\n');
 }
 
@@ -176,6 +182,7 @@ function buildSectionDefs(stateFileRel) {
     { id: 'prior', title: 'Prior phases', level: 2, source: readPrior },
     { id: 'phase', title: 'Phase entry rules', level: 2, source: readPhase },
     { id: 'shell', title: 'Shell cwd', level: 2, source: readShell },
+    { id: 'web', title: 'Web tools', level: 2, source: readWeb },
     { id: 'review', title: 'Pre-commit review', level: 2, source: readReview },
     { id: 'check', title: 'Post-edit checks', level: 2, source: readCheck },
     {
@@ -218,15 +225,8 @@ async function main() {
   const stateFileRel = statePathRelative(root, id);
 
   const ctx = buildContext(root, stateFileRel);
-  const out = {};
-  // 公式 sessionStart env — 後続 hook で conversation_id が欠ける場合の正規の伝播手段
-  if (id && id !== 'unknown') {
-    out.env = { [GATE_CONVERSATION_ENV]: id };
-  }
-  if (ctx.trim()) out.additional_context = ctx;
-  if (Object.keys(out).length === 0) return respond({});
-
-  return respond(out);
+  if (!ctx.trim()) return respond({});
+  return respond({ additional_context: ctx });
 }
 
 main().catch((error) => {

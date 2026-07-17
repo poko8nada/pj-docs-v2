@@ -52,7 +52,7 @@
       },
       {
         "command": "node .cursor/hooks/gate.mjs",
-        "matcher": "Write|StrReplace|Read|Delete|EditNotebook",
+        "matcher": "Write|StrReplace|Delete|EditNotebook",
         "failClosed": true
       }
     ],

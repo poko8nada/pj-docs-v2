@@ -26,7 +26,6 @@ import {
 import {
   findStateFileName,
   formatJstIso,
-  GATE_CONVERSATION_ENV,
   idFromTranscriptPath,
   loadState,
   onSessionStart,
@@ -98,8 +97,8 @@ try {
     const outInject = run('inject-context.mjs', { ...base, is_background_agent: false });
     const ctx0 = outInject.additional_context || '';
     assert(
-      'inject returns conversation env',
-      outInject.env?.[GATE_CONVERSATION_ENV] === id,
+      'inject does not export gate env',
+      outInject.env == null,
       JSON.stringify(outInject),
     );
     assert(
@@ -111,6 +110,13 @@ try {
       'inject includes shell cwd rule',
       ctx0.includes('Shell cwd') && ctx0.includes('git -C'),
       'shell section missing',
+    );
+    assert(
+      'inject includes web tools',
+      ctx0.includes('Web tools') &&
+        ctx0.includes('web_search_exa') &&
+        ctx0.includes('WebFetch'),
+      'web section missing',
     );
     assert(
       'inject includes pre-commit review',
@@ -535,11 +541,16 @@ try {
     );
   }
 
-  // 16c. sessionStart env で conversation_id を補完
+  // 16c. CURSOR_TRANSCRIPT_PATH で conversation_id を補完（gate env は使わない）
   {
-    const envId = 'session-env-id';
-    const prev = process.env[GATE_CONVERSATION_ENV];
-    process.env[GATE_CONVERSATION_ENV] = envId;
+    const envId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const prev = process.env.CURSOR_TRANSCRIPT_PATH;
+    process.env.CURSOR_TRANSCRIPT_PATH = join(
+      smokeTmpRoot,
+      'agent-transcripts',
+      envId,
+      `${envId}.jsonl`,
+    );
     try {
       writeFileSync(
         join(stateTmp, `20260716-130000+0900__${envId}.json`),
@@ -555,21 +566,48 @@ try {
       });
       const st = loadState(root, envId);
       assert(
-        'GATE_CONVERSATION_ENV unlocks implement',
+        'CURSOR_TRANSCRIPT_PATH unlocks implement',
         st.phase === 'chore' && st.implement === true,
         JSON.stringify(st),
       );
     } finally {
-      if (prev === undefined) delete process.env[GATE_CONVERSATION_ENV];
-      else process.env[GATE_CONVERSATION_ENV] = prev;
+      if (prev === undefined) delete process.env.CURSOR_TRANSCRIPT_PATH;
+      else process.env.CURSOR_TRANSCRIPT_PATH = prev;
     }
   }
 
-  // 20. 統合: track-phase（ID あり）→ implement Read（ID なし）→ Write
-  // 実機で壊れた経路。16/16b は毎回 conversation_id 付きなので拾えない。
+  // 16d. unknown では /chore しても state を作らない
+  {
+    run('track.mjs', {
+      workspace_roots: [root],
+      cwd: root,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore no-id',
+    });
+    assert('unknown creates no state file', findStateFileName(root, 'unknown') === null);
+  }
+
+  // 16e. locked でも Read は allow（解錠は track、ロックは編集のみ）
+  {
+    const outRead = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Read',
+      tool_input: { path: join(root, 'utils/foo.ts') },
+    });
+    assert('locked Read allow', outRead.permission === 'allow', JSON.stringify(outRead));
+  }
+
+  // 20. 統合: track-phase（ID あり）→ implement Read（間違った conversation_id + transcript）→ Write
   {
     const realId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
     const withId = { conversation_id: realId, workspace_roots: [root], cwd: root };
+    const wrongId = {
+      conversation_id: 'wrong-conversation-id',
+      workspace_roots: [root],
+      cwd: root,
+      transcript_path: join(smokeTmpRoot, 'agent-transcripts', realId, `${realId}.jsonl`),
+    };
     const noId = { workspace_roots: [root], cwd: root };
     const implementPath = join(root, '.cursor/skills/implement/SKILL.md');
     const probePath = join(root, '.cursor/hooks/_integration-probe.txt');
@@ -589,39 +627,34 @@ try {
       tool_input: { path: implementPath },
     });
     st = loadState(root, realId);
-    assert('integration without id/env stays locked', st.implement === false, JSON.stringify(st));
+    assert('integration without id/transcript stays locked', st.implement === false, JSON.stringify(st));
 
     const outInject = run('inject-context.mjs', { ...withId });
     assert(
-      'integration inject exports env',
-      outInject.env?.[GATE_CONVERSATION_ENV] === realId,
+      'integration inject has no gate env',
+      outInject.env == null,
       JSON.stringify(outInject),
     );
 
-    const envOnly = { [GATE_CONVERSATION_ENV]: realId };
-    run(
-      'track.mjs',
-      {
-        ...noId,
-        hook_event_name: 'preToolUse',
-        tool_name: 'ReadFile',
-        tool_input: { path: implementPath },
-      },
-      envOnly,
-    );
+    run('track.mjs', {
+      ...wrongId,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: implementPath },
+    });
     st = loadState(root, realId);
-    assert('integration env unlocks implement', st.implement === true, JSON.stringify(st));
-
-    const outWrite = run(
-      'gate.mjs',
-      {
-        ...noId,
-        hook_event_name: 'preToolUse',
-        tool_name: 'Write',
-        tool_input: { path: probePath },
-      },
-      envOnly,
+    assert(
+      'integration transcript wins over wrong conversation_id',
+      st.implement === true,
+      JSON.stringify(st),
     );
+
+    const outWrite = run('gate.mjs', {
+      ...wrongId,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: probePath },
+    });
     assert('integration Write allow', outWrite.permission === 'allow', JSON.stringify(outWrite));
     try {
       unlinkSync(probePath);
@@ -682,6 +715,70 @@ try {
       command: 'node -e 1',
     });
     assert('off bootstrap denies node', outLocked.permission === 'deny', JSON.stringify(outLocked));
+  }
+
+  // 17b. entry: core が壊れても bootstrap 中は allow（entry 救命胴衣）
+  {
+    const brokenCore = join(smokeTmpRoot, 'broken-core.mjs');
+    writeFileSync(
+      brokenCore,
+      'export async function handleGate() { throw new Error("core-boom"); }\n',
+    );
+    enableBootstrap(root);
+    const outAllow = run(
+      'gate.mjs',
+      {
+        ...base,
+        hook_event_name: 'beforeShellExecution',
+        command: 'node -e 1',
+      },
+      { CURSOR_GATE_CORE_PATH: brokenCore },
+    );
+    assert(
+      'broken core + bootstrap allows',
+      outAllow.permission === 'allow',
+      JSON.stringify(outAllow),
+    );
+    disableBootstrap(root);
+    const outDeny = run(
+      'gate.mjs',
+      {
+        ...base,
+        hook_event_name: 'beforeShellExecution',
+        command: 'node -e 1',
+      },
+      { CURSOR_GATE_CORE_PATH: brokenCore },
+    );
+    assert(
+      'broken core without bootstrap denies',
+      outDeny.permission === 'deny',
+      JSON.stringify(outDeny),
+    );
+    assert(
+      'broken core deny mentions error',
+      String(outDeny.user_message || '').includes('core-boom'),
+      JSON.stringify(outDeny),
+    );
+
+    const brokenImport = join(smokeTmpRoot, 'broken-import.mjs');
+    writeFileSync(brokenImport, 'export async function handleGate() {\n');
+    enableBootstrap(root);
+    const outImportAllow = run(
+      'gate.mjs',
+      {
+        ...base,
+        hook_event_name: 'preToolUse',
+        tool_name: 'Write',
+        tool_input: { path: join(root, 'utils/foo.ts') },
+      },
+      { CURSOR_GATE_CORE_PATH: brokenImport },
+    );
+    assert(
+      'broken import + bootstrap allows',
+      outImportAllow.permission === 'allow',
+      JSON.stringify(outImportAllow),
+    );
+    disableBootstrap(root);
   }
 
   // 18. track-phase: /bootstrap と /bootstrap off

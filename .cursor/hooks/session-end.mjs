@@ -15,7 +15,8 @@ async function readStdinJson() {
 
 async function main() {
   const payload = await readStdinJson();
-  disableBootstrap(workspaceRoot(payload));
+  const root = workspaceRoot(payload);
+  disableBootstrap(root);
   process.stdout.write('{}\n');
 }
 
