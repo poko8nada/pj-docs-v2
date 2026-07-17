@@ -83,4 +83,4 @@ rg -n 'NOTE:' <changed files>
 After `git add`, before `git commit`:
 
 1. Run **`notes` skill — Commit check** (`.cursor/skills/notes/scripts/list-removed.mjs`). Do not commit until the user OKs any removed NOTE lines.
-2. Run **`/pre-commit-reviewer`** on the current `review.files` batch. Harness blocks `git commit` while `review.status` is `pending`. Launching the reviewer sets `reviewed` and clears `files` (PASS/GAPS are not read by the harness). If you re-edit afterward (including GAPS fixes), status returns to `pending` — review that new batch before commit.
+2. Run **`/pre-commit-reviewer`**. Harness blocks `git commit` while `review.status` is `pending`. The hook injects `review.files` into the Task prompt (no git diff). Launching the reviewer sets `reviewed` and clears `files` (PASS/GAPS are not read by the harness). If you re-edit afterward (including GAPS fixes), status returns to `pending` — review that new batch before commit.

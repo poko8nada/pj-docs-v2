@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   conversationId,
+  loadState,
   onSessionStart,
   statePathRelative,
   workspaceRoot,
@@ -144,8 +145,9 @@ function readReview() {
   return [
     '`review.status`: `idle` → `pending` (edits) → `reviewed` (reviewer Task launched) → `idle` (commit).',
     '`git commit` is blocked only while `status === pending` (agent shell only — lefthook covers human paths).',
-    'Harness does not read PASS/GAPS — launching `/pre-commit-reviewer` clears `files` and sets `reviewed`.',
-    'Re-edits after review (including GAPS fixes) go back to `pending` with a new `files` batch — review again.',
+    'Harness accumulates edited paths in `review.files` (harness + product; state/bootstrap excluded). No git diff.',
+    'On `/pre-commit-reviewer` Task launch, hook injects `review.files` into the Task prompt, then sets `reviewed` and clears `files`.',
+    'Re-edits after review go back to `pending` with a new `files` batch — review again.',
     'Before commit: `notes` Commit check → `/pre-commit-reviewer` → read output → fix if needed → re-review if re-edited → `git commit`.',
     'Successful `git commit` (or an allowed commit attempt) resets `review` to `idle`.',
   ].join('\n');
@@ -161,7 +163,10 @@ function readCheck() {
   ].join('\n');
 }
 
-function readGateState(stateFileRel) {
+function readGateState(root, id, stateFileRel) {
+  const state = loadState(root, id);
+  const review = state.review ?? { status: 'idle', files: [] };
+  const check = state.check ?? { pending: [] };
   return [
     `Your gate state (read-only for you; hooks write it): \`${stateFileRel}\``,
     'Created on the first user prompt as `discussion` (not at CLI startup). Work phases update the same file.',
@@ -171,11 +176,18 @@ function readGateState(stateFileRel) {
     '`check`: `pending` — relative paths queued for format/lint/typecheck on agent `stop`.',
     'If the glob has no match yet, no prompt has been sent in this conversation. Never edit state files.',
     'State key prefers transcript UUID, then conversation_id. Stale files older than 7 days are purged on sessionStart.',
+    '',
+    'Current values:',
+    `phase: ${state.phase}`,
+    `implement: ${state.implement}`,
+    `review.status: ${review.status}`,
+    `review.files: ${JSON.stringify(review.files ?? [])}`,
+    `check.pending: ${JSON.stringify(check.pending ?? [])}`,
   ].join('\n');
 }
 
 /** SECTION_DEFS が injected context の唯一の source of truth */
-function buildSectionDefs(stateFileRel) {
+function buildSectionDefs(root, id, stateFileRel) {
   return [
     { id: 'agents', title: 'AGENTS.md', level: 1, codeblock: true, source: readAgents },
     { id: 'spec', title: 'Product Design', level: 1, source: readSpec },
@@ -190,7 +202,7 @@ function buildSectionDefs(stateFileRel) {
       id: 'gate',
       title: 'Gate state',
       level: 2,
-      source: () => readGateState(stateFileRel),
+      source: () => readGateState(root, id, stateFileRel),
     },
   ];
 }
@@ -201,9 +213,9 @@ function renderSection(section) {
   return `${heading}\n\n${body}`;
 }
 
-function buildContext(worktree, stateFileRel) {
+function buildContext(worktree, root, id, stateFileRel) {
   const rendered = [];
-  for (const def of buildSectionDefs(stateFileRel)) {
+  for (const def of buildSectionDefs(root, id, stateFileRel)) {
     const body = def.source(worktree);
     if (!body?.trim()) continue;
     rendered.push(renderSection({ ...def, body }));
@@ -225,7 +237,7 @@ async function main() {
   onSessionStart(root);
   const stateFileRel = statePathRelative(root, id);
 
-  const ctx = buildContext(root, stateFileRel);
+  const ctx = buildContext(root, root, id, stateFileRel);
   if (!ctx.trim()) return respond({});
   return respond({ additional_context: ctx });
 }

@@ -449,6 +449,7 @@ try {
     const ctx = out.additional_context || '';
     const name = findStateFileName(root, id);
     assert('inject mentions Gate state', ctx.includes('Gate state'), ctx.slice(0, 200));
+    assert('inject includes live review.files', ctx.includes('review.files:'), ctx.slice(0, 400));
     assert('inject mentions dated state path', Boolean(name && ctx.includes(name)), name);
     assert('inject mentions discussion', ctx.includes('discussion'), '');
     assert('inject mentions JST naming', ctx.includes('+0900'), '');
@@ -876,10 +877,18 @@ try {
       tool_name: 'Write',
       tool_input: { path: join(root, 'utils/_review-probe.ts') },
     });
+    run('track.mjs', {
+      ...reviewBase,
+      hook_event_name: 'postToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, '.cursor/hooks/_harness-review-probe.mjs') },
+    });
     const stDirty = loadState(root, reviewId);
     assert(
-      'review pending after product write',
-      stDirty.review?.status === 'pending' && stDirty.review?.files?.includes('utils/_review-probe.ts'),
+      'review pending after edits',
+      stDirty.review?.status === 'pending' &&
+        stDirty.review?.files?.includes('utils/_review-probe.ts') &&
+        stDirty.review?.files?.includes('.cursor/hooks/_harness-review-probe.mjs'),
       JSON.stringify(stDirty),
     );
 
@@ -890,12 +899,21 @@ try {
     });
     assert('review blocks git commit', denyCommit.permission === 'deny', JSON.stringify(denyCommit));
 
-    run('track.mjs', {
+    const injectOut = run('track.mjs', {
       ...reviewBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Task',
       tool_input: { subagent_type: 'pre-commit-reviewer', description: 'review before commit' },
     });
+    const injected = String(injectOut.updated_input?.description ?? injectOut.updated_input?.prompt ?? '');
+    assert(
+      'preToolUse Task injects review.files into prompt',
+      injectOut.permission === 'allow' &&
+        injected.includes('[harness-review]') &&
+        injected.includes('utils/_review-probe.ts') &&
+        injected.includes('.cursor/hooks/_harness-review-probe.mjs'),
+      JSON.stringify(injectOut),
+    );
     const stReviewed = loadState(root, reviewId);
     assert(
       'preToolUse Task sets reviewed and clears files',

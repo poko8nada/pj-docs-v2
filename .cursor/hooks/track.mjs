@@ -7,7 +7,7 @@
  * | beforeSubmitPrompt | phase / bootstrap                           |
  * | Read*              | implement: true on implement/SKILL.md Read  |
  * | postToolUse Write* | review.pending + check.pending              |
- * | preToolUse Task         | review → reviewed on /pre-commit-reviewer   |
+ * | preToolUse Task         | inject review.files → reviewed on reviewer    |
  * | beforeShellExecution    | review/check reset when git commit allowed  |
  * | afterShellExecution     | review/check reset on successful git commit (IDE) |
  */
@@ -16,6 +16,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { disableBootstrap, enableBootstrap } from './_bootstrap.mjs';
 import {
   commandIncludesGitCommit,
+  injectReviewFilesIntoTaskInput,
   isPreCommitReviewerContext,
   isReviewablePath,
 } from './_review.mjs';
@@ -146,7 +147,9 @@ function maybeMarkCheckPending(root, payload) {
   const filePath = filePathFromPayload(payload);
   if (!filePath || !isCheckablePath(root, String(filePath))) return;
 
-  const abs = resolve(isAbsolute(String(filePath)) ? String(filePath) : resolve(root, String(filePath)));
+  const abs = resolve(
+    isAbsolute(String(filePath)) ? String(filePath) : resolve(root, String(filePath)),
+  );
   markCheckPending(root, id, abs);
 }
 
@@ -158,15 +161,26 @@ function maybeMarkReviewDirty(root, payload) {
   const filePath = filePathFromPayload(payload);
   if (!filePath || !isReviewablePath(root, String(filePath))) return;
 
-  const abs = resolve(isAbsolute(String(filePath)) ? String(filePath) : resolve(root, String(filePath)));
+  const abs = resolve(
+    isAbsolute(String(filePath)) ? String(filePath) : resolve(root, String(filePath)),
+  );
   markReviewDirty(root, id, abs);
 }
 
 function handlePreToolUseTask(root, payload) {
+  if (!isPreCommitReviewerContext(payload)) return allow();
+
   const id = conversationId(payload);
   const state = loadState(root, id);
-  if (isReviewBlocking(state) && isPreCommitReviewerContext(payload)) {
-    markReviewed(root, id);
+  if (!isReviewBlocking(state)) return allow();
+
+  const files = [...normalizeReview(state.review).files];
+  const toolInput = payload.tool_input ?? {};
+  const updatedInput = injectReviewFilesIntoTaskInput(toolInput, files);
+  markReviewed(root, id);
+
+  if (updatedInput) {
+    return respond({ permission: 'allow', updated_input: updatedInput });
   }
   return allow();
 }

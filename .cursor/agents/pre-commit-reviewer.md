@@ -23,7 +23,7 @@ Use these as review criteria, not just style preference.
 When invoked:
 
 1. Read applicable reference files above.
-2. Read the changed files listed in the task (and their tests).
+2. Read the changed files listed in the task prompt. Paths are injected by the harness under `[harness-review]` — do not use git diff.
 3. Check implementation matches agreed scope.
 4. Check error paths and edge cases in code.
 5. Check tests actually cover those paths — not just happy path.

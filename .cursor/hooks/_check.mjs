@@ -4,13 +4,13 @@
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { isReviewablePath } from './_review.mjs';
+import { isProductSourcePath } from './_review.mjs';
 
 const CHECKABLE_EXT = /\.(ts|tsx|js|jsx)$/i;
 
-/** lefthook pre-commit と同じ拡張子（harness 除外は isReviewablePath） */
+/** lefthook pre-commit と同じ拡張子（product のみ — harness は除外） */
 export function isCheckablePath(root, filePath) {
-  if (!isReviewablePath(root, filePath)) return false;
+  if (!isProductSourcePath(root, filePath)) return false;
   const abs = resolve(isAbsolute(filePath) ? filePath : resolve(root, String(filePath)));
   const rel = relative(root, abs);
   const posix = rel.split(sep).join('/');
