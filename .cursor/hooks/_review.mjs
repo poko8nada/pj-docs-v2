@@ -5,11 +5,18 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { isBootstrapMarkerPath } from './_bootstrap.mjs';
 import { isUnderStateDir } from './_state.mjs';
 
-const REVIEWABLE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|css|md|json|ya?ml)$/i;
+/** コード＋CSSのみ（md/json/yaml は Issue 下書き等で gate を汚さない） */
+const REVIEWABLE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|css)$/i;
 
-export const DENY_REVIEW =
-  '[gate-review] review.status is pending. Do not run `git add && git commit` together. ' +
-  'Run (1) `git add <paths>` alone (2) `/pre-commit-reviewer` (3) `git commit` alone.';
+/** @param {string[]} files */
+export function denyReviewMessage(files) {
+  const list = Array.isArray(files) && files.length > 0 ? files.join(', ') : '(none)';
+  return (
+    `[gate-review] review.files is non-empty (unreviewed): ${list}. ` +
+    'Run `/pre-commit-reviewer` to clear them, then `git commit`. ' +
+    '`git add` order does not matter.'
+  );
+}
 
 export const REVIEW_INJECT_MARKER = '[harness-review]';
 
@@ -92,52 +99,4 @@ function shellSegments(command) {
 /** `git commit` を含むか（segment 単位） */
 export function commandIncludesGitCommit(command) {
   return shellSegments(command).some((seg) => /\bgit\b/.test(seg) && /\bcommit\b/.test(seg));
-}
-
-/** `git add` を含むか（segment 単位） */
-export function commandIncludesGitAdd(command) {
-  return shellSegments(command).some((seg) => /\bgit\b/.test(seg) && /\badd\b/.test(seg));
-}
-
-/**
- * `git add` の明示パスを抽出（`.` / glob / フラグは無視 — git diff は使わない）。
- * @returns {string[]}
- */
-export function pathsFromGitAddCommand(command) {
-  const out = [];
-  for (const seg of shellSegments(command)) {
-    if (!/\bgit\b/.test(seg) || !/\badd\b/.test(seg)) continue;
-    const tokens = seg.split(/\s+/).filter(Boolean);
-    let i = tokens.findIndex((t) => t === 'add');
-    if (i < 0) continue;
-    i += 1;
-    while (i < tokens.length) {
-      const t = tokens[i];
-      if (t === '--') {
-        i += 1;
-        while (i < tokens.length) {
-          const p = tokens[i];
-          if (p && p !== '.' && !p.includes('*') && !p.includes('?')) out.push(p);
-          i += 1;
-        }
-        break;
-      }
-      if (t.startsWith('-')) {
-        // -u / --all / -A / -p などはパスを持たない（値付きオプションは稀なのでスキップ）
-        if (t === '--' || t === '-A' || t === '--all' || t === '-u' || t === '--update') {
-          i += 1;
-          continue;
-        }
-        i += 1;
-        continue;
-      }
-      if (t === '.' || t.includes('*') || t.includes('?')) {
-        i += 1;
-        continue;
-      }
-      out.push(t);
-      i += 1;
-    }
-  }
-  return [...new Set(out)];
 }

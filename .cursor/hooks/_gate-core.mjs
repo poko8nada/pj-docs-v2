@@ -15,13 +15,14 @@ import {
   isBootstrapMarkerPath,
   isShellWriteToBootstrapMarker,
 } from './_bootstrap.mjs';
-import { commandIncludesGitCommit, DENY_REVIEW } from './_review.mjs';
+import { commandIncludesGitCommit, denyReviewMessage } from './_review.mjs';
 import {
   conversationId,
   isReviewBlocking,
   isUnderStateDir,
   isUnlocked,
   loadState,
+  normalizeReview,
   stateDir,
   WORK_PHASES,
   workspaceRoot,
@@ -469,7 +470,7 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
   if (outsideErr) return deny(outsideErr);
 
   if (commandIncludesGitCommit(command) && isReviewBlocking(state)) {
-    return deny(DENY_REVIEW);
+    return deny(denyReviewMessage(normalizeReview(state.review).files));
   }
 
   if (unlocked) return allow();

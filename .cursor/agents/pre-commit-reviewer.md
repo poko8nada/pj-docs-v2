@@ -14,7 +14,6 @@ Read `.cursor/skills/implement/references/` files that apply to the changed file
 - TypeScript (`.ts` / `.tsx`): `references/typescript.md`
 - CSS / Tailwind: `references/css.md`
 - Tests (`.test.ts` / `.test.tsx`): `references/testing.md`
-- Markdown: `references/markdown.md`
 
 Use these as review criteria, not just style preference.
 

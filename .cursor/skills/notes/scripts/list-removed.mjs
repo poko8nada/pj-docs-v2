@@ -58,9 +58,7 @@ function getStagedDiff() {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (error) {
-    const err = /** @type {NodeJS.ErrnoException & { status?: number; stderr?: string }} */ (
-      error
-    );
+    const err = /** @type {NodeJS.ErrnoException & { status?: number; stderr?: string }} */ (error);
     if (err.status === 128 || /not a git repository/i.test(String(err.stderr ?? ''))) {
       return '';
     }

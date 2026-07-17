@@ -77,6 +77,25 @@ When creating a phase issue, the body must reference:
 4. Run `gh`. On create of Design / Forge / Refine, also comment on Spec per the table. On phase complete, close the phase issue and comment on Spec.
 5. Return issue number + what changed to the caller.
 
+## Body write (gh)
+
+Prefer heredoc — stay inside the workspace root (no `/tmp`, no paths outside the project):
+
+```bash
+gh issue edit <number> --body "$(cat <<'EOF'
+…full body…
+EOF
+)"
+```
+
+If that fails (body too large, shell quoting), use a scratch file under `.cursor/tmp/` (gitignored):
+
+1. Write `.cursor/tmp/issue-<number>-body.md`
+2. `gh issue edit <number> --body-file .cursor/tmp/issue-<number>-body.md` (or `gh issue create --body-file …`)
+3. Delete the scratch file after `gh` succeeds
+
+Do not leave drafts in the repo root or other tracked paths.
+
 ## References
 
 - `references/spec-template.md`

@@ -919,10 +919,10 @@ try {
     });
     const stDirty = loadState(root, reviewId);
     assert(
-      'review pending after edits',
-      stDirty.review?.status === 'pending' &&
-        stDirty.review?.files?.includes('utils/_review-probe.ts') &&
-        stDirty.review?.files?.includes('.cursor/hooks/_harness-review-probe.mjs'),
+      'review files after edits',
+      Array.isArray(stDirty.review?.files) &&
+        stDirty.review.files.includes('utils/_review-probe.ts') &&
+        stDirty.review.files.includes('.cursor/hooks/_harness-review-probe.mjs'),
       JSON.stringify(stDirty),
     );
 
@@ -956,10 +956,8 @@ try {
     );
     const stReviewed = loadState(root, reviewId);
     assert(
-      'preToolUse Task sets reviewed and clears files',
-      stReviewed.review?.status === 'reviewed' &&
-        Array.isArray(stReviewed.review?.files) &&
-        stReviewed.review.files.length === 0,
+      'preToolUse Task clears review.files',
+      Array.isArray(stReviewed.review?.files) && stReviewed.review.files.length === 0,
       JSON.stringify(stReviewed),
     );
 
@@ -969,7 +967,7 @@ try {
       command: 'git commit -m test',
     });
     assert(
-      'review allows git commit after reviewed',
+      'review allows git commit when files empty',
       allowCommit.permission === 'allow',
       JSON.stringify(allowCommit),
     );
@@ -979,11 +977,11 @@ try {
       hook_event_name: 'beforeShellExecution',
       command: 'git commit -m test',
     });
-    const stStillReviewed = loadState(root, reviewId);
+    const stStillClear = loadState(root, reviewId);
     assert(
-      'beforeShell commit attempt does not reset reviewed',
-      stStillReviewed.review?.status === 'reviewed',
-      JSON.stringify(stStillReviewed),
+      'beforeShell commit attempt does not refill files',
+      Array.isArray(stStillClear.review?.files) && stStillClear.review.files.length === 0,
+      JSON.stringify(stStillClear),
     );
 
     run('track.mjs', {
@@ -994,8 +992,8 @@ try {
     });
     const stAfter = loadState(root, reviewId);
     assert(
-      'successful commit resets review to idle',
-      stAfter.review?.status === 'idle',
+      'successful commit keeps review.files empty',
+      Array.isArray(stAfter.review?.files) && stAfter.review.files.length === 0,
       JSON.stringify(stAfter),
     );
 
@@ -1007,11 +1005,28 @@ try {
     });
     const stAdd = loadState(root, reviewId);
     assert(
-      'successful git add unions explicit paths into review.files',
-      stAdd.review?.status === 'pending' &&
-        stAdd.review?.files?.includes('.cursor/hooks/_missed-by-write.mjs') &&
-        stAdd.review?.files?.includes('utils/_from-add.ts'),
+      'git add does not change review state',
+      Array.isArray(stAdd.review?.files) && stAdd.review.files.length === 0,
       JSON.stringify(stAdd),
+    );
+
+    run('track.mjs', {
+      ...reviewBase,
+      hook_event_name: 'postToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'docs/_not-reviewable.md') },
+    });
+    run('track.mjs', {
+      ...reviewBase,
+      hook_event_name: 'postToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'package-lock-probe.json') },
+    });
+    const stDocs = loadState(root, reviewId);
+    assert(
+      'md/json edits do not enter review.files',
+      Array.isArray(stDocs.review?.files) && stDocs.review.files.length === 0,
+      JSON.stringify(stDocs),
     );
 
     run('track.mjs', {
@@ -1022,10 +1037,24 @@ try {
     });
     const stRedirty = loadState(root, reviewId);
     assert(
-      're-edit returns to pending with new files',
-      stRedirty.review?.status === 'pending' &&
-        stRedirty.review?.files?.includes('utils/_review-probe.ts'),
+      're-edit refills review.files',
+      Array.isArray(stRedirty.review?.files) &&
+        stRedirty.review.files.includes('utils/_review-probe.ts'),
       JSON.stringify(stRedirty),
+    );
+
+    const denyAfterAddCommit = run('gate.mjs', {
+      ...reviewBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git add utils/_review-probe.ts && git commit -m test',
+    });
+    assert(
+      'add&&commit still blocked while files non-empty',
+      denyAfterAddCommit.permission === 'deny' &&
+        String(denyAfterAddCommit.agent_message ?? denyAfterAddCommit.user_message ?? '').includes(
+          'utils/_review-probe.ts',
+        ),
+      JSON.stringify(denyAfterAddCommit),
     );
   }
 

@@ -143,13 +143,12 @@ function readWeb() {
 
 function readReview() {
   return [
-    '`review.status`: `idle` → `pending` (edits or successful `git add` of reviewable paths) → `reviewed` (reviewer Task) → `idle` (successful commit only).',
-    '`git commit` is blocked only while `status === pending`. Do not combine `git add && git commit` — add alone, then reviewer, then commit alone.',
-    'Harness accumulates edited paths in `review.files` (harness + product; state/bootstrap excluded). No git diff.',
-    'Successful `git add <explicit-paths>` also unions those paths into `review.files` (`.` / globs ignored).',
-    'On `/pre-commit-reviewer` Task launch, hook injects `review.files` into the Task prompt, then sets `reviewed` and clears `files`.',
-    'Empty or failed commit attempts do not reset `reviewed` — only a successful `git commit` returns to `idle`.',
-    'Re-edits after review go back to `pending` with a new `files` batch — review again.',
+    '`review.files`: reviewable edits accumulate here; `/pre-commit-reviewer` clears them; successful `git commit` also clears.',
+    '`git commit` is blocked only while `review.files` is non-empty. `git add` order does not matter; add does not change review state.',
+    'Tracked extensions: `*.{ts,tsx,js,jsx,mjs,cjs,css}` (harness + product; state/bootstrap excluded). `md` / `json` / `yaml` are not tracked. No git diff.',
+    'On `/pre-commit-reviewer` Task launch, hook injects `review.files` into the Task prompt, then clears `files`.',
+    'Empty or failed commit attempts do not clear `files` — only reviewer launch or a successful `git commit` clears them.',
+    'Re-edits after clear go back into `files` — review again before commit.',
   ].join('\n');
 }
 
@@ -165,14 +164,14 @@ function readCheck() {
 
 function readGateState(root, id, stateFileRel) {
   const state = loadState(root, id);
-  const review = state.review ?? { status: 'idle', files: [] };
+  const review = state.review ?? { files: [] };
   const check = state.check ?? { pending: [] };
   return [
     `Your gate state (read-only for you; hooks write it): \`${stateFileRel}\``,
     'Created on the first user prompt as `discussion` (not at CLI startup). Work phases update the same file.',
     'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `review`, `check`, `updatedAt` (JST `+09:00`).',
     '`implement`: `null` in `discussion` (N/A); `false` = work phase, handshake pending; `true` = code edits allowed.',
-    '`review`: `status` (`idle`|`pending`|`reviewed`) + `files` (unreviewed paths while `pending`). Commit blocked when `pending`. Reviewer Task → `reviewed` and clears `files`.',
+    '`review`: `{ files }` — unreviewed paths. Commit blocked when `files` is non-empty. Reviewer Task or successful commit clears `files`.',
     '`check`: `pending` — relative paths queued for format/lint/typecheck on agent `stop`.',
     'If the glob has no match yet, no prompt has been sent in this conversation. Never edit state files.',
     'State key prefers transcript UUID, then conversation_id. Stale files older than 7 days are purged on sessionStart.',
@@ -180,7 +179,6 @@ function readGateState(root, id, stateFileRel) {
     'Current values:',
     `phase: ${state.phase}`,
     `implement: ${state.implement}`,
-    `review.status: ${review.status}`,
     `review.files: ${JSON.stringify(review.files ?? [])}`,
     `check.pending: ${JSON.stringify(check.pending ?? [])}`,
   ].join('\n');
