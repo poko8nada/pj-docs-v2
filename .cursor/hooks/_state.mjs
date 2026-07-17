@@ -15,6 +15,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normalizeReadRefs } from './_refs.mjs';
 
 const hooksDir = fileURLToPath(new URL('.', import.meta.url));
 const projectRootFallback = resolve(hooksDir, '../..');
@@ -171,13 +172,14 @@ export function normalizeReview(review) {
   return { files };
 }
 
-/** @returns {{ phase: string, implement: boolean | null, review: ReturnType<typeof defaultReview>, check: ReturnType<typeof defaultCheck>, updatedAt: string }} */
+/** @returns {{ phase: string, implement: boolean | null, review: ReturnType<typeof defaultReview>, check: ReturnType<typeof defaultCheck>, readRefs: string[], updatedAt: string }} */
 export function defaultState() {
   return {
     phase: PHASE_DISCUSSION,
     implement: null,
     review: defaultReview(),
     check: defaultCheck(),
+    readRefs: [],
     updatedAt: formatJstIso(),
   };
 }
@@ -205,6 +207,7 @@ export function loadState(root, id) {
       implement: normalizeImplement(phase, raw.implement),
       review: normalizeReview(raw.review),
       check: normalizeCheck(raw.check),
+      readRefs: normalizeReadRefs(raw.readRefs),
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : defaultState().updatedAt,
     };
   } catch {
@@ -224,6 +227,7 @@ export function saveState(root, id, state) {
     implement: normalizeImplement(phase, state.implement ?? prev.implement),
     review: normalizeReview(state.review ?? prev.review),
     check: normalizeCheck(state.check ?? prev.check),
+    readRefs: normalizeReadRefs(state.readRefs !== undefined ? state.readRefs : prev.readRefs),
     updatedAt: formatJstIso(),
   };
   writeFileSync(path, JSON.stringify(next, null, 2) + '\n', 'utf8');
@@ -265,6 +269,32 @@ export function resetReview(root, id) {
     phase: prev.phase,
     implement: prev.implement,
     review: defaultReview(),
+    readRefs: prev.readRefs,
+  });
+}
+
+/** implement/references の Read を記録 */
+export function markReadRef(root, id, refBasename) {
+  const prev = loadState(root, id);
+  const readRefs = normalizeReadRefs([...(prev.readRefs ?? []), refBasename]);
+  return saveState(root, id, {
+    phase: prev.phase,
+    implement: prev.implement,
+    review: prev.review,
+    check: prev.check,
+    readRefs,
+  });
+}
+
+/** フェーズ入場・再入場で reference 既読をクリア */
+export function clearReadRefs(root, id) {
+  const prev = loadState(root, id);
+  return saveState(root, id, {
+    phase: prev.phase,
+    implement: prev.implement,
+    review: prev.review,
+    check: prev.check,
+    readRefs: [],
   });
 }
 

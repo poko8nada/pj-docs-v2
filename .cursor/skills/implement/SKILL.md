@@ -39,10 +39,13 @@ If agreement or unit is unclear, stop and return to the caller — do not invent
 
 Read the reference files relevant to the task. Internalize — do not summarize in chat.
 
-- TypeScript: `references/typescript.md`
+- TypeScript (`.ts` / `.tsx` / `.js` / `.jsx`): `references/typescript.md`
 - CSS / Tailwind: `references/css.md`
-- Testing: `references/testing.md`
-- Markdown: `references/markdown.md`
+- Tests (`*.test.ts` / `*.test.tsx`): `references/testing.md` only
+- Markdown (`.md` / `.mdc`): `references/markdown.md`
+- `.mjs` / `.cjs`: no reference required
+
+The harness **blocks** edits to those paths until the matching reference has been Read in the current work unit (`readRefs` in gate state). Deny messages name the file to Read. Any phase trigger (including same-phase re-entry) clears `readRefs` and sets `implement: false`.
 
 ## Step 2 — Build
 
@@ -83,4 +86,4 @@ rg -n 'NOTE:' <changed files>
 When `review.files` is non-empty (harness shows this in gate state):
 
 1. Run **`notes` skill — Commit check** (`.cursor/skills/notes/scripts/list-removed.mjs`). Do not commit until the user OKs any removed NOTE lines.
-2. Run **`/pre-commit-reviewer`**. The hook injects `review.files` into the Task prompt (no git diff) and clears them. `git add` order does not matter and does not change review state. Harness blocks `git commit` only while `review.files` is non-empty. Re-edits refill `files`. Only reviewer launch or a successful commit clears `files` (empty commit attempts do not).
+2. Run **`/pre-commit-reviewer`**. The hook injects each `review.files` path with `git diff HEAD` (or full content if new/untracked), then clears `files`. The reviewer focuses on that injection (readonly; no git). `git add` order does not matter. Harness blocks `git commit` only while `review.files` is non-empty. Re-edits refill `files`. Only reviewer launch or a successful commit clears `files` (empty commit attempts do not).

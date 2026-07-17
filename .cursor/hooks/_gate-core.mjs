@@ -16,6 +16,7 @@ import {
   isShellWriteToBootstrapMarker,
 } from './_bootstrap.mjs';
 import { commandIncludesGitCommit, denyReviewMessage } from './_review.mjs';
+import { denyRefsMessage, missingRefs, requiredRefsForPath } from './_refs.mjs';
 import {
   conversationId,
   isReviewBlocking,
@@ -27,6 +28,8 @@ import {
   WORK_PHASES,
   workspaceRoot,
 } from './_state.mjs';
+
+const WRITE_TOOLS = new Set(['Write', 'StrReplace', 'Delete', 'EditNotebook']);
 
 const DENY_CODE =
   '[gate] Code edits require a work phase (/spec|/design|/forge|/refine|/chore) and Read of .cursor/skills/implement/SKILL.md. Default phase is discussion (no code).';
@@ -521,7 +524,16 @@ export async function handleGate(payload) {
   if (toolName === 'Read' || toolName === 'ReadFile') return allow();
 
   if (isBootstrapActive(root)) return allow();
-  if (unlocked) return allow();
+
+  if (unlocked) {
+    if (WRITE_TOOLS.has(toolName) && fileArg) {
+      const required = requiredRefsForPath(root, String(fileArg));
+      const missing = missingRefs(state.readRefs ?? [], required);
+      if (missing.length > 0) return deny(denyRefsMessage(missing));
+    }
+    return allow();
+  }
+
   if (fileArg && isRootMarkdown(root, String(fileArg))) return allow();
   return deny(DENY_CODE);
 }

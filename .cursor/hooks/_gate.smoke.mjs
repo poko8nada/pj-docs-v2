@@ -33,11 +33,25 @@ import {
   purgeStaleStates,
   STATE_TTL_DAYS,
 } from './_state.mjs';
+import { buildReviewTaskInjection, collectReviewDiff } from './_review.mjs';
 
 const hooksDir = fileURLToPath(new URL('.', import.meta.url));
 const root = resolve(hooksDir, '../..');
 const smokeTmpRoot = join(hooksDir, '.smoke-tmp');
 mkdirSync(smokeTmpRoot, { recursive: true });
+
+function trackRead(convBase, relPath) {
+  run('track.mjs', {
+    ...convBase,
+    hook_event_name: 'preToolUse',
+    tool_name: 'ReadFile',
+    tool_input: { path: join(root, relPath) },
+  });
+}
+
+function trackReadTsRef(convBase) {
+  trackRead(convBase, '.cursor/skills/implement/references/typescript.md');
+}
 const stateTmp = mkdtempSync(join(smokeTmpRoot, 'state-'));
 const id = 'test-conversation';
 
@@ -350,6 +364,19 @@ try {
       file_path: join(root, '.cursor/skills/implement/SKILL.md'),
     });
     assert('forge track-implement allow', out.permission === 'allow', JSON.stringify(out));
+    const denyNoRef = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/foo.ts') },
+    });
+    assert(
+      'unlocked Write without typescript.md deny',
+      denyNoRef.permission === 'deny' &&
+        String(denyNoRef.agent_message ?? '').includes('typescript.md'),
+      JSON.stringify(denyNoRef),
+    );
+    trackReadTsRef(base);
     const out2 = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
@@ -390,14 +417,50 @@ try {
     assert('redirect into state deny', out.permission === 'deny', JSON.stringify(out));
   }
 
-  // 10. phase switch resets implement
+  // 10. phase switch / re-entry resets implement + readRefs
   {
+    trackReadTsRef(base);
+    assert(
+      'readRefs records typescript.md',
+      loadState(root, id).readRefs?.includes('typescript.md'),
+      JSON.stringify(loadState(root, id)),
+    );
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore typo' });
     const st = readState();
     assert(
-      'phase switch resets implement',
-      st.phase === 'chore' && st.implement === false,
+      'phase switch resets implement and readRefs',
+      st.phase === 'chore' &&
+        st.implement === false &&
+        Array.isArray(st.readRefs) &&
+        st.readRefs.length === 0,
       JSON.stringify(st),
+    );
+
+    run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeReadFile',
+      file_path: join(root, '.cursor/skills/implement/SKILL.md'),
+    });
+    trackReadTsRef(base);
+    assert(
+      'chore unlock + ref before re-entry',
+      loadState(root, id).implement === true &&
+        loadState(root, id).readRefs?.includes('typescript.md'),
+      JSON.stringify(loadState(root, id)),
+    );
+    run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore again',
+    });
+    const stRe = readState();
+    assert(
+      'same-phase re-entry resets implement and readRefs',
+      stRe.phase === 'chore' &&
+        stRe.implement === false &&
+        Array.isArray(stRe.readRefs) &&
+        stRe.readRefs.length === 0,
+      JSON.stringify(stRe),
     );
   }
 
@@ -452,6 +515,12 @@ try {
     const name = findStateFileName(root, id);
     assert('inject mentions Gate state', ctx.includes('Gate state'), ctx.slice(0, 200));
     assert('inject includes live review.files', ctx.includes('review.files:'), ctx.slice(0, 400));
+    assert('inject includes live readRefs', ctx.includes('readRefs:'), ctx.slice(0, 400));
+    assert(
+      'inject mentions refs gate',
+      ctx.includes('Implement references gate'),
+      ctx.slice(0, 400),
+    );
     assert('inject mentions dated state path', Boolean(name && ctx.includes(name)), name);
     assert('inject mentions discussion', ctx.includes('discussion'), '');
     assert('inject mentions JST naming', ctx.includes('+0900'), '');
@@ -905,6 +974,12 @@ try {
       tool_name: 'ReadFile',
       tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
     });
+    writeFileSync(join(root, 'utils/_review-probe.ts'), 'export const reviewProbe = 1;\n');
+    writeFileSync(
+      join(root, '.cursor/hooks/_harness-review-probe.mjs'),
+      'export const harnessReviewProbe = 1;\n',
+    );
+    trackReadTsRef(reviewBase);
     run('track.mjs', {
       ...reviewBase,
       hook_event_name: 'postToolUse',
@@ -951,9 +1026,41 @@ try {
         injected.includes('[harness-review]') &&
         injected.includes('utils/_review-probe.ts') &&
         injected.includes('.cursor/hooks/_harness-review-probe.mjs') &&
+        injected.includes('reviewProbe') &&
+        injected.includes('Do not run git') &&
         injectedTask.includes('[harness-review]'),
       JSON.stringify(injectOut),
     );
+    try {
+      unlinkSync(join(root, 'utils/_review-probe.ts'));
+      unlinkSync(join(root, '.cursor/hooks/_harness-review-probe.mjs'));
+    } catch {
+      // 無ければ無視
+    }
+
+    const trackedPath = 'utils/types.ts';
+    const trackedAbs = join(root, trackedPath);
+    const trackedOriginal = readFileSync(trackedAbs, 'utf8');
+    try {
+      writeFileSync(trackedAbs, `${trackedOriginal}\n// smoke-tracked-diff-probe\n`);
+      const got = collectReviewDiff(root, trackedPath);
+      assert(
+        'tracked edit yields kind diff',
+        got.kind === 'diff' && got.body.includes('smoke-tracked-diff-probe'),
+        JSON.stringify(got),
+      );
+      const block = buildReviewTaskInjection(root, [trackedPath]);
+      assert(
+        'injection includes diff fence for tracked edit',
+        Boolean(block) &&
+          block.includes('```diff') &&
+          block.includes('smoke-tracked-diff-probe') &&
+          block.includes(trackedPath),
+        String(block).slice(0, 500),
+      );
+    } finally {
+      writeFileSync(trackedAbs, trackedOriginal);
+    }
     const stReviewed = loadState(root, reviewId);
     assert(
       'preToolUse Task clears review.files',
@@ -1170,6 +1277,112 @@ try {
       'successful commit clears check pending',
       stCommitReset.check?.pending?.length === 0,
       JSON.stringify(stCommitReset.check),
+    );
+  }
+
+  // 23. readRefs gate: md / test / mjs
+  {
+    const refsId = 'refs-gate-id';
+    const refsBase = { conversation_id: refsId, workspace_roots: [root], cwd: root };
+    run('track.mjs', {
+      ...refsBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore refs test',
+    });
+    run('track.mjs', {
+      ...refsBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+    });
+
+    const denyMd = run('gate.mjs', {
+      ...refsBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'docs/note.md') },
+    });
+    assert(
+      'md write without markdown.md deny',
+      denyMd.permission === 'deny' && String(denyMd.agent_message ?? '').includes('markdown.md'),
+      JSON.stringify(denyMd),
+    );
+    trackRead(refsBase, '.cursor/skills/implement/references/markdown.md');
+    const allowMd = run('gate.mjs', {
+      ...refsBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'docs/note.md') },
+    });
+    assert(
+      'md write after markdown.md allow',
+      allowMd.permission === 'allow',
+      JSON.stringify(allowMd),
+    );
+
+    const denyTest = run('gate.mjs', {
+      ...refsBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/foo.test.ts') },
+    });
+    assert(
+      'test write without testing.md deny',
+      denyTest.permission === 'deny' && String(denyTest.agent_message ?? '').includes('testing.md'),
+      JSON.stringify(denyTest),
+    );
+    assert(
+      'test deny does not require typescript.md',
+      !String(denyTest.agent_message ?? '').includes('typescript.md'),
+      JSON.stringify(denyTest),
+    );
+    trackRead(refsBase, '.cursor/skills/implement/references/testing.md');
+    const allowTest = run('gate.mjs', {
+      ...refsBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/foo.test.ts') },
+    });
+    assert(
+      'test write after testing.md allow',
+      allowTest.permission === 'allow',
+      JSON.stringify(allowTest),
+    );
+
+    const allowMjs = run('gate.mjs', {
+      ...refsBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, '.cursor/hooks/_refs-probe.mjs') },
+    });
+    assert(
+      'mjs write needs no reference',
+      allowMjs.permission === 'allow',
+      JSON.stringify(allowMjs),
+    );
+
+    const denyCss = run('gate.mjs', {
+      ...refsBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'styles/app.css') },
+    });
+    assert(
+      'css write without css.md deny',
+      denyCss.permission === 'deny' && String(denyCss.agent_message ?? '').includes('css.md'),
+      JSON.stringify(denyCss),
+    );
+    trackRead(refsBase, '.cursor/skills/implement/references/css.md');
+    const allowCss = run('gate.mjs', {
+      ...refsBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'styles/app.css') },
+    });
+    assert(
+      'css write after css.md allow',
+      allowCss.permission === 'allow',
+      JSON.stringify(allowCss),
     );
   }
 } finally {

@@ -5,7 +5,7 @@
  * | Event              | Action                                      |
  * |--------------------|---------------------------------------------|
  * | beforeSubmitPrompt | phase / bootstrap                           |
- * | Read*              | implement: true on implement/SKILL.md Read  |
+ * | Read*              | implement unlock + readRefs on references/*.md |
  * | postToolUse Write* | review.pending + check.pending              |
  * | preToolUse Task         | inject review.files → reviewed on reviewer    |
  * | afterShellExecution     | git commit 成功 → review/check reset          |
@@ -19,6 +19,7 @@ import {
   isPreCommitReviewerContext,
   isReviewablePath,
 } from './_review.mjs';
+import { implementRefBasename } from './_refs.mjs';
 import { isCheckablePath } from './_check.mjs';
 import {
   conversationId,
@@ -28,8 +29,8 @@ import {
   loadState,
   markCheckPending,
   markReviewDirty,
+  markReadRef,
   clearReviewFiles,
-  normalizeImplement,
   normalizeReview,
   normalizeCheck,
   PHASE_DISCUSSION,
@@ -100,6 +101,17 @@ function maybeUnlockImplement(root, payload) {
   }
 }
 
+/** implement/references/*.md の Read を readRefs に記録（作業フェーズ中） */
+function maybeMarkReadRef(root, payload) {
+  const filePath = filePathFromPayload(payload);
+  const ref = implementRefBasename(root, String(filePath ?? ''));
+  if (!ref) return;
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  if (!WORK_PHASES.has(state.phase)) return;
+  markReadRef(root, id, ref);
+}
+
 function handleBeforeSubmitPrompt(root, payload) {
   const id = conversationId(payload);
   const prompt = String(payload.prompt ?? '');
@@ -121,18 +133,22 @@ function handleBeforeSubmitPrompt(root, payload) {
   const prev = loadState(root, id);
   let implement;
   let review = normalizeReview(prev.review);
+  let readRefs = [...(prev.readRefs ?? [])];
 
   if (phase === PHASE_DISCUSSION) {
     implement = null;
     review = defaultReview();
-  } else if (prev.phase === phase) {
-    implement = normalizeImplement(phase, prev.implement);
+    readRefs = [];
   } else {
+    // 作業フェーズ入場・再入場＝作業単位の境界
     implement = false;
-    review = defaultReview();
+    readRefs = [];
+    if (prev.phase !== phase) {
+      review = defaultReview();
+    }
   }
 
-  saveState(root, id, { phase, implement, review });
+  saveState(root, id, { phase, implement, review, readRefs });
   return respond({ continue: true });
 }
 
@@ -173,7 +189,7 @@ function handlePreToolUseTask(root, payload) {
 
   const files = [...normalizeReview(state.review).files];
   const toolInput = payload.tool_input ?? {};
-  const updatedInput = injectReviewFilesIntoTaskInput(toolInput, files);
+  const updatedInput = injectReviewFilesIntoTaskInput(toolInput, root, files);
   clearReviewFiles(root, id);
 
   if (updatedInput) {
@@ -239,6 +255,7 @@ async function main() {
 
   if (isReadEvent) {
     maybeUnlockImplement(root, payload);
+    maybeMarkReadRef(root, payload);
     if (event === 'postToolUse') return empty();
     return allow();
   }

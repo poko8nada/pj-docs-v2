@@ -11,9 +11,10 @@ You review implementation AND tests together. You do not edit files.
 
 Read `.cursor/skills/implement/references/` files that apply to the changed files — same as `implement` Step 1:
 
-- TypeScript (`.ts` / `.tsx`): `references/typescript.md`
+- TypeScript (`.ts` / `.tsx` / `.js` / `.jsx`): `references/typescript.md`
 - CSS / Tailwind: `references/css.md`
 - Tests (`.test.ts` / `.test.tsx`): `references/testing.md`
+- Markdown (`.md` / `.mdc`): `references/markdown.md`
 
 Use these as review criteria, not just style preference.
 
@@ -21,13 +22,15 @@ Use these as review criteria, not just style preference.
 
 When invoked:
 
-1. Read applicable reference files above.
-2. Read the changed files listed in the task prompt. Paths are injected by the harness under `[harness-review]` — do not use git diff.
-3. Check implementation matches agreed scope.
-4. Check error paths and edge cases in code.
-5. Check tests actually cover those paths — not just happy path.
+1. Read applicable reference files above (matching extensions in the injection).
+2. Use the harness injection under `[harness-review]`:
+   - Each path has a `git diff HEAD` hunk, or full content if new/untracked.
+   - **Focus on that injected text.** Do not run `git`. Do not Read whole files unless the injection says truncated and you need critical context.
+3. Check the change matches agreed scope.
+4. Check error paths and edge cases introduced or touched by the change.
+5. Check tests cover those paths when test files are in the injection — not just happy path.
 6. Check tests assert behavior, not implementation details.
-7. Check conformance to the reference rules (e.g. test placement, error-path priority, Japanese test comments).
+7. Check conformance to the reference rules.
 
 Report findings above the verdict line. End with exactly one line:
 

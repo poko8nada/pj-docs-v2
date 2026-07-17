@@ -121,8 +121,17 @@ function readPhase() {
     'Work phases start only when the user explicitly invokes `/spec`, `/design`, `/forge`, `/refine`, or `/chore`. That unlocks full gh/git (issue writes, commits, etc.).',
     'Do not self-invoke phase skills or treat a work phase as active without that invocation.',
     'Code edits require a work phase first, then Read of `.cursor/skills/implement/SKILL.md` (`implement: true`). In `discussion`, `implement` is `null` — not applicable.',
+    'Any work-phase trigger (`/spec|/design|/forge|/refine|/chore`), including same-phase re-entry, sets `implement: false` and clears `readRefs` (new work unit boundary).',
     'If the gate is broken, the user may invoke `/bootstrap` (emergency bypass) — do not self-invoke. How-to: `.cursor/skills/bootstrap/SKILL.md`.',
     'Phase how-to lives in each phase skill — not here.',
+  ].join('\n');
+}
+
+function readRefsGate() {
+  return [
+    'After `implement: true`, edits to gated paths also require a prior Read of the matching `.cursor/skills/implement/references/*.md` (tracked in `readRefs`).',
+    'Mapping: `.ts/.tsx/.js/.jsx` → `typescript.md`; `.css` → `css.md`; `*.test.ts(x)` → `testing.md` only; `.md/.mdc` → `markdown.md`; `.mjs/.cjs` → none.',
+    'Missing reference → deny naming the file to Read. Phase triggers clear `readRefs` (see Phase entry rules).',
   ].join('\n');
 }
 
@@ -145,8 +154,8 @@ function readReview() {
   return [
     '`review.files`: reviewable edits accumulate here; `/pre-commit-reviewer` clears them; successful `git commit` also clears.',
     '`git commit` is blocked only while `review.files` is non-empty. `git add` order does not matter; add does not change review state.',
-    'Tracked extensions: `*.{ts,tsx,js,jsx,mjs,cjs,css}` (harness + product; state/bootstrap excluded). `md` / `json` / `yaml` are not tracked. No git diff.',
-    'On `/pre-commit-reviewer` Task launch, hook injects `review.files` into the Task prompt, then clears `files`.',
+    'Tracked extensions: `*.{ts,tsx,js,jsx,mjs,cjs,css}` (harness + product; state/bootstrap excluded). `md` / `json` / `yaml` are not tracked for review.files.',
+    'On `/pre-commit-reviewer` Task launch, hook injects each path with `git diff HEAD` (or full content if new/untracked), with soft size caps, then clears `files`. Reviewer stays readonly and must not run git.',
     'Empty or failed commit attempts do not clear `files` — only reviewer launch or a successful `git commit` clears them.',
     'Re-edits after clear go back into `files` — review again before commit.',
   ].join('\n');
@@ -169,10 +178,11 @@ function readGateState(root, id, stateFileRel) {
   return [
     `Your gate state (read-only for you; hooks write it): \`${stateFileRel}\``,
     'Created on the first user prompt as `discussion` (not at CLI startup). Work phases update the same file.',
-    'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `review`, `check`, `updatedAt` (JST `+09:00`).',
+    'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `review`, `check`, `readRefs`, `updatedAt` (JST `+09:00`).',
     '`implement`: `null` in `discussion` (N/A); `false` = work phase, handshake pending; `true` = code edits allowed.',
     '`review`: `{ files }` — unreviewed paths. Commit blocked when `files` is non-empty. Reviewer Task or successful commit clears `files`.',
     '`check`: `pending` — relative paths queued for format/lint/typecheck on agent `stop`.',
+    '`readRefs`: implement reference basenames already Read this work unit (e.g. `typescript.md`). Cleared on phase trigger.',
     'If the glob has no match yet, no prompt has been sent in this conversation. Never edit state files.',
     'State key prefers transcript UUID, then conversation_id. Stale files older than 7 days are purged on sessionStart.',
     '',
@@ -181,6 +191,7 @@ function readGateState(root, id, stateFileRel) {
     `implement: ${state.implement}`,
     `review.files: ${JSON.stringify(review.files ?? [])}`,
     `check.pending: ${JSON.stringify(check.pending ?? [])}`,
+    `readRefs: ${JSON.stringify(state.readRefs ?? [])}`,
   ].join('\n');
 }
 
@@ -192,6 +203,7 @@ function buildSectionDefs(root, id, stateFileRel) {
     { id: 'issues', title: 'Open GitHub Issues', level: 2, codeblock: true, source: readIssues },
     { id: 'prior', title: 'Prior phases', level: 2, source: readPrior },
     { id: 'phase', title: 'Phase entry rules', level: 2, source: readPhase },
+    { id: 'refs', title: 'Implement references gate', level: 2, source: readRefsGate },
     { id: 'shell', title: 'Shell cwd', level: 2, source: readShell },
     { id: 'web', title: 'Web tools', level: 2, source: readWeb },
     { id: 'review', title: 'Pre-commit review', level: 2, source: readReview },
