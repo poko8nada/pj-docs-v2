@@ -142,11 +142,12 @@ function readWeb() {
 
 function readReview() {
   return [
-    'After editing product/test sources, harness sets `review.required` until `/pre-commit-reviewer` is invoked once.',
-    '`git commit` is blocked while `review.required && !review.done` (agent shell only — lefthook covers human paths).',
-    'Before commit: `notes` Commit check → `/pre-commit-reviewer` → read output → fix GAPS if any → `git commit`.',
-    'Reviewer is readonly — harness does not re-review after GAPS; main agent fixes then commits.',
-    'Successful `git commit` (or an allowed commit attempt) resets `review` to idle (`required: false`).',
+    '`review.status`: `idle` → `pending` (edits) → `reviewed` (reviewer Task launched) → `idle` (commit).',
+    '`git commit` is blocked only while `status === pending` (agent shell only — lefthook covers human paths).',
+    'Harness does not read PASS/GAPS — launching `/pre-commit-reviewer` clears `files` and sets `reviewed`.',
+    'Re-edits after review (including GAPS fixes) go back to `pending` with a new `files` batch — review again.',
+    'Before commit: `notes` Commit check → `/pre-commit-reviewer` → read output → fix if needed → re-review if re-edited → `git commit`.',
+    'Successful `git commit` (or an allowed commit attempt) resets `review` to `idle`.',
   ].join('\n');
 }
 
@@ -166,7 +167,7 @@ function readGateState(stateFileRel) {
     'Created on the first user prompt as `discussion` (not at CLI startup). Work phases update the same file.',
     'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `review`, `check`, `updatedAt` (JST `+09:00`).',
     '`implement`: `null` in `discussion` (N/A); `false` = work phase, handshake pending; `true` = code edits allowed.',
-    '`review`: `required` + `done` — commit blocked when `required && !done`. `done` is set when `/pre-commit-reviewer` Task is invoked.',
+    '`review`: `status` (`idle`|`pending`|`reviewed`) + `files` (unreviewed paths while `pending`). Commit blocked when `pending`. Reviewer Task → `reviewed` and clears `files`.',
     '`check`: `pending` — relative paths queued for format/lint/typecheck on agent `stop`.',
     'If the glob has no match yet, no prompt has been sent in this conversation. Never edit state files.',
     'State key prefers transcript UUID, then conversation_id. Stale files older than 7 days are purged on sessionStart.',

@@ -6,8 +6,8 @@
  * |--------------------|---------------------------------------------|
  * | beforeSubmitPrompt | phase / bootstrap                           |
  * | Read*              | implement: true on implement/SKILL.md Read  |
- * | postToolUse Write* | review.required + check.pending              |
- * | preToolUse Task         | review.done=true on /pre-commit-reviewer    |
+ * | postToolUse Write* | review.pending + check.pending              |
+ * | preToolUse Task         | review → reviewed on /pre-commit-reviewer   |
  * | beforeShellExecution    | review/check reset when git commit allowed  |
  * | afterShellExecution     | review/check reset on successful git commit (IDE) |
  */
@@ -28,13 +28,15 @@ import {
   loadState,
   markCheckPending,
   markReviewDirty,
-  markReviewDone,
+  markReviewed,
   normalizeImplement,
   normalizeReview,
   normalizeCheck,
   PHASE_DISCUSSION,
   resetCheck,
   resetReview,
+  REVIEW_IDLE,
+  REVIEW_REVIEWED,
   saveState,
   WORK_PHASES,
   workspaceRoot,
@@ -164,7 +166,7 @@ function handlePreToolUseTask(root, payload) {
   const id = conversationId(payload);
   const state = loadState(root, id);
   if (isReviewBlocking(state) && isPreCommitReviewerContext(payload)) {
-    markReviewDone(root, id);
+    markReviewed(root, id);
   }
   return allow();
 }
@@ -189,10 +191,10 @@ function maybeResetAfterCommit(root, payload) {
   if (isReviewBlocking(state)) return empty();
 
   const review = normalizeReview(state.review);
-  const hadReview = review.required;
   const hadCheck = normalizeCheck(state.check).pending.length > 0;
 
-  if (hadReview) resetReview(root, id);
+  // reviewed（レビュー起動済み）のとき idle へ。idle のままなら何もしない。
+  if (review.status === REVIEW_REVIEWED) resetReview(root, id);
   if (hadCheck) resetCheck(root, id);
   return empty();
 }
@@ -206,7 +208,7 @@ function handleAfterShellExecution(root, payload) {
   const review = normalizeReview(state.review);
   const hadCheck = normalizeCheck(state.check).pending.length > 0;
 
-  if (review.required) resetReview(root, id);
+  if (review.status !== REVIEW_IDLE) resetReview(root, id);
   if (hadCheck) resetCheck(root, id);
   return empty();
 }

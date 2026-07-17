@@ -859,7 +859,7 @@ try {
     assert('allow cd .. from root', allowParent.permission === 'allow', JSON.stringify(allowParent));
   }
 
-  // 21. review gate: dirty → commit deny → preToolUse Task → commit allow
+  // 21. review gate: dirty → commit deny → reviewer → files clear → commit allow → re-edit
   {
     const reviewId = 'review-gate-id';
     const reviewBase = { conversation_id: reviewId, workspace_roots: [root], cwd: root };
@@ -878,8 +878,8 @@ try {
     });
     const stDirty = loadState(root, reviewId);
     assert(
-      'review dirty after product write',
-      stDirty.review?.required === true && stDirty.review?.done === false,
+      'review pending after product write',
+      stDirty.review?.status === 'pending' && stDirty.review?.files?.includes('utils/_review-probe.ts'),
       JSON.stringify(stDirty),
     );
 
@@ -896,15 +896,25 @@ try {
       tool_name: 'Task',
       tool_input: { subagent_type: 'pre-commit-reviewer', description: 'review before commit' },
     });
-    const stDone = loadState(root, reviewId);
-    assert('preToolUse Task sets review done', stDone.review?.done === true, JSON.stringify(stDone));
+    const stReviewed = loadState(root, reviewId);
+    assert(
+      'preToolUse Task sets reviewed and clears files',
+      stReviewed.review?.status === 'reviewed' &&
+        Array.isArray(stReviewed.review?.files) &&
+        stReviewed.review.files.length === 0,
+      JSON.stringify(stReviewed),
+    );
 
     const allowCommit = run('gate.mjs', {
       ...reviewBase,
       hook_event_name: 'beforeShellExecution',
       command: 'git commit -m test',
     });
-    assert('review allows git commit after done', allowCommit.permission === 'allow', JSON.stringify(allowCommit));
+    assert(
+      'review allows git commit after reviewed',
+      allowCommit.permission === 'allow',
+      JSON.stringify(allowCommit),
+    );
 
     run('track.mjs', {
       ...reviewBase,
@@ -913,8 +923,8 @@ try {
     });
     const stReset = loadState(root, reviewId);
     assert(
-      'review resets when commit allowed',
-      stReset.review?.required === false && stReset.review?.done === true,
+      'review resets to idle when commit allowed',
+      stReset.review?.status === 'idle' && stReset.review?.files?.length === 0,
       JSON.stringify(stReset),
     );
 
@@ -927,7 +937,7 @@ try {
     const stAfter = loadState(root, reviewId);
     assert(
       'review stays idle after afterShellExecution',
-      stAfter.review?.required === false && stAfter.review?.done === true,
+      stAfter.review?.status === 'idle',
       JSON.stringify(stAfter),
     );
 
@@ -939,8 +949,8 @@ try {
     });
     const stRedirty = loadState(root, reviewId);
     assert(
-      're-edit resets review done',
-      stRedirty.review?.required === true && stRedirty.review?.done === false,
+      're-edit returns to pending with new files',
+      stRedirty.review?.status === 'pending' && stRedirty.review?.files?.includes('utils/_review-probe.ts'),
       JSON.stringify(stRedirty),
     );
   }

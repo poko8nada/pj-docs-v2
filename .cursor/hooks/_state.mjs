@@ -142,9 +142,15 @@ export function statePathRelative(root, id) {
   return `.cursor/hooks/state/*__${sanitizeConversationId(id)}.json`;
 }
 
-/** @returns {{ required: boolean, done: boolean, files: string[] }} */
+/** review.status: idle → pending → reviewed → (commit) → idle */
+export const REVIEW_IDLE = 'idle';
+export const REVIEW_PENDING = 'pending';
+export const REVIEW_REVIEWED = 'reviewed';
+export const REVIEW_STATUSES = new Set([REVIEW_IDLE, REVIEW_PENDING, REVIEW_REVIEWED]);
+
+/** @returns {{ status: string, files: string[] }} */
 export function defaultReview() {
-  return { required: false, done: true, files: [] };
+  return { status: REVIEW_IDLE, files: [] };
 }
 
 /** @returns {{ pending: string[] }} */
@@ -160,21 +166,38 @@ export function normalizeCheck(check) {
   return { pending };
 }
 
+/** 旧 { required, done } も status へ移行する */
 export function normalizeReview(review) {
   if (!review || typeof review !== 'object') return defaultReview();
-  const files = Array.isArray(review.files)
+  let files = Array.isArray(review.files)
     ? [...new Set(review.files.map((f) => String(f)).filter(Boolean))]
     : [];
-  const required = review.required === true;
-  let done;
-  if (typeof review.done === 'boolean') {
-    done = review.done;
-  } else if (typeof review.cleared === 'boolean') {
-    done = review.cleared;
+
+  let status;
+  if (typeof review.status === 'string' && REVIEW_STATUSES.has(review.status)) {
+    status = review.status;
+  } else if ('required' in review || 'done' in review || 'cleared' in review) {
+    // 旧モデル: required && !done → pending / required && done → reviewed / else → idle
+    const required = review.required === true;
+    let done;
+    if (typeof review.done === 'boolean') {
+      done = review.done;
+    } else if (typeof review.cleared === 'boolean') {
+      done = review.cleared;
+    } else {
+      done = !required;
+    }
+    if (!required) status = REVIEW_IDLE;
+    else if (done) status = REVIEW_REVIEWED;
+    else status = REVIEW_PENDING;
   } else {
-    done = !required;
+    status = REVIEW_IDLE;
   }
-  return { required, done, files };
+
+  // idle / reviewed では files は空（未レビュー変更の蓄積は pending のみ）
+  if (status === REVIEW_IDLE || status === REVIEW_REVIEWED) files = [];
+
+  return { status, files };
 }
 
 /** @returns {{ phase: string, implement: boolean | null, review: ReturnType<typeof defaultReview>, check: ReturnType<typeof defaultCheck>, updatedAt: string }} */
@@ -237,31 +260,34 @@ export function saveState(root, id, state) {
 }
 
 export function isReviewBlocking(state) {
-  const review = normalizeReview(state?.review);
-  return review.required && !review.done;
+  return normalizeReview(state?.review).status === REVIEW_PENDING;
 }
 
-/** implement 解禁後の reviewable 編集を記録 */
+/** implement 解禁後の reviewable 編集を記録（idle/reviewed からも pending へ） */
 export function markReviewDirty(root, id, filePath) {
   const prev = loadState(root, id);
   const abs = resolve(filePath);
   const rel = relative(root, abs).split(sep).join('/');
   const review = normalizeReview(prev.review);
-  review.required = true;
-  review.done = false;
+  review.status = REVIEW_PENDING;
   if (rel && !review.files.includes(rel)) review.files.push(rel);
   return saveState(root, id, { phase: prev.phase, implement: prev.implement, review });
 }
 
-/** preToolUse Task で /pre-commit-reviewer が呼ばれたとき */
-export function markReviewDone(root, id) {
+/**
+ * preToolUse Task で /pre-commit-reviewer が呼ばれたとき。
+ * PASS/GAPS は見ない。起動検知のみ → reviewed + files クリア。
+ */
+export function markReviewed(root, id) {
   const prev = loadState(root, id);
-  const review = normalizeReview(prev.review);
-  review.done = true;
-  return saveState(root, id, { phase: prev.phase, implement: prev.implement, review });
+  return saveState(root, id, {
+    phase: prev.phase,
+    implement: prev.implement,
+    review: { status: REVIEW_REVIEWED, files: [] },
+  });
 }
 
-/** git commit 成功後に review を初期状態へ */
+/** git commit 後（または許可された commit 試行）に review を idle へ */
 export function resetReview(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, { phase: prev.phase, implement: prev.implement, review: defaultReview() });

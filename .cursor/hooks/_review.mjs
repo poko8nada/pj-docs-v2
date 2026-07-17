@@ -7,7 +7,7 @@ import { isUnderStateDir } from './_state.mjs';
 const REVIEWABLE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|css)$/i;
 
 export const DENY_REVIEW =
-  '[gate-review] Review required before commit. Launch /pre-commit-reviewer once on changed files, then commit.';
+  '[gate-review] review.status is pending. Launch /pre-commit-reviewer on the accumulated files, then commit.';
 
 /** pre-commit-reviewer 相当の Task / subagent か */
 export function isPreCommitReviewerContext(payload) {
