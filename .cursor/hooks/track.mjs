@@ -8,17 +8,18 @@
  * | Read*              | implement: true on implement/SKILL.md Read  |
  * | postToolUse Write* | review.pending + check.pending              |
  * | preToolUse Task         | inject review.files → reviewed on reviewer    |
- * | beforeShellExecution    | review/check reset when git commit allowed  |
- * | afterShellExecution     | review/check reset on successful git commit (IDE) |
+ * | afterShellExecution     | git add → files 合流 / git commit 成功 → reset |
  */
 import { realpathSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { disableBootstrap, enableBootstrap } from './_bootstrap.mjs';
 import {
+  commandIncludesGitAdd,
   commandIncludesGitCommit,
   injectReviewFilesIntoTaskInput,
   isPreCommitReviewerContext,
   isReviewablePath,
+  pathsFromGitAddCommand,
 } from './_review.mjs';
 import { isCheckablePath } from './_check.mjs';
 import {
@@ -37,7 +38,6 @@ import {
   resetCheck,
   resetReview,
   REVIEW_IDLE,
-  REVIEW_REVIEWED,
   saveState,
   WORK_PHASES,
   workspaceRoot,
@@ -196,35 +196,41 @@ function shellSucceeded(payload) {
   return true;
 }
 
-function maybeResetAfterCommit(root, payload) {
+/** 成功した git add の明示パスを review.files（と product なら check）へ合流 */
+function maybeEnrichFromGitAdd(root, payload) {
   const command = shellCommand(payload);
-  if (!commandIncludesGitCommit(command)) return empty();
+  if (!commandIncludesGitAdd(command) || commandIncludesGitCommit(command)) return empty();
+  if (!shellSucceeded(payload)) return empty();
 
   const id = conversationId(payload);
   const state = loadState(root, id);
-  if (isReviewBlocking(state)) return empty();
+  if (!WORK_PHASES.has(state.phase) || state.implement !== true) return empty();
 
-  const review = normalizeReview(state.review);
-  const hadCheck = normalizeCheck(state.check).pending.length > 0;
-
-  // reviewed（レビュー起動済み）のとき idle へ。idle のままなら何もしない。
-  if (review.status === REVIEW_REVIEWED) resetReview(root, id);
-  if (hadCheck) resetCheck(root, id);
+  for (const rel of pathsFromGitAddCommand(command)) {
+    const abs = resolve(root, rel);
+    if (isReviewablePath(root, abs)) markReviewDirty(root, id, abs);
+    if (isCheckablePath(root, abs)) markCheckPending(root, id, abs);
+  }
   return empty();
 }
 
+/** 成功した git commit だけ idle / check クリア（試行時点では reset しない） */
 function handleAfterShellExecution(root, payload) {
   const command = shellCommand(payload);
-  if (!commandIncludesGitCommit(command) || !shellSucceeded(payload)) return empty();
+  if (!shellSucceeded(payload)) return empty();
 
-  const id = conversationId(payload);
-  const state = loadState(root, id);
-  const review = normalizeReview(state.review);
-  const hadCheck = normalizeCheck(state.check).pending.length > 0;
+  if (commandIncludesGitCommit(command)) {
+    const id = conversationId(payload);
+    const state = loadState(root, id);
+    const review = normalizeReview(state.review);
+    const hadCheck = normalizeCheck(state.check).pending.length > 0;
 
-  if (review.status !== REVIEW_IDLE) resetReview(root, id);
-  if (hadCheck) resetCheck(root, id);
-  return empty();
+    if (review.status !== REVIEW_IDLE) resetReview(root, id);
+    if (hadCheck) resetCheck(root, id);
+    return empty();
+  }
+
+  return maybeEnrichFromGitAdd(root, payload);
 }
 
 async function main() {
@@ -241,8 +247,9 @@ async function main() {
     return handleAfterShellExecution(root, payload);
   }
 
+  // beforeShellExecution: commit 試行では reset しない（空コミットすり抜け防止）
   if (event === 'beforeShellExecution') {
-    return maybeResetAfterCommit(root, payload);
+    return empty();
   }
 
   if (event === 'preToolUse' && toolName === 'Task') {

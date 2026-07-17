@@ -143,13 +143,13 @@ function readWeb() {
 
 function readReview() {
   return [
-    '`review.status`: `idle` → `pending` (edits) → `reviewed` (reviewer Task launched) → `idle` (commit).',
-    '`git commit` is blocked only while `status === pending` (agent shell only — lefthook covers human paths).',
+    '`review.status`: `idle` → `pending` (edits or successful `git add` of reviewable paths) → `reviewed` (reviewer Task) → `idle` (successful commit only).',
+    '`git commit` is blocked only while `status === pending`. Do not combine `git add && git commit` — add alone, then reviewer, then commit alone.',
     'Harness accumulates edited paths in `review.files` (harness + product; state/bootstrap excluded). No git diff.',
+    'Successful `git add <explicit-paths>` also unions those paths into `review.files` (`.` / globs ignored).',
     'On `/pre-commit-reviewer` Task launch, hook injects `review.files` into the Task prompt, then sets `reviewed` and clears `files`.',
+    'Empty or failed commit attempts do not reset `reviewed` — only a successful `git commit` returns to `idle`.',
     'Re-edits after review go back to `pending` with a new `files` batch — review again.',
-    'Before commit: `notes` Commit check → `/pre-commit-reviewer` → read output → fix if needed → re-review if re-edited → `git commit`.',
-    'Successful `git commit` (or an allowed commit attempt) resets `review` to `idle`.',
   ].join('\n');
 }
 

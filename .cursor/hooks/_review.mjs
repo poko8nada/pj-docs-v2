@@ -8,7 +8,8 @@ import { isUnderStateDir } from './_state.mjs';
 const REVIEWABLE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|css|md|json|ya?ml)$/i;
 
 export const DENY_REVIEW =
-  '[gate-review] review.status is pending. Launch /pre-commit-reviewer on the accumulated files, then commit.';
+  '[gate-review] review.status is pending. Do not run `git add && git commit` together. ' +
+  'Run (1) `git add <paths>` alone (2) `/pre-commit-reviewer` (3) `git commit` alone.';
 
 export const REVIEW_INJECT_MARKER = '[harness-review]';
 
@@ -82,27 +83,79 @@ export function buildReviewTaskInjection(files) {
   ].join('\n');
 }
 
-/** preToolUse Task 用: review.files を prompt / description に前置 */
+/** preToolUse Task 用: review.files を prompt / description / task に前置 */
 export function injectReviewFilesIntoTaskInput(toolInput, files) {
   const block = buildReviewTaskInjection(files);
   if (!block) return null;
   const input = toolInput && typeof toolInput === 'object' ? { ...toolInput } : {};
   const original = String(input.prompt ?? input.description ?? input.task ?? '');
   const merged = `${block}${original}`;
-  if (input.prompt !== undefined || input.description === undefined) input.prompt = merged;
-  if (input.description !== undefined) input.description = merged;
-  if (input.prompt === undefined && input.description === undefined) input.prompt = merged;
+  // ランタイムがどれを見るかわからないので共通フィールド全部に書く
+  input.prompt = merged;
+  input.description = merged;
+  input.task = merged;
   return input;
+}
+
+function shellSegments(command) {
+  const cleaned = String(command ?? '')
+    .replace(/<<-?\s*["']?(\w+)["']?[\s\S]*?\n\s*\1/g, ' ')
+    .replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
+  return cleaned
+    .split(/&&|\|\||;|\n|\|/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 /** `git commit` を含むか（segment 単位） */
 export function commandIncludesGitCommit(command) {
-  const cleaned = String(command ?? '')
-    .replace(/<<-?\s*["']?(\w+)["']?[\s\S]*?\n\s*\1/g, ' ')
-    .replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
-  const segments = cleaned
-    .split(/&&|\|\||;|\n|\|/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return segments.some((seg) => /\bgit\b/.test(seg) && /\bcommit\b/.test(seg));
+  return shellSegments(command).some((seg) => /\bgit\b/.test(seg) && /\bcommit\b/.test(seg));
+}
+
+/** `git add` を含むか（segment 単位） */
+export function commandIncludesGitAdd(command) {
+  return shellSegments(command).some((seg) => /\bgit\b/.test(seg) && /\badd\b/.test(seg));
+}
+
+/**
+ * `git add` の明示パスを抽出（`.` / glob / フラグは無視 — git diff は使わない）。
+ * @returns {string[]}
+ */
+export function pathsFromGitAddCommand(command) {
+  const out = [];
+  for (const seg of shellSegments(command)) {
+    if (!/\bgit\b/.test(seg) || !/\badd\b/.test(seg)) continue;
+    const tokens = seg.split(/\s+/).filter(Boolean);
+    let i = tokens.findIndex((t) => t === 'add');
+    if (i < 0) continue;
+    i += 1;
+    while (i < tokens.length) {
+      const t = tokens[i];
+      if (t === '--') {
+        i += 1;
+        while (i < tokens.length) {
+          const p = tokens[i];
+          if (p && p !== '.' && !p.includes('*') && !p.includes('?')) out.push(p);
+          i += 1;
+        }
+        break;
+      }
+      if (t.startsWith('-')) {
+        // -u / --all / -A / -p などはパスを持たない（値付きオプションは稀なのでスキップ）
+        if (t === '--' || t === '-A' || t === '--all' || t === '-u' || t === '--update') {
+          i += 1;
+          continue;
+        }
+        i += 1;
+        continue;
+      }
+      if (t === '.' || t.includes('*') || t.includes('?')) {
+        i += 1;
+        continue;
+      }
+      out.push(t);
+      i += 1;
+    }
+  }
+  return [...new Set(out)];
 }

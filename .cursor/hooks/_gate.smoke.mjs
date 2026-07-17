@@ -905,13 +905,15 @@ try {
       tool_name: 'Task',
       tool_input: { subagent_type: 'pre-commit-reviewer', description: 'review before commit' },
     });
-    const injected = String(injectOut.updated_input?.description ?? injectOut.updated_input?.prompt ?? '');
+    const injected = String(injectOut.updated_input?.description ?? '');
+    const injectedTask = String(injectOut.updated_input?.task ?? '');
     assert(
       'preToolUse Task injects review.files into prompt',
       injectOut.permission === 'allow' &&
         injected.includes('[harness-review]') &&
         injected.includes('utils/_review-probe.ts') &&
-        injected.includes('.cursor/hooks/_harness-review-probe.mjs'),
+        injected.includes('.cursor/hooks/_harness-review-probe.mjs') &&
+        injectedTask.includes('[harness-review]'),
       JSON.stringify(injectOut),
     );
     const stReviewed = loadState(root, reviewId);
@@ -939,11 +941,11 @@ try {
       hook_event_name: 'beforeShellExecution',
       command: 'git commit -m test',
     });
-    const stReset = loadState(root, reviewId);
+    const stStillReviewed = loadState(root, reviewId);
     assert(
-      'review resets to idle when commit allowed',
-      stReset.review?.status === 'idle' && stReset.review?.files?.length === 0,
-      JSON.stringify(stReset),
+      'beforeShell commit attempt does not reset reviewed',
+      stStillReviewed.review?.status === 'reviewed',
+      JSON.stringify(stStillReviewed),
     );
 
     run('track.mjs', {
@@ -954,9 +956,24 @@ try {
     });
     const stAfter = loadState(root, reviewId);
     assert(
-      'review stays idle after afterShellExecution',
+      'successful commit resets review to idle',
       stAfter.review?.status === 'idle',
       JSON.stringify(stAfter),
+    );
+
+    run('track.mjs', {
+      ...reviewBase,
+      hook_event_name: 'afterShellExecution',
+      command: 'git add .cursor/hooks/_missed-by-write.mjs utils/_from-add.ts',
+      exit_code: 0,
+    });
+    const stAdd = loadState(root, reviewId);
+    assert(
+      'successful git add unions explicit paths into review.files',
+      stAdd.review?.status === 'pending' &&
+        stAdd.review?.files?.includes('.cursor/hooks/_missed-by-write.mjs') &&
+        stAdd.review?.files?.includes('utils/_from-add.ts'),
+      JSON.stringify(stAdd),
     );
 
     run('track.mjs', {
@@ -1057,12 +1074,19 @@ try {
 
     run('track.mjs', {
       ...checkBase,
-      hook_event_name: 'beforeShellExecution',
+      hook_event_name: 'postToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/types.ts') },
+    });
+    run('track.mjs', {
+      ...checkBase,
+      hook_event_name: 'afterShellExecution',
       command: 'git commit -m test',
+      exit_code: 0,
     });
     const stCommitReset = loadState(root, checkId);
     assert(
-      'allowed commit clears check pending',
+      'successful commit clears check pending',
       stCommitReset.check?.pending?.length === 0,
       JSON.stringify(stCommitReset.check),
     );
