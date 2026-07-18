@@ -15,7 +15,7 @@ Build exactly the unit the caller already agreed with the user. The plan (or cho
 
 - Coding how/rules via `references/` (read what applies; do not dump them in chat)
 - Implementing the agreed unit
-- Batch verify + confirm message (changed files)
+- Confirm message (changed files); run tests when the plan requires them
 
 ## What you do not own
 
@@ -53,15 +53,22 @@ Build what the plan’s **File changes** (or the agreed chore/design scope) spec
 
 Keep the dev environment usable so the user can verify at any point.
 
-## Step 3 — Verify
+## Step 3 — Verify (tests only)
 
-Run verification as a **single batch** after changes — not per-file. Prefer this repo’s scripts when present:
+Do **not** manually run `pnpm format` / `lint` / `typecheck` (or `format:check`). The harness already does that:
+
+- agent `stop` (and leftover flush on `beforeSubmitPrompt`): format + lint on edited `*.{js,jsx,ts,tsx,mjs,cjs}`; `typecheck:staged` on `*.{ts,tsx}`
+- lefthook pre-commit: same split
+
+If the stop hook reports failures via `followup_message`, fix those — do not re-run the whole batch yourself up front.
+
+For **tests**, follow the plan’s Test policy as a single batch after changes when tests apply:
 
 ```bash
-pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:run
+pnpm test:run
 ```
 
-If a script is missing, run what exists and note the gap in confirm. Follow Test policy from the plan when a slice marks `N/A`.
+If the script is missing, note the gap in confirm. When the plan marks tests `N/A`, skip this step.
 
 ## Step 4 — Confirm
 

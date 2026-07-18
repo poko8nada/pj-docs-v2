@@ -172,7 +172,7 @@ export function normalizeReview(review) {
   return { files };
 }
 
-/** @returns {{ phase: string, implement: boolean | null, review: ReturnType<typeof defaultReview>, check: ReturnType<typeof defaultCheck>, readRefs: string[], updatedAt: string }} */
+/** @returns {{ phase: string, implement: boolean | null, review: ReturnType<typeof defaultReview>, check: ReturnType<typeof defaultCheck>, readRefs: string[], label: string, updatedAt: string }} */
 export function defaultState() {
   return {
     phase: PHASE_DISCUSSION,
@@ -180,8 +180,19 @@ export function defaultState() {
     review: defaultReview(),
     check: defaultCheck(),
     readRefs: [],
+    label: '',
     updatedAt: formatJstIso(),
   };
+}
+
+/** 空文字可。英数字・._- のみ、最大 64（load 時の正規化用） */
+function normalizeLabel(label) {
+  if (label === undefined || label === null) return '';
+  const s = String(label).trim();
+  if (!s) return '';
+  if (s.length > 64) return '';
+  if (!/^[a-zA-Z0-9._-]+$/.test(s)) return '';
+  return s;
 }
 
 function normalizePhase(phase) {
@@ -208,6 +219,7 @@ export function loadState(root, id) {
       review: normalizeReview(raw.review),
       check: normalizeCheck(raw.check),
       readRefs: normalizeReadRefs(raw.readRefs),
+      label: normalizeLabel(raw.label),
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : defaultState().updatedAt,
     };
   } catch {
@@ -228,6 +240,7 @@ export function saveState(root, id, state) {
     review: normalizeReview(state.review ?? prev.review),
     check: normalizeCheck(state.check ?? prev.check),
     readRefs: normalizeReadRefs(state.readRefs !== undefined ? state.readRefs : prev.readRefs),
+    label: normalizeLabel(state.label !== undefined ? state.label : prev.label),
     updatedAt: formatJstIso(),
   };
   writeFileSync(path, JSON.stringify(next, null, 2) + '\n', 'utf8');
