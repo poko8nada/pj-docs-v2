@@ -434,7 +434,18 @@ function isShellWriteToState(root, command) {
   return false;
 }
 
+function isSetLabelShellCommand(command) {
+  const cleaned = stripQuotesAndHeredoc(String(command ?? '')).trim();
+  if (!cleaned) return false;
+  // 複合コマンドは不可（単体の set-label のみ常時 allow）。`&` は `&&` より後で判定
+  if (/&&|\|\||;|\n|\||&/.test(cleaned)) return false;
+  return /(?:^|[\s/])node(?:\s+|$).*\.cursor\/skills\/label\/scripts\/set-label\.mjs(?:\s|$)/.test(
+    cleaned,
+  );
+}
+
 function isAllowedWithoutCodeUnlock(command, inWorkPhase) {
+  if (isSetLabelShellCommand(command)) return true;
   const cleaned = stripQuotesAndHeredoc(String(command ?? ''));
   const segments = cleaned
     .split(/&&|\|\||;|\n|\|/)
@@ -475,6 +486,9 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
   if (commandIncludesGitCommit(command) && isReviewBlocking(state)) {
     return deny(denyReviewMessage(normalizeReview(state.review).files));
   }
+
+  // label script はどのフェーズでも許可（state は script が書く）
+  if (isSetLabelShellCommand(command)) return allow();
 
   if (unlocked) return allow();
   if (isAllowedWithoutCodeUnlock(command, inWorkPhase)) return allow();

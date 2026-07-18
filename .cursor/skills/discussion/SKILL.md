@@ -23,6 +23,8 @@ Typical states (use as anchors in Understanding):
 - Returned from a work phase → restate what was agreed in that phase and what is now open; wait for user before re-entering work
 - Request is clearly tiny harness/meta fix → say user should invoke `/chore`, not stretch discussion
 
+When the session topic is clear (or changes), set a short state `label` via the `label` skill — allowed here; do not invent a slug if the topic is still fuzzy.
+
 Revise until the user agrees the next move. Do not drift into implementation.
 
 ## Flow

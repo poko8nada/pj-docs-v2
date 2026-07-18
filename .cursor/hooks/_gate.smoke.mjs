@@ -252,6 +252,30 @@ try {
     assert('locked pnpm deny', out.permission === 'deny', JSON.stringify(out));
   }
 
+  // 5b. set-label script allow while locked; chained command still deny
+  {
+    const out = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a',
+    });
+    assert('locked set-label allow', out.permission === 'allow', JSON.stringify(out));
+
+    const outChain = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a && pnpm test:run',
+    });
+    assert('locked set-label chain deny', outChain.permission === 'deny', JSON.stringify(outChain));
+
+    const outBg = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a & pnpm test:run',
+    });
+    assert('locked set-label bg deny', outBg.permission === 'deny', JSON.stringify(outBg));
+  }
+
   // 6. track phase — 既存 discussion を forge に更新（新規ファイルは増やさない）
   {
     const nameBefore = findStateFileName(root, id);
