@@ -128,8 +128,8 @@ try {
     );
     assert(
       'inject includes pre-commit review',
-      ctx0.includes('Pre-commit review') && ctx0.includes('/pre-commit-reviewer'),
-      'review section missing',
+      ctx0.includes('Gate rules') && ctx0.includes('/pre-commit-reviewer'),
+      'gate rules / review hint missing',
     );
     assert('inject still no file', findStateFileName(root, id) === null);
 
@@ -542,7 +542,7 @@ try {
     assert('inject includes live readRefs', ctx.includes('readRefs:'), ctx.slice(0, 400));
     assert(
       'inject mentions refs gate',
-      ctx.includes('Implement references gate'),
+      ctx.includes('Gate rules') && ctx.includes('readRefs'),
       ctx.slice(0, 400),
     );
     assert('inject mentions dated state path', Boolean(name && ctx.includes(name)), name);

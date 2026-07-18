@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * sessionStart でプロジェクト context を additional_context として注入する。
- * 対象: AGENTS.md / Spec / Open issues / prior / phase・shell・web・gate state（短文）
- * state ファイルはここでは作らない（TTL 掃除のみ）。作成は初回ユーザー発話（beforeSubmitPrompt）。
+ * 対象: AGENTS.md / Spec / Issues / Cursor 特有（shell・web）/ Gate rules + Current values
+ * 詳細手順は各 skill へ。state ファイルはここでは作らない（TTL 掃除のみ）。作成は初回ユーザー発話（beforeSubmitPrompt）。
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -107,67 +107,25 @@ function readIssues(worktree) {
   );
 }
 
-/** 前フェーズ issue 本文は注入しない — 読む指示のみ */
-function readPrior() {
-  return [
-    'Before acting on a phase, treat prior-phase GitHub issues as source of truth.',
-    'Read Spec (and Design / Forge / Refine as relevant) yourself — bodies are not auto-injected here.',
-  ].join('\n');
-}
-
-function readPhase() {
-  return [
-    'Default phase is `discussion` (first user prompt). How-to: `.cursor/skills/discussion/SKILL.md`. User may invoke `/discussion` to return from a work phase.',
-    'Work phases start only when the user explicitly invokes `/spec`, `/design`, `/forge`, `/refine`, or `/chore`. That unlocks full gh/git (issue writes, commits, etc.).',
-    'Do not self-invoke phase skills or treat a work phase as active without that invocation.',
-    'Code edits require a work phase first, then Read of `.cursor/skills/implement/SKILL.md` (`implement: true`). In `discussion`, `implement` is `null` — not applicable.',
-    'Any work-phase trigger (`/spec|/design|/forge|/refine|/chore`), including same-phase re-entry, sets `implement: false` and clears `readRefs` (new work unit boundary).',
-    'If the gate is broken, the user may invoke `/bootstrap` (emergency bypass) — do not self-invoke. How-to: `.cursor/skills/bootstrap/SKILL.md`.',
-    'Phase how-to lives in each phase skill — not here.',
-  ].join('\n');
-}
-
-function readRefsGate() {
-  return [
-    'After `implement: true`, edits to gated paths also require a prior Read of the matching `.cursor/skills/implement/references/*.md` (tracked in `readRefs`).',
-    'Mapping: `.ts/.tsx/.js/.jsx` → `typescript.md`; `.css` → `css.md`; `*.test.ts(x)` → `testing.md` only; `.md/.mdc` → `markdown.md`; `.mjs/.cjs` → none.',
-    'Missing reference → deny naming the file to Read. Phase triggers clear `readRefs` (see Phase entry rules).',
-  ].join('\n');
-}
-
+/** Cursor 特有: ワークスペース root 固定（エージェントが cd / git -C しがち） */
 function readShell() {
-  return [
-    'Shell cwd is always the workspace root at session start.',
-    'Do not prefix commands with `cd` to the workspace root or `git -C <workspace-root>`.',
-    'Run commands directly (`git add …`, `pnpm test`). `cd` into subdirectories is fine (`cd utils && …`).',
-  ].join('\n');
+  return 'Shell cwd is workspace root. Do not `cd` to root or `git -C <workspace-root>`. Subdir `cd` is fine.';
 }
 
+/** Cursor 特有: このリポの検索／取得の優先順位（MCP / 組み込みツール） */
 function readWeb() {
   return [
-    'Search: prefer MCP `web_search_exa`. On 429 / rate limit, fall back to built-in `WebSearch`.',
-    'Fetch: use built-in `WebFetch` (not `web_fetch_exa`). Library docs: Context7 first.',
+    'Search: MCP `web_search_exa` (on 429 → built-in `WebSearch`).',
+    'Fetch: built-in `WebFetch`. Library docs: Context7 first.',
   ].join('\n');
 }
 
-function readReview() {
+/** ゲート要点を1か所に（詳細は各 skill / deny メッセージ） */
+function readGateRules() {
   return [
-    '`review.files`: reviewable edits accumulate here; `/pre-commit-reviewer` clears them; successful `git commit` also clears.',
-    '`git commit` is blocked only while `review.files` is non-empty. `git add` order does not matter; add does not change review state.',
-    'Tracked extensions: `*.{ts,tsx,js,jsx,mjs,cjs,css}` (harness + product; state/bootstrap excluded). `md` / `json` / `yaml` are not tracked for review.files.',
-    'On `/pre-commit-reviewer` Task launch, hook injects each path with `git diff HEAD` (or full content if new/untracked), with soft size caps, then clears `files`. Reviewer stays readonly and must not run git.',
-    'Empty or failed commit attempts do not clear `files` — only reviewer launch or a successful `git commit` clears them.',
-    'Re-edits after clear go back into `files` — review again before commit.',
-  ].join('\n');
-}
-
-function readCheck() {
-  return [
-    'After editing `*.{js,jsx,ts,tsx,mjs,cjs}` (harness included; state/bootstrap excluded), harness accumulates paths in `check.pending`.',
-    'On agent stop: `pnpm format` + `pnpm lint` on those files; `pnpm typecheck:staged` only on `*.{ts,tsx}` (same split as lefthook pre-commit).',
-    'On failure, `stop` returns `followup_message` so the agent auto-continues to fix (max 1 follow-up per turn via in-hook `loop_count`).',
-    'If `stop` is skipped after a follow-up turn, `beforeSubmitPrompt` flushes leftover `pending` (blocks send on failure).',
-    'After a successful `git commit` (afterShellExecution), `check.pending` is cleared. Re-edits accumulate again.',
+    'Phase: default `discussion`. Work only after user `/spec|/design|/forge|/refine|/chore`. Code → Read `implement/SKILL.md`. Trigger → `implement: false`, `readRefs: []`. Broken → user `/bootstrap` only.',
+    'References: before gated edits, Read the matching `implement/references/*.md` (deny names the file). Do not edit state files.',
+    'Review: `review.files` non-empty → commit blocked; `/pre-commit-reviewer` clears. `md` / `json` / `yaml` are not tracked.',
   ].join('\n');
 }
 
@@ -176,16 +134,9 @@ function readGateState(root, id, stateFileRel) {
   const review = state.review ?? { files: [] };
   const check = state.check ?? { pending: [] };
   return [
-    `Your gate state (read-only for you; hooks write it): \`${stateFileRel}\``,
-    'Created on the first user prompt as `discussion` (not at CLI startup). Work phases update the same file.',
-    'Filename: `YYYYMMDD-HHmmss+0900__<conversation_id>.json` (JST). Fields: `phase`, `implement`, `review`, `check`, `readRefs`, `label`, `updatedAt` (JST `+09:00`).',
-    '`implement`: `null` in `discussion` (N/A); `false` = work phase, handshake pending; `true` = code edits allowed.',
-    '`review`: `{ files }` — unreviewed paths. Commit blocked when `files` is non-empty. Reviewer Task or successful commit clears `files`.',
-    '`check`: `pending` — relative paths queued for format/lint/typecheck on agent `stop`.',
-    '`readRefs`: implement reference basenames already Read this work unit (e.g. `typescript.md`). Cleared on phase trigger.',
-    '`label`: optional short slug for humans (set via `node .cursor/skills/label/scripts/set-label.mjs <label>`).',
-    'If the glob has no match yet, no prompt has been sent in this conversation. Never edit state files.',
-    'State key prefers transcript UUID, then conversation_id. Stale files older than 7 days are purged on sessionStart.',
+    `Gate state (hooks-only; do not edit): \`${stateFileRel}\``,
+    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `implement`: `null` in discussion; `false` = handshake pending; `true` = unlocked.',
+    'Set `label` via `node .cursor/skills/label/scripts/set-label.mjs <label>`.',
     '',
     'Current values:',
     `phase: ${state.phase}`,
@@ -203,13 +154,10 @@ function buildSectionDefs(root, id, stateFileRel) {
     { id: 'agents', title: 'AGENTS.md', level: 1, codeblock: true, source: readAgents },
     { id: 'spec', title: 'Product Design', level: 1, source: readSpec },
     { id: 'issues', title: 'Open GitHub Issues', level: 2, codeblock: true, source: readIssues },
-    { id: 'prior', title: 'Prior phases', level: 2, source: readPrior },
-    { id: 'phase', title: 'Phase entry rules', level: 2, source: readPhase },
-    { id: 'refs', title: 'Implement references gate', level: 2, source: readRefsGate },
+    // Cursor 特有ルール（他 IDE / 汎用エージェント向けではない）
     { id: 'shell', title: 'Shell cwd', level: 2, source: readShell },
     { id: 'web', title: 'Web tools', level: 2, source: readWeb },
-    { id: 'review', title: 'Pre-commit review', level: 2, source: readReview },
-    { id: 'check', title: 'Post-edit checks', level: 2, source: readCheck },
+    { id: 'gate-rules', title: 'Gate rules', level: 2, source: readGateRules },
     {
       id: 'gate',
       title: 'Gate state',
