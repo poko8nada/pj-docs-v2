@@ -143,6 +143,11 @@ try {
       'shell section missing',
     );
     assert(
+      'inject includes shell chain guidance',
+      ctx0.includes('one logical action') && ctx0.includes('unrelated steps'),
+      'shell chain guidance missing',
+    );
+    assert(
       'inject includes web tools',
       ctx0.includes('Web tools') && ctx0.includes('web_search_exa') && ctx0.includes('WebFetch'),
       'web section missing',
@@ -273,7 +278,7 @@ try {
     assert('locked pnpm deny', out.permission === 'deny', JSON.stringify(out));
   }
 
-  // 5b. set-label script allow while locked; chained command still deny
+  // 5b. set-label: セグメント単位で常時 allow。他セグメントが deny なら全体 deny
   {
     const out = run('gate.mjs', {
       ...base,
@@ -281,6 +286,17 @@ try {
       command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a',
     });
     assert('locked set-label allow', out.permission === 'allow', JSON.stringify(out));
+
+    const outWithReadonly = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a && git status',
+    });
+    assert(
+      'locked set-label + readonly allow',
+      outWithReadonly.permission === 'allow',
+      JSON.stringify(outWithReadonly),
+    );
 
     const outChain = run('gate.mjs', {
       ...base,
@@ -328,7 +344,7 @@ try {
       st.phase === 'forge' &&
         st.unlock.implement === false &&
         st.unlock.issue === false &&
-        st.unlock.issueTemplate === false,
+        st.unlock.issueTemplate === undefined,
       JSON.stringify(st),
     );
   }
@@ -409,7 +425,9 @@ try {
     const stReady = loadState(root, id);
     assert(
       'issue handshake complete',
-      stReady.unlock.issue === true && stReady.unlock.issueTemplate === true,
+      stReady.unlock.issue === true &&
+        Array.isArray(stReady.read.refs) &&
+        stReady.read.refs.includes('issue/forge-template.md'),
       JSON.stringify(stReady),
     );
 
@@ -544,8 +562,8 @@ try {
   {
     trackReadTsRef(base);
     assert(
-      'read.refs records typescript.md',
-      loadState(root, id).read.refs?.includes('typescript.md'),
+      'read.refs records implement/typescript.md',
+      loadState(root, id).read.refs?.includes('implement/typescript.md'),
       JSON.stringify(loadState(root, id)),
     );
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore typo' });
@@ -570,7 +588,7 @@ try {
     assert(
       'chore unlock + ref before re-entry',
       loadState(root, id).unlock.implement === true &&
-        loadState(root, id).read.refs?.includes('typescript.md') &&
+        loadState(root, id).read.refs?.includes('implement/typescript.md') &&
         loadState(root, id).read.skills?.includes('implement'),
       JSON.stringify(loadState(root, id)),
     );
@@ -590,6 +608,64 @@ try {
         stRe.read.skills.length === 0,
       JSON.stringify(stRe),
     );
+  }
+
+  // 10b. review.files はフェーズ変更でも残る
+  {
+    const persistId = 'review-persist-id';
+    const persistBase = { conversation_id: persistId, workspace_roots: [root], cwd: root };
+    run('track.mjs', {
+      ...persistBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore review persist',
+    });
+    run('track.mjs', {
+      ...persistBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+    });
+    writeFileSync(join(root, 'utils/_review-persist-probe.ts'), 'export const persistProbe = 1;\n');
+    trackReadTsRef(persistBase);
+    run('track.mjs', {
+      ...persistBase,
+      hook_event_name: 'postToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/_review-persist-probe.ts') },
+    });
+    assert(
+      'review files before phase switch',
+      loadState(root, persistId).review.files.includes('utils/_review-persist-probe.ts'),
+      JSON.stringify(loadState(root, persistId)),
+    );
+    run('track.mjs', {
+      ...persistBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/forge after review dirty',
+    });
+    const stPersist = loadState(root, persistId);
+    assert(
+      'review files persist across phase switch',
+      stPersist.phase === 'forge' &&
+        stPersist.review.files.includes('utils/_review-persist-probe.ts') &&
+        stPersist.read.refs.length === 0,
+      JSON.stringify(stPersist),
+    );
+    run('track.mjs', {
+      ...persistBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/discussion clear phase',
+    });
+    assert(
+      'review files persist into discussion',
+      loadState(root, persistId).review.files.includes('utils/_review-persist-probe.ts'),
+      JSON.stringify(loadState(root, persistId)),
+    );
+    try {
+      unlinkSync(join(root, 'utils/_review-persist-probe.ts'));
+    } catch {
+      // 無ければ無視
+    }
   }
 
   // 11. resume: sessionStart 掃除だけでは phase を消さない / ファイル名は維持
@@ -647,14 +723,12 @@ try {
     assert('inject includes live read.refs', ctx.includes('read.refs:'), ctx.slice(0, 400));
     assert(
       'inject includes live issue handshake',
-      ctx.includes('unlock.issue:') && ctx.includes('unlock.issueTemplate:'),
+      ctx.includes('unlock.issue:') && !ctx.includes('unlock.issueTemplate:'),
       ctx.slice(0, 400),
     );
     assert(
       'inject mentions refs gate',
-      ctx.includes('Gate rules') &&
-        ctx.includes('read.refs') &&
-        ctx.includes('unlock.issueTemplate'),
+      ctx.includes('Gate rules') && ctx.includes('read.refs') && ctx.includes('skill/name.md'),
       ctx.slice(0, 400),
     );
     assert('inject mentions dated state path', Boolean(name && ctx.includes(name)), name);
@@ -1578,7 +1652,10 @@ try {
     const st = loadState(root, heredocId);
     assert(
       'heredoc case issue ready',
-      st.phase === 'design' && st.unlock.issue === true && st.unlock.issueTemplate === true,
+      st.phase === 'design' &&
+        st.unlock.issue === true &&
+        Array.isArray(st.read.refs) &&
+        st.read.refs.includes('issue/design-app-template.md'),
       JSON.stringify(st),
     );
 
@@ -1671,7 +1748,6 @@ try {
           phase: 'chore',
           implement: true,
           issue: null,
-          issueTemplate: false,
           review: { files: [] },
           check: { pending: [] },
           readRefs: [],
@@ -1689,7 +1765,6 @@ try {
           phase: 'discussion',
           implement: null,
           issue: null,
-          issueTemplate: false,
           review: { files: [] },
           check: { pending: [] },
           readRefs: [],

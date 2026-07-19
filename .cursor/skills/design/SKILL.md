@@ -19,23 +19,33 @@ Inspect the repo and open issues first (Spec, Design if any). Then present **Con
 Typical states (use as anchors in Understanding):
 
 - Spec exists, no Design issue yet → propose **thin Design issue**, then app or web reference
-- Design issue exists, `# Grain` empty → propose **`grain` Mode — Define**, persist via `issue`, then Prepare
-- Design issue exists, slices incomplete → propose **continue the next open slice** (or re-plan if the slice list is wrong)
-- `# Grain`, `# Tokens`, and `# Screen` solid and slices done → say so; do not invent Forge — user invokes `/forge` when ready
+- Design issue exists, `# Grain` empty → propose **Analyze** (if needed), then **`grain` Mode — Define**
+- `# Grain` filled, Default matrix empty → propose **Default Component/Section Matrix**, then slices
+- Slices incomplete → propose **continue the next open slice** (or re-order if the list is wrong)
+- Slices done, All matrix empty → propose **close inventory** (All matrix + unbuilt-but-needed)
+- `# Grain`, `# Tokens`, and `# Screen` (Default + All) solid → say so; do not invent Forge — user invokes `/forge` when ready
 
 Revise until the user agrees the next move. Do not ask “app or web?” with no grounding.
 
 ## Flow
 
 1. Read the **Spec** issue as source of truth for product intent.
-2. Create or update a **thin** Design issue via `issue` skill when needed (template / lifecycle live there).
-3. If `# Grain` in the Design issue is empty, invoke **`grain`** skill — **Mode — Define**. Persist returned `# Grain` and `# Tokens` via `issue` after user agreement. Skip if `# Grain` is already filled. Details: `.cursor/skills/grain/SKILL.md`.
-4. Read **exactly one** reference and follow it (do not paste the whole file into chat):
+2. Create a **thin** Design issue via `issue` when needed (template / lifecycle live there).
+3. Read **exactly one** reference and follow it (do not paste the whole file into chat):
    - App → `.cursor/skills/design/references/app.md`
    - Web → `.cursor/skills/design/references/web.md`
-5. Before any thinking-surface code edit, Read `.cursor/skills/implement/SKILL.md` to obtain permission to code, then run `implement` skill.
-6. As slice plans and `# Screen` sections are agreed, persist them via `issue` skill. One vertical slice at a time when building the screen — user agreement between slices.
-7. During surface work, invoke **`grain`** (Audit / Improve) when visceral drift or polish needs a grain pass. Grain's close gate (Audit) is internal to grain — not a Design phase close condition.
+4. Follow that reference’s stage order (Analyze → Grain Define → Default matrix → Slices → build → All matrix close).
+5. Before any thinking-surface code edit, Read `.cursor/skills/implement/SKILL.md`, then run `implement`.
+6. During surface work, invoke **`grain`** (Audit / Improve) when visceral drift or polish needs a grain pass. Grain’s close gate (Audit) is internal to grain — not a Design phase close condition.
+
+**Issue persist (Design):** Prefer **milestones**, not per-slice chatter. Persist via `issue` at:
+
+- Thin Design issue create
+- After Grain Define agreement (`# Grain` / `# Tokens`)
+- **Session end** (or “how far we got”) — slice checkboxes / notes
+- **Close** — Default matrix reconciled + All matrix + Implementation Matrix filled
+
+Do not comment or edit the body after every small chat agreement. Other phases may tighten later; this rule is for Design.
 
 **Browser check:** Use the `cmux-browser` skill. Prefer an existing cmux surface and an already-running dev server. If the server is down, read `package.json` scripts and start the right one (prefer `dev`), then open/use cmux.
 

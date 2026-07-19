@@ -28,15 +28,23 @@ Revise until the user agrees which mode applies. Do not ask “① or ②?” wi
 
 1. Read prior phase issues and the relevant code as source of truth.
 2. Run `feasibility` skill before locking technical choices (agent knowledge drifts; do this by default, not only when something “feels risky”).
-3. Follow `.cursor/skills/refine/references/plan.md` to produce the plan.
-4. Write the agreed plan into the **Refine issue** via `issue` skill. No product code in this mode.
+3. Follow `.cursor/skills/refine/references/plan.md` to produce the plan — **inventory of improvements first (with tiers), then slice order** (do not slice from an empty list).
+4. Write the agreed plan into the **Refine issue** via `issue` skill (milestone). No product code in this mode.
 
 ## Mode ② — Implement slices
 
 1. Confirm the Refine issue has an agreed slice list. If not, return to Mode ①.
 2. Before any product code edit, Read `.cursor/skills/implement/SKILL.md` to obtain permission to code, then run `implement` skill.
-3. Take **one vertical slice** → verify → get user agreement → update the Refine issue via `issue` skill. Repeat. Prefer draft-then-grow over horizontal splits (refactor everything, then test everything).
+3. Take **one vertical slice** → verify → get user agreement in chat. Prefer draft-then-grow over horizontal splits (refactor everything, then test everything). Repeat.
 4. For UX/visual polish slices, or when the product diverges from Design `# Grain` / `# Tokens`, invoke **`grain`** (Audit, Improve, or Define for a major re-skin). Fold returned briefs into the implement unit.
+
+**Issue persist (Refine):** Prefer **milestones**, not per-slice chatter — same idea as Design:
+
+- Mode ① lock (full plan once)
+- **Session end** (or “how far we got”) — slice checkboxes / Notes
+- Phase close
+
+Do not comment or edit the body after every slice agreement. Chat agreement stays per slice.
 
 **Browser check:** Use the `cmux-browser` skill. Prefer an existing cmux surface and an already-running dev server. If the server is down, read `package.json` scripts and start the right one (prefer `dev`), then open/use cmux.
 

@@ -15,7 +15,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normalizeReadRefs } from './_refs.mjs';
+import { normalizeReadRefs, discoverSkillNames } from './_refs.mjs';
 
 const hooksDir = fileURLToPath(new URL('.', import.meta.url));
 const projectRootFallback = resolve(hooksDir, '../..');
@@ -257,16 +257,18 @@ export function normalizeReview(review) {
   return { files };
 }
 
-/** Read した `.cursor/skills/<name>/SKILL.md` の name（重複なし） */
-export function normalizeSkills(skills) {
+/** Read した `.cursor/skills/<name>/SKILL.md` の name（重複なし・ソート） */
+export function normalizeSkills(skills, root = null) {
   if (!Array.isArray(skills)) return [];
+  const valid = root != null ? discoverSkillNames(root) : null;
   return [
     ...new Set(
       skills
         .map((s) => String(s).trim())
-        .filter((s) => s.length > 0 && s.length <= 64 && /^[a-zA-Z0-9._-]+$/.test(s)),
+        .filter((s) => s.length > 0 && s.length <= 64 && /^[a-zA-Z0-9._-]+$/.test(s))
+        .filter((s) => (valid ? valid.has(s) : true)),
     ),
-  ];
+  ].toSorted();
 }
 
 export function defaultUnlock(phase = PHASE_DISCUSSION) {
@@ -274,7 +276,6 @@ export function defaultUnlock(phase = PHASE_DISCUSSION) {
   return {
     implement: normalizeImplement(p, null),
     issue: normalizeIssue(p, null),
-    issueTemplate: normalizeIssueTemplate(p, false),
   };
 }
 
@@ -285,7 +286,7 @@ export function defaultRead() {
 /**
  * @returns {{
  *   phase: string,
- *   unlock: { implement: boolean | null, issue: boolean | null, issueTemplate: boolean },
+ *   unlock: { implement: boolean | null, issue: boolean | null },
  *   read: { skills: string[], refs: string[] },
  *   review: ReturnType<typeof defaultReview>,
  *   check: ReturnType<typeof defaultCheck>,
@@ -334,27 +335,20 @@ export function normalizeIssue(phase, issue) {
   return issue === true;
 }
 
-/** discussion / chore → false（N/A）。Spec-flow → true/false のみ */
-export function normalizeIssueTemplate(phase, issueTemplate) {
-  const p = normalizePhase(phase);
-  if (!SPEC_FLOW_PHASES.has(p)) return false;
-  return issueTemplate === true;
-}
-
 export function normalizeUnlock(phase, unlock) {
   const src = unlock && typeof unlock === 'object' ? unlock : {};
   return {
     implement: normalizeImplement(phase, src.implement),
     issue: normalizeIssue(phase, src.issue),
-    issueTemplate: normalizeIssueTemplate(phase, src.issueTemplate),
   };
 }
 
-export function normalizeRead(read) {
+/** @param {unknown} read @param {string | null} [root] */
+export function normalizeRead(read, root = null) {
   const src = read && typeof read === 'object' ? read : {};
   return {
-    skills: normalizeSkills(src.skills),
-    refs: normalizeReadRefs(src.refs),
+    skills: normalizeSkills(src.skills, root),
+    refs: normalizeReadRefs(src.refs, root),
   };
 }
 
@@ -362,8 +356,9 @@ export function normalizeRead(read) {
  * 旧 flat（implement / issue / readRefs）と新（unlock / read）の両方を正規化形へ。
  * @param {Record<string, unknown>} raw
  * @param {string} phase
+ * @param {string | null} [root]
  */
-function coerceUnlockRead(raw, phase) {
+function coerceUnlockRead(raw, phase, root = null) {
   const hasNested = raw.unlock != null || raw.read != null;
   if (hasNested) {
     const unlockSrc =
@@ -372,7 +367,6 @@ function coerceUnlockRead(raw, phase) {
         : {
             implement: raw.implement,
             issue: raw.issue,
-            issueTemplate: raw.issueTemplate,
           };
     const readSrc =
       raw.read && typeof raw.read === 'object'
@@ -383,19 +377,21 @@ function coerceUnlockRead(raw, phase) {
         : { skills: raw.skills, refs: raw.readRefs };
     return {
       unlock: normalizeUnlock(phase, unlockSrc),
-      read: normalizeRead(readSrc),
+      read: normalizeRead(readSrc, root),
     };
   }
   return {
     unlock: normalizeUnlock(phase, {
       implement: raw.implement,
       issue: raw.issue,
-      issueTemplate: raw.issueTemplate,
     }),
-    read: normalizeRead({
-      skills: raw.skills,
-      refs: raw.readRefs,
-    }),
+    read: normalizeRead(
+      {
+        skills: raw.skills,
+        refs: raw.readRefs,
+      },
+      root,
+    ),
   };
 }
 
@@ -405,7 +401,7 @@ export function loadState(root, id) {
   try {
     const raw = JSON.parse(readFileSync(join(stateDir(root), name), 'utf8'));
     const phase = normalizePhase(typeof raw.phase === 'string' ? raw.phase : PHASE_DISCUSSION);
-    const { unlock, read } = coerceUnlockRead(raw, phase);
+    const { unlock, read } = coerceUnlockRead(raw, phase, root);
     return {
       phase,
       unlock,
@@ -425,7 +421,7 @@ export function loadState(root, id) {
  * @param {string} id
  * @param {{
  *   phase?: string,
- *   unlock?: Partial<{ implement: boolean | null, issue: boolean | null, issueTemplate: boolean }>,
+ *   unlock?: Partial<{ implement: boolean | null, issue: boolean | null }>,
  *   read?: Partial<{ skills: string[], refs: string[] }>,
  *   review?: unknown,
  *   check?: unknown,
@@ -449,15 +445,14 @@ export function saveState(root, id, state) {
       implement:
         unlockPatch.implement !== undefined ? unlockPatch.implement : prev.unlock.implement,
       issue: unlockPatch.issue !== undefined ? unlockPatch.issue : prev.unlock.issue,
-      issueTemplate:
-        unlockPatch.issueTemplate !== undefined
-          ? unlockPatch.issueTemplate
-          : prev.unlock.issueTemplate,
     }),
-    read: normalizeRead({
-      skills: readPatch.skills !== undefined ? readPatch.skills : prev.read.skills,
-      refs: readPatch.refs !== undefined ? readPatch.refs : prev.read.refs,
-    }),
+    read: normalizeRead(
+      {
+        skills: readPatch.skills !== undefined ? readPatch.skills : prev.read.skills,
+        refs: readPatch.refs !== undefined ? readPatch.refs : prev.read.refs,
+      },
+      root,
+    ),
     review: normalizeReview(state.review ?? prev.review),
     check: normalizeCheck(state.check ?? prev.check),
     label: normalizeLabel(state.label !== undefined ? state.label : prev.label),
@@ -517,17 +512,17 @@ export function skillNameFromPath(root, filePath) {
 /** SKILL.md Read を read.skills に記録（重複なし） */
 export function markReadSkill(root, id, skillName) {
   const prev = loadState(root, id);
-  const skills = normalizeSkills([...(prev.read?.skills ?? []), skillName]);
+  const skills = normalizeSkills([...(prev.read?.skills ?? []), skillName], root);
   return saveState(root, id, {
     phase: prev.phase,
     read: { skills, refs: prev.read.refs },
   });
 }
 
-/** implement/references の Read を記録 */
-export function markReadRef(root, id, refBasename) {
+/** skill references 配下 md の Read を `skill/name.md` で記録 */
+export function markReadRef(root, id, refId) {
   const prev = loadState(root, id);
-  const refs = normalizeReadRefs([...(prev.read?.refs ?? []), refBasename]);
+  const refs = normalizeReadRefs([...(prev.read?.refs ?? []), refId], root);
   return saveState(root, id, {
     phase: prev.phase,
     read: { skills: prev.read.skills, refs },

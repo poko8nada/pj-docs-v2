@@ -13,7 +13,9 @@ Create thin (empty Plan sections). The `forge` skill + `references/plan.md` prod
 
 - Forge turns Spec + Design into working product. The deliverable is the code; the body holds the Plan.
 - Plan shape: What / How (optional) / Order & Verify / File changes / Rationale — how to write it is `.cursor/skills/forge/references/plan.md`. Do not invent a different structure here.
-- Slices are vertical capabilities (one sitting, verifiable). Capability order and data fidelity are separate rules — see plan.md. Mark slices done in Order & Verify; update Notes at natural break points.
+- Mode ①: inventory capabilities from Spec + Design `# Screen` (Default / All), then slice order — do not slice from an empty list.
+- Slices are vertical capabilities (one sitting, verifiable). Capability order and data fidelity are separate rules — see plan.md.
+- Persist issue updates at **milestones** (Mode ① lock, session end, close) — not after every slice. Chat agreement stays per slice.
 - Design issue `# Screen` is the source for component structure, Props, and TODOs. `# Grain` and `# Tokens` set visual direction. Read the Design issue before locking or implementing.
 - When UI drifts from `# Grain` / `# Tokens`, or interactivity lands, the forge phase may invoke `grain` (Audit / Improve). Fold returned briefs into the next slice.
 
@@ -26,7 +28,9 @@ Create thin (empty Plan sections). The `forge` skill + `references/plan.md` prod
 ### Common Failure Modes
 
 - Bundled slices ("Add X CRUD", "ship the whole auth feature"). Grow capability by capability.
+- Slicing before an inventory from Spec / Design Screen.
 - Throwaway placeholder data in early slices — data must stay production-representative; “draft” means fewer capabilities, not fake-looking data.
+- Commenting / editing the issue after every slice agreement.
 - Ad-hoc tests or no Test policy decision per slice.
 - Treating user agreement as implied.
 

@@ -1,8 +1,10 @@
 /**
  * spec / design / forge / refine 入場時の issue ハンドシェイク。
- * issue/SKILL.md Read → issue: true、フェーズテンプレ Read → issueTemplate: true。
+ * issue/SKILL.md Read → unlock.issue: true。
+ * フェーズテンプレ Read → read.refs に `issue/<template>.md`（isIssueReady が参照）。
  */
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
+import { normalizeReadRefs } from './_refs.mjs';
 import { SPEC_FLOW_PHASES } from './_state.mjs';
 
 export const ISSUE_SKILL_REL = '.cursor/skills/issue/SKILL.md';
@@ -16,7 +18,7 @@ const ISSUE_TEMPLATE_NAMES = new Set([
   'refine-template.md',
 ]);
 
-/** @type {Record<string, string[]>} */
+/** @type {Record<string, string[]>} basename（`issue/` なし） */
 const PHASE_ISSUE_TEMPLATES = {
   spec: ['spec-template.md'],
   design: ['design-app-template.md', 'design-web-template.md'],
@@ -42,10 +44,27 @@ export function issueTemplateBasename(root, filePath) {
   return ISSUE_TEMPLATE_NAMES.has(name) ? name : null;
 }
 
-export function issueTemplateValidForPhase(phase, name) {
+/** フェーズに必要な `issue/<template>.md` id 一覧 */
+export function phaseIssueTemplateRefIds(phase) {
+  return (PHASE_ISSUE_TEMPLATES[phase] ?? []).map((n) => `issue/${n}`);
+}
+
+/**
+ * @param {string} phase
+ * @param {string} nameOrId basename または `issue/….md`
+ */
+export function issueTemplateValidForPhase(phase, nameOrId) {
   const allowed = PHASE_ISSUE_TEMPLATES[phase];
   if (!allowed) return false;
+  const raw = String(nameOrId);
+  const name = raw.includes('/') ? raw.slice(raw.indexOf('/') + 1) : raw;
   return allowed.includes(name);
+}
+
+/** @param {string} phase @param {string[] | undefined} refs */
+export function hasPhaseIssueTemplate(phase, refs) {
+  const have = new Set(normalizeReadRefs(refs));
+  return phaseIssueTemplateRefIds(phase).some((id) => have.has(id));
 }
 
 export function isSpecFlowPhase(phase) {
@@ -54,7 +73,7 @@ export function isSpecFlowPhase(phase) {
 
 export function isIssueReady(state) {
   if (!isSpecFlowPhase(state?.phase)) return true;
-  return state?.unlock?.issue === true && state?.unlock?.issueTemplate === true;
+  return state?.unlock?.issue === true && hasPhaseIssueTemplate(state.phase, state?.read?.refs);
 }
 
 export function templateHintForPhase(phase) {
@@ -72,7 +91,7 @@ export function templateHintForPhase(phase) {
   }
 }
 
-/** @param {{ phase?: string, unlock?: { issue?: boolean | null, issueTemplate?: boolean } }} state */
+/** @param {{ phase?: string, unlock?: { issue?: boolean | null }, read?: { refs?: string[] } }} state */
 export function denyIssueMessage(state) {
   if (!isSpecFlowPhase(state?.phase)) return '[gate-issue] unexpected phase';
   if (state.unlock?.issue !== true) {

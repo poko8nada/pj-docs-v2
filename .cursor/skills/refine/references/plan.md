@@ -32,6 +32,11 @@ Skip **How** for one-offs. If present: pattern, why this way (rejected alternati
 
 ### Order & Verify
 
+Do not invent slices from nothing. Same idea as Design (inventory → then build order):
+
+1. **Inventory** — from Step 1 analysis, list concrete improvements in scope with impact tiers (chat is fine; short bullets).
+2. **Slice order** — only then sequence those items into thin slices.
+
 **Two separate rules — do not collapse them:**
 
 1. **Capability order (thin improvements)**  

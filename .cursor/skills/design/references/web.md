@@ -2,27 +2,23 @@
 
 ## Principle
 
-The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. The conversation around the screen produces the real output: `# Screen` (page structure, section matrix), `# Grain` / `# Tokens` (via `grain`), and the slice plan in the [Design] issue body.
+The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. The conversation around the screen produces the real output: `# Screen` (Default + All section matrices), `# Grain` / `# Tokens` (via `grain`), and the slice plan in the Design issue body.
 
 `prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not the Design issue body, not the default screen. Delete `prototype/` when the product can speak for itself.
 
-## How this is structured
+Scope of the thinking surface is the **default screen (top / home)** only. Additional pages belong in All inventory at close, not in early Prepare.
 
-This file describes the design prepare workflow. Prepare produces a plan (slice list) and writes it to the body. The number of slices is variable, decided during prepare based on the project's user-facing concerns.
-
-A **slice** is a vertical user-facing concern. For example, in a landing page, "Hero" and "Features" are slices. A slice is not a single section — it includes all sections for that concern, plus the index.tsx update to compose them.
+A **slice** is a vertical user-facing concern used as **build order** after the Default section matrix exists. One slice includes the sections for that concern, plus the index composition update, plus comment blocks.
 
 ---
 
-## Prepare
+## Stages
 
-The prepare workflow consists of 6 steps.
+Do not slice before the Default matrix. Do not fill All matrix before building.
 
-### Step 1: Analyze (web type + stack)
+### 1. Analyze (web type + stack)
 
-**Web type confirmation:**
-
-The web type was discussed during Context & Understanding. Confirm it now before building:
+**Web type confirmation** (discussed in Context & Understanding; confirm before building):
 
 | Type                | Description                                             |
 | ------------------- | ------------------------------------------------------- |
@@ -44,226 +40,61 @@ Read `package.json` and config files. Determine the prototype location.
 
 Sections/components live in the appropriate directory (e.g., `components/`, `sections/`).
 
-### Step 2: Identify slices
+Agree locations + Web Type in chat. No issue write required for Analyze alone.
 
-Think about what the user sees on the default screen (top page). Group related sections into slices by user-facing concern.
+### 2. Grain Define
 
-**Examples by web type:**
+If `# Grain` in the Design issue is empty, invoke **`grain`** — **Mode — Define**. Persist `# Grain` and `# Tokens` via `issue` after user agreement (milestone). Skip if `# Grain` is already filled.
 
-**Landing page:**
+Details: `.cursor/skills/grain/SKILL.md` — do not duplicate Define flow here.
 
-- Slice 1: Chrome (Header + Footer + index.tsx placeholder)
+### 3. Default Section Matrix (plan)
+
+From Spec + Grain + Web Type, list what belongs on the **top / home screen only**. Thin columns are enough:
+
+| Section | Role |
+| ------- | ---- |
+
+**Examples (default only):**
+
+- Landing: Chrome, Hero, Features, Social proof, CTA
+- Blog: Chrome, Post list (+ sidebar if on the list page) — **not** Post detail
+- Small corporate: Chrome, Story, Team, Contact
+
+Show in chat; agree yes / edit / no. Persist at a milestone. Off-default pages/sections wait for All matrix at close.
+
+### 4. Slices (build order)
+
+Looking at the agreed Default matrix, decide **in what order** to build.
+
+**Example (landing):**
+
+- Slice 1: Chrome (Header + Footer + index placeholder)
 - Slice 2: Hero
 - Slice 3: Features
-- Slice 4: Social proof (Testimonials + Logos)
+- Slice 4: Social proof
 - Slice 5: Conversion (CTA)
 
-**Blog:**
+A 1:1 section-to-slice mapping is too fine; one giant slice is too coarse. Aim for one slice per user-facing concern.
 
-- Slice 1: Chrome (Header + Footer + index.tsx)
-- Slice 2: Post list (PostList + Sidebar)
-- Slice 3: Post detail (PostDetail)
+Agree the checklist in chat. Persist `## Slices` at a milestone (session end is fine).
 
-**Small corporate:**
+### 5. Build slices
 
-- Slice 1: Chrome (Header + Footer + index.tsx)
-- Slice 2: Story
-- Slice 3: Team
-- Slice 4: Contact (Form + Map)
+One slice at a time, with user agreement between slices. For each slice:
 
-A 1:1 section-to-slice mapping is too fine. A "all sections per slice" mapping is too coarse. Aim for one slice per user-facing concern.
+1. Confirm the slice in chat
+2. Caller runs `implement` (after implement handshake)
+3. Write sections in production location; compose on the default screen
+4. Responsive layout required; interactivity not implemented except CSS
+5. Browser-check when useful
+6. Optionally thicken Default matrix in chat — **issue persist at session end**, not every slice
 
-### Step 3: Grain
+Apply `# Grain` and `# Tokens`. Invoke **`grain`** Audit / Improve when the surface drifts.
 
-If `# Grain` in the Design issue is empty, invoke **`grain`** skill — **Mode — Define** before Step 4. Persist returned `# Grain` and `# Tokens` via `issue` after user agreement in Step 5. Mode details and close gate: `.cursor/skills/grain/SKILL.md` — do not duplicate Define flow here.
+**Hardcoded data rules:** realistic values; edge cases; inline in the screen file; no fetch, state, or event handlers.
 
-If `# Grain` is already filled, skip.
-
-**Component comment format (apply to every section/component written in any slice):**
-
-```tsx
-// [ComponentName]
-//
-// 役割:
-//   - このコンポーネントが何をするか1〜2行で
-//
-// 状態:
-//   - stateName[, stateName2, ...][: 補足説明]
-//   例:
-//     - default
-//     - open, closed: メニュー/アコーディオン開閉
-//   該当なければ「なし」と書く
-//
-// バリアント:
-//   |        | primary | secondary | danger | n/a |
-//   | 該当✓ |         |           |        |     |
-//   - バリアントで補足が必要なら箇条書きで
-//
-// Props:
-//   - propName: 型 — 説明(propName? で任意)
-//   例:
-//     - title: string — 見出し
-//     - children: ReactNode
-//
-// インタラクション:
-//   - on{Event}: 動作
-//   イベント: click / hover / focus / submit / scroll / keydown
-//   例: - onClick: ナビゲーション遷移
-//   該当なければ「なし」と書く
-//
-// 考慮事項:
-//   - 任意の free-form メモ(a11y / SEO / perf / edge case / browser 等)
-//   例:
-//     - a11y: aria-label、Tab フォーカス順序
-//     - SEO: 適切な見出しレベル、alt 属性
-//   該当なければ「なし」と書く
-```
-
-### Step 4: Display
-
-Show in chat: Grain summary, Tokens summary, proposed slice list, Section Matrix placeholders, and confirmed Web Type.
-
-### Step 5: User agreement
-
-Present a clear yes / edit / no on the plan. Prefer grounded discussion over an empty prompt.
-
-- **yes** — the plan is locked in this workflow. Proceed to Step 6.
-- **edit** — the user provides specific edits. Update the plan and ask again.
-- **no** — the plan is rejected. Return to Step 2 with the user's feedback.
-
-### Step 6: Hand off body content to the caller
-
-After **yes**, return to the caller with the content below ready to persist (the caller writes the Design issue — do not raw-edit the issue from this file).
-
-**Filled in Step 6:**
-
-- `# Grain` and `# Tokens`: from grain Define (Step 3)
-- `## Web Type` (under `# Screen`): confirmed type
-- `## Section Matrix`: sections for the default screen, placeholder layouts/parts
-- `## Slices` under `# Plan`: the slice list as checkboxes (all `[ ]`)
-
-**NOT filled in Step 6 (left as `(none)` or empty):**
-
-- `## Page Structure`: filled when the user mentions additional pages (often emerges during run)
-- `## Implementation Matrix`: filled when discussed (hook/API decisions often emerge from discussing the design)
-
-The body structure after Step 6:
-
-```markdown
-... existing plan sections (Goal, Reference, What, Constraints) ...
-
-# Plan (進捗管理)
-
-## Slices
-
-- [ ] Slice 1: Chrome
-- [ ] Slice 2: Hero
-      ...
-
-# Wireframe (homepage)
-
-...
-
----
-
-# Grain
-
-### Grain-stable
-
-| Axis | Choice |
-...
-
-### Behavioral temperament
-
-| Axis | Choice |
-...
-
----
-
-# Tokens
-
-### Color
-
-| Token | Value | Use |
-...
-
-### Typography
-
-...
-
-### Spacing
-
-...
-
-### Radius
-
-...
-
----
-
-# Screen
-
-## Web Type
-
-Landing page (or whichever type was confirmed)
-
-## Section Matrix
-
-| Section | Layout (PC) | Layout (Mobile) | Main parts |
-...
-
-## Page Structure
-
-(none — to be filled after discuss / slices)
-
-## Implementation Matrix
-
-(none — to be filled after discuss / slices)
-```
-
----
-
-## Slices
-
-Each slice is executed one at a time, with user confirmation between slices. For each slice:
-
-1. Read the agreed slice from the plan / Design Progress checklist
-2. Write the sections in the slice to production location (with `data-component` and comment block)
-3. Update `index.tsx` to compose the new sections
-4. Present a confirm message (changed files, verification result)
-5. Return checklist / `# Screen` updates to the caller to persist
-
-### Slice 1: Chrome (Header + Footer + index.tsx)
-
-The first slice is always the page shell.
-
-**Done condition:**
-
-- `Header` section exists in production location, with `data-component="Header"`, with comment block
-- `Footer` section exists in production location, with `data-component="Footer"`, with comment block
-- `index.tsx` exists, renders Header + Footer + a placeholder for the main area
-- Hardcoded data covers edge cases
-
-**What "default" means:**
-The default screen is the top page of the site. The goal is to agree on the visual direction of this top page before expanding to additional pages.
-
-- Build with header, footer, and key content sections
-- Header, footer, and sidebar are not placeholders — build them with production-level style
-- Apply `# Grain` and `# Tokens` from the Design issue
-- Responsive design is required for all sections
-- Interactive behavior is not implemented — the screen is static. Except for what CSS can do.
-
-**Hardcoded data rules (apply to all slices):**
-
-- Use realistic values — not "lorem ipsum" or "Item 1, Item 2"
-- Cover edge cases: very long strings, very short strings, missing optional fields, zero counts, large numbers, mixed states
-- Define data inline in the screen file — no shared fixtures
-- Do not fetch data, use state, or add event handlers
-
-**Writing sections/components:**
-
-- Write in production location, not under `prototype/`
-- Add `data-component="ComponentName"` on the root element
+**Writing sections:** production location; `data-component="Name"` on the root; structured comment block (same spirit as app — 役割 / 状態 / バリアント / Props / インタラクション / 考慮事項).
 
 ```tsx
 // components/header.tsx
@@ -271,8 +102,6 @@ export function Header({ siteName, nav }) {
   return <header data-component="Header">...</header>;
 }
 ```
-
-**Writing the default screen:**
 
 ```tsx
 // prototype/index.tsx
@@ -283,48 +112,34 @@ export default function DefaultScreen() {
   return (
     <>
       <Header siteName="Acme" nav={[{ label: "Home", href: "/" }]} />
-      <main>{/* Feature slices will fill this */}</main>
+      <main>{/* Feature slices fill this */}</main>
       <Footer />
     </>
   );
 }
 ```
 
-### Slices 2..N: Feature slices
+**Slice 1 (Chrome)** is usually first: Header + Footer + index with a main placeholder.
 
-Each feature slice adds one user-facing concern. The slice is **vertical**: it includes all sections for that concern, plus the index.tsx update to compose them, plus the comment blocks for each section.
+### 6. Close inventory
 
-**Done condition (per slice):**
+After default-screen slices are done:
 
-- Each section for the concern exists in production location, with `data-component`, with comment block
-- The index.tsx is updated to include the new sections in the main area
-- Hardcoded data for the concern covers edge cases
-- The screen renders and shows the concern working in the default state
+1. Reconcile **Default Section Matrix** with the prototype (layouts / parts as needed)
+2. Fill **All Section Matrix** — product-wide sections needed, including ones **not** on the thinking surface (e.g. Blog Post detail)
+3. Fill **Page Structure** and **Implementation Matrix** when relevant
+4. Agree in chat; persist once via `issue`; Design may close
 
----
-
-## Between slices
-
-Between slices (or after some slices), the user can:
-
-- Discuss in chat (the agent responds, may edit the screen or the plan)
-- Make decisions that affect the issue (`# Tokens` values, additional pages, hooks/APIs)
+Record `## Web Type` under `# Screen` by close if not already persisted.
 
 ---
 
 ## Done condition (overall)
 
-The design phase is done when:
+- Default-screen slices are done (checklist may be updated at session milestones)
+- `# Grain`, `# Tokens`, and `# Screen` (Web Type, Default + All matrices, Page Structure / Implementation as needed) are filled — no `(TBD)` at close
+- The default screen renders in the browser; user confirmed direction
 
-- All slices are marked `[x]` in `# Plan` / `## Slices`
-- `# Grain`, `# Tokens`, and `# Screen` are filled (Web Type, Section Matrix, Page Structure, Implementation Matrix)
-- The screen renders correctly in the browser
-- The user has confirmed the design direction
+After that, return to the caller for Design issue close / Spec lifecycle comments.
 
-After all of the above, return to the caller for Design issue close / Spec lifecycle comments.
-
-`prototype/` stays in the repo as an alignment snapshot for the duration of the early forge phase.
-
-**If a significant design change comes up during forge** — delete `prototype/` and re-run this web design alignment from scratch. Do not version or accumulate screens inside `prototype/`. Each run is disposable and self-contained.
-
-**If a small change comes up** — modify the product directly. Update the Design issue body if it still matters. Do not re-run this alignment for minor adjustments.
+`prototype/` stays as an alignment snapshot early in forge. Significant redesign → delete `prototype/` and re-run this alignment. Small changes → edit the product directly.
