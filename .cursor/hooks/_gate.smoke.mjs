@@ -27,13 +27,23 @@ import {
   findStateFileName,
   formatJstIso,
   idFromTranscriptPath,
+  lastPromptIdPath,
   loadState,
   onSessionStart,
   PHASE_DISCUSSION,
   purgeStaleStates,
+  readLastPromptId,
   STATE_TTL_DAYS,
 } from './_state.mjs';
 import { buildReviewTaskInjection, collectReviewDiff } from './_review.mjs';
+
+function clearSticky() {
+  try {
+    unlinkSync(lastPromptIdPath(root));
+  } catch {
+    // 無ければ無視
+  }
+}
 
 const hooksDir = fileURLToPath(new URL('.', import.meta.url));
 const root = resolve(hooksDir, '../..');
@@ -52,8 +62,19 @@ function trackRead(convBase, relPath) {
 function trackReadTsRef(convBase) {
   trackRead(convBase, '.cursor/skills/implement/references/typescript.md');
 }
+
+function trackReadIssueSkill(convBase) {
+  trackRead(convBase, '.cursor/skills/issue/SKILL.md');
+}
+
+function trackReadForgeTemplate(convBase) {
+  trackRead(convBase, '.cursor/skills/issue/references/forge-template.md');
+}
 const stateTmp = mkdtempSync(join(smokeTmpRoot, 'state-'));
 const id = 'test-conversation';
+
+/** 実プロジェクトの bootstrap を汚さない／消したままにしない */
+const restoreBootstrap = isBootstrapActive(root);
 
 let failed = 0;
 
@@ -291,10 +312,17 @@ try {
       findStateFileName(root, id),
     );
     const st = readState();
-    assert('phase is forge', st.phase === 'forge' && st.implement === false, JSON.stringify(st));
+    assert(
+      'phase is forge',
+      st.phase === 'forge' &&
+        st.implement === false &&
+        st.issue === false &&
+        st.issueTemplate === false,
+      JSON.stringify(st),
+    );
   }
 
-  // 7. still deny Write after phase only — but gh/git writes unlock
+  // 7. still deny Write after phase only — gh issue write needs handshake; git writes unlock
   {
     const out = run('gate.mjs', {
       ...base,
@@ -304,12 +332,27 @@ try {
     });
     assert('phase-only Write deny', out.permission === 'deny', JSON.stringify(out));
 
+    const outGhList = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'gh issue list',
+    });
+    assert(
+      'spec-flow gh issue list allow before handshake',
+      outGhList.permission === 'allow',
+      JSON.stringify(outGhList),
+    );
+
     const outGh = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'gh issue create --title t --body b',
     });
-    assert('phase unlocks gh write', outGh.permission === 'allow', JSON.stringify(outGh));
+    assert(
+      'spec-flow gh issue create deny before handshake',
+      outGh.permission === 'deny' && String(outGh.agent_message).includes('[gate-issue]'),
+      JSON.stringify(outGh),
+    );
 
     const outGit = run('gate.mjs', {
       ...base,
@@ -324,6 +367,46 @@ try {
       command: 'pnpm test:run',
     });
     assert('phase-only pnpm still deny', outPnpm.permission === 'deny', JSON.stringify(outPnpm));
+  }
+
+  // 7b. issue handshake — skill Read, template Read, then gh issue write
+  {
+    trackReadIssueSkill(base);
+    assert(
+      'issue skill read sets issue true',
+      loadState(root, id).issue === true,
+      JSON.stringify(loadState(root, id)),
+    );
+
+    const outGhPartial = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'gh issue create --title t --body b',
+    });
+    assert(
+      'gh issue create deny before template',
+      outGhPartial.permission === 'deny' && String(outGhPartial.agent_message).includes('template'),
+      JSON.stringify(outGhPartial),
+    );
+
+    trackReadForgeTemplate(base);
+    const stReady = loadState(root, id);
+    assert(
+      'issue handshake complete',
+      stReady.issue === true && stReady.issueTemplate === true,
+      JSON.stringify(stReady),
+    );
+
+    const outGhReady = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'gh issue create --title t --body b',
+    });
+    assert(
+      'gh issue create allow after handshake',
+      outGhReady.permission === 'allow',
+      JSON.stringify(outGhReady),
+    );
   }
 
   // 8. discussion 中の implement Read はフラグを立てない／Write 不可
@@ -541,8 +624,13 @@ try {
     assert('inject includes live review.files', ctx.includes('review.files:'), ctx.slice(0, 400));
     assert('inject includes live readRefs', ctx.includes('readRefs:'), ctx.slice(0, 400));
     assert(
+      'inject includes live issue handshake',
+      ctx.includes('issue:') && ctx.includes('issueTemplate:'),
+      ctx.slice(0, 400),
+    );
+    assert(
       'inject mentions refs gate',
-      ctx.includes('Gate rules') && ctx.includes('readRefs'),
+      ctx.includes('Gate rules') && ctx.includes('readRefs') && ctx.includes('issueTemplate'),
       ctx.slice(0, 400),
     );
     assert('inject mentions dated state path', Boolean(name && ctx.includes(name)), name);
@@ -563,8 +651,9 @@ try {
     );
   }
 
-  // 15. transcript_path のみでも gate が chore state を読める
+  // 15. transcript_path のみでも gate が chore state を読める（sticky 無しのフォールバック）
   {
+    clearSticky();
     const transcriptId = 'aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee';
     const transcriptPath = join(
       smokeTmpRoot,
@@ -639,6 +728,7 @@ try {
 
   // 16c. CURSOR_TRANSCRIPT_PATH で conversation_id を補完（gate env は使わない）
   {
+    clearSticky();
     const envId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
     const prev = process.env.CURSOR_TRANSCRIPT_PATH;
     process.env.CURSOR_TRANSCRIPT_PATH = join(
@@ -694,19 +784,34 @@ try {
     assert('locked Read allow', outRead.permission === 'allow', JSON.stringify(outRead));
   }
 
-  // 20. 統合: track-phase（ID あり）→ implement Read（間違った conversation_id + transcript）→ Write
+  // 20. 統合: sticky（発話 ID）が汚染 payload より勝つ
   {
+    clearSticky();
     const realId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const staleId = 'f15fcdeb-7a9c-44e2-9035-f7c6c7c39fb1';
     const withId = { conversation_id: realId, workspace_roots: [root], cwd: root };
-    const wrongId = {
-      conversation_id: 'wrong-conversation-id',
+    const noId = { workspace_roots: [root], cwd: root };
+    const contaminated = {
+      conversation_id: staleId,
+      session_id: staleId,
       workspace_roots: [root],
       cwd: root,
-      transcript_path: join(smokeTmpRoot, 'agent-transcripts', realId, `${realId}.jsonl`),
+      transcript_path: join(smokeTmpRoot, 'agent-transcripts', staleId, `${staleId}.jsonl`),
     };
-    const noId = { workspace_roots: [root], cwd: root };
     const implementPath = join(root, '.cursor/skills/implement/SKILL.md');
     const probePath = join(root, '.cursor/hooks/_integration-probe.txt');
+
+    run('track.mjs', {
+      ...noId,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: implementPath },
+    });
+    assert(
+      'integration without sticky stays locked',
+      loadState(root, realId).implement !== true,
+      JSON.stringify(loadState(root, realId)),
+    );
 
     run('track.mjs', {
       ...withId,
@@ -719,6 +824,11 @@ try {
       st.phase === 'chore' && st.implement === false,
       JSON.stringify(st),
     );
+    assert(
+      'integration sticky written',
+      readLastPromptId(root) === realId,
+      String(readLastPromptId(root)),
+    );
 
     run('track.mjs', {
       ...noId,
@@ -728,29 +838,43 @@ try {
     });
     st = loadState(root, realId);
     assert(
-      'integration without id/transcript stays locked',
-      st.implement === false,
+      'integration sticky unlocks without payload id',
+      st.implement === true,
       JSON.stringify(st),
     );
 
-    const outInject = run('inject-context.mjs', { ...withId });
-    assert('integration inject has no gate env', outInject.env == null, JSON.stringify(outInject));
+    // 再ロックして汚染 payload でも sticky で解禁できることを見る
+    run('track.mjs', {
+      ...withId,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore again',
+    });
+    assert(
+      'integration re-entry locks',
+      loadState(root, realId).implement === false,
+      JSON.stringify(loadState(root, realId)),
+    );
 
     run('track.mjs', {
-      ...wrongId,
+      ...contaminated,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
       tool_input: { path: implementPath },
     });
     st = loadState(root, realId);
     assert(
-      'integration transcript wins over wrong conversation_id',
+      'integration sticky wins over contaminated transcript',
       st.implement === true,
       JSON.stringify(st),
     );
+    assert(
+      'integration stale id state untouched',
+      loadState(root, staleId).implement !== true,
+      JSON.stringify(loadState(root, staleId)),
+    );
 
     const outWrite = run('gate.mjs', {
-      ...wrongId,
+      ...contaminated,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
       tool_input: { path: probePath },
@@ -801,6 +925,7 @@ try {
       JSON.stringify(outMarker),
     );
     disableBootstrap(root);
+    clearSticky();
     writeFileSync(
       stateAbs(),
       JSON.stringify(
@@ -1411,9 +1536,10 @@ try {
   }
 } finally {
   rmSync(stateTmp, { recursive: true, force: true });
-  disableBootstrap(root);
   // state 以外の一時物も含め、ルートごと消す（空判定に頼らない）
   rmSync(smokeTmpRoot, { recursive: true, force: true });
+  if (restoreBootstrap) enableBootstrap(root);
+  else disableBootstrap(root);
 }
 
 if (existsSync(smokeTmpRoot)) {

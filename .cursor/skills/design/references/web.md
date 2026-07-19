@@ -2,9 +2,9 @@
 
 ## Principle
 
-The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. The conversation around the screen produces the real output: a page structure, a section matrix, and a style guide in the [Design] issue body.
+The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. The conversation around the screen produces the real output: `# Screen` (page structure, section matrix), `# Grain` / `# Tokens` (via `grain`), and the slice plan in the [Design] issue body.
 
-`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not the design spec (which lives in the [Design] issue body), not the default screen. Delete `prototype/` when the product can speak for itself.
+`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not the Design issue body, not the default screen. Delete `prototype/` when the product can speak for itself.
 
 ## How this is structured
 
@@ -16,7 +16,7 @@ A **slice** is a vertical user-facing concern. For example, in a landing page, "
 
 ## Prepare
 
-The prepare workflow consists of 5 steps.
+The prepare workflow consists of 6 steps.
 
 ### Step 1: Analyze (web type + stack)
 
@@ -73,6 +73,12 @@ Think about what the user sees on the default screen (top page). Group related s
 
 A 1:1 section-to-slice mapping is too fine. A "all sections per slice" mapping is too coarse. Aim for one slice per user-facing concern.
 
+### Step 3: Grain
+
+If `# Grain` in the Design issue is empty, invoke **`grain`** skill — **Mode — Define** before Step 4. Persist returned `# Grain` and `# Tokens` via `issue` after user agreement in Step 5. Mode details and close gate: `.cursor/skills/grain/SKILL.md` — do not duplicate Define flow here.
+
+If `# Grain` is already filled, skip.
+
 **Component comment format (apply to every section/component written in any slice):**
 
 ```tsx
@@ -113,64 +119,98 @@ A 1:1 section-to-slice mapping is too fine. A "all sections per slice" mapping i
 //   該当なければ「なし」と書く
 ```
 
-### Step 3: Display
+### Step 4: Display
 
-Show the proposed slice list in chat. Also show the initial Style Guide values, Section Matrix (with placeholder layouts), and confirmed Web Type for the user to review.
+Show in chat: Grain summary, Tokens summary, proposed slice list, Section Matrix placeholders, and confirmed Web Type.
 
-### Step 4: User agreement
+### Step 5: User agreement
 
 Present a clear yes / edit / no on the plan. Prefer grounded discussion over an empty prompt.
 
-- **yes** — the plan is locked in this workflow. Proceed to Step 5.
+- **yes** — the plan is locked in this workflow. Proceed to Step 6.
 - **edit** — the user provides specific edits. Update the plan and ask again.
 - **no** — the plan is rejected. Return to Step 2 with the user's feedback.
 
-### Step 5: Hand off body content to the caller
+### Step 6: Hand off body content to the caller
 
 After **yes**, return to the caller with the content below ready to persist (the caller writes the Design issue — do not raw-edit the issue from this file).
 
-**Filled in Step 5:**
+**Filled in Step 6:**
 
-- `## Web Type` (under `# Design Spec`): confirmed type
-- `## Style Guide`: initial values (Color, Typography, Spacing)
+- `# Grain` and `# Tokens`: from grain Define (Step 3)
+- `## Web Type` (under `# Screen`): confirmed type
 - `## Section Matrix`: sections for the default screen, placeholder layouts/parts
-- `## Slices` section (plan): the slice list as checkboxes (all `[ ]`)
+- `## Slices` under `# Plan`: the slice list as checkboxes (all `[ ]`)
 
-**NOT filled in Step 5 (left as `(none)` or empty):**
+**NOT filled in Step 6 (left as `(none)` or empty):**
 
 - `## Page Structure`: filled when the user mentions additional pages (often emerges during run)
 - `## Implementation Matrix`: filled when discussed (hook/API decisions often emerge from discussing the design)
 
-The body structure after Step 5:
+The body structure after Step 6:
 
 ```markdown
 ... existing plan sections (Goal, Reference, What, Constraints) ...
+
+# Plan (進捗管理)
 
 ## Slices
 
 - [ ] Slice 1: Chrome
 - [ ] Slice 2: Hero
-- [ ] Slice 3: Features
-- [ ] Slice 4: Social proof
-- [ ] Slice 5: Conversion
+      ...
+
+# Wireframe (homepage)
+
+...
 
 ---
 
-# Design Spec (web)
+# Grain
+
+### Grain-stable
+
+| Axis | Choice |
+...
+
+### Behavioral temperament
+
+| Axis | Choice |
+...
+
+---
+
+# Tokens
+
+### Color
+
+| Token | Value | Use |
+...
+
+### Typography
+
+...
+
+### Spacing
+
+...
+
+### Radius
+
+...
+
+---
+
+# Screen
 
 ## Web Type
 
 Landing page (or whichever type was confirmed)
 
-## Style Guide
-
-| Token | Value | Use |
-| ... (initial values)
-
 ## Section Matrix
 
 | Section | Layout (PC) | Layout (Mobile) | Main parts |
-| ... (placeholder layouts for default screen sections)
+...
 
 ## Page Structure
 
@@ -179,20 +219,6 @@ Landing page (or whichever type was confirmed)
 ## Implementation Matrix
 
 (none — to be filled after discuss / slices)
-
----
-
-# Design Progress
-
-## Slices
-
-- [ ] Slice 1: Chrome
-- [ ] Slice 2: Hero
-- [ ] Slice 3: Features
-- [ ] Slice 4: Social proof
-- [ ] Slice 5: Conversion
-
-## Notes
 ```
 
 ---
@@ -205,7 +231,7 @@ Each slice is executed one at a time, with user confirmation between slices. For
 2. Write the sections in the slice to production location (with `data-component` and comment block)
 3. Update `index.tsx` to compose the new sections
 4. Present a confirm message (changed files, verification result)
-5. Return checklist / Design Spec updates to the caller to persist
+5. Return checklist / `# Screen` updates to the caller to persist
 
 ### Slice 1: Chrome (Header + Footer + index.tsx)
 
@@ -223,7 +249,7 @@ The default screen is the top page of the site. The goal is to agree on the visu
 
 - Build with header, footer, and key content sections
 - Header, footer, and sidebar are not placeholders — build them with production-level style
-- Focus on typography, spacing, colors, and visual hierarchy
+- Apply `# Grain` and `# Tokens` from the Design issue
 - Responsive design is required for all sections
 - Interactive behavior is not implemented — the screen is static. Except for what CSS can do.
 
@@ -282,7 +308,7 @@ Each feature slice adds one user-facing concern. The slice is **vertical**: it i
 Between slices (or after some slices), the user can:
 
 - Discuss in chat (the agent responds, may edit the screen or the plan)
-- Make decisions that affect the spec (style values, additional pages, hooks/APIs)
+- Make decisions that affect the issue (`# Tokens` values, additional pages, hooks/APIs)
 
 ---
 
@@ -290,8 +316,8 @@ Between slices (or after some slices), the user can:
 
 The design phase is done when:
 
-- All slices are marked `[x]` in `# Design Progress` / `## Slices`
-- All spec sections are filled (Web Type, Style Guide, Section Matrix, Page Structure, Implementation Matrix)
+- All slices are marked `[x]` in `# Plan` / `## Slices`
+- `# Grain`, `# Tokens`, and `# Screen` are filled (Web Type, Section Matrix, Page Structure, Implementation Matrix)
 - The screen renders correctly in the browser
 - The user has confirmed the design direction
 

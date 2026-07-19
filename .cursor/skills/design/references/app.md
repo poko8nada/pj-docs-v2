@@ -2,20 +2,20 @@
 
 ## Principle
 
-The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. The conversation around the screen produces the real output: a component matrix and a minimal style guide in the [Design] issue body.
+The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. The conversation around the screen produces the real output: `# Screen` (component matrix), `# Grain` / `# Tokens` (via `grain`), and the slice plan in the [Design] issue body.
 
 - Data is realistic and covers edge cases: very long strings, very short strings, missing optional fields, zero counts, mixed statuses, special characters
 - CSS hover/focus/active styles are included as normal — these are part of the component, not separate states
 - Interactive behavior (clicks, modals opening, drag-and-drop) is not implemented — the screen is static. **Except for what CSS can does.**
 - The goal is to see the layout, hierarchy, typography, spacing, and component structure in a realistic condition
 
-`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not the design spec (which lives in the [Design] issue body), not the default screen. Delete `prototype/` when the product can speak for itself.
+`prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not the Design issue body, not the default screen. Delete `prototype/` when the product can speak for itself.
 
 ---
 
 ## Prepare
 
-The prepare workflow consists of 5 steps.
+The prepare workflow consists of 6 steps.
 
 ### Step 1: Analyze
 
@@ -46,74 +46,102 @@ Think about what the user sees on the default screen. Group related components i
 - Edit/delete concern: edit mode + confirm dialog
 - Detail concern: detail panel or drawer
 
-### Step 3: Display
+### Step 3: Grain
 
-Show the proposed slice list in chat. Also show the initial Style Guide values and Component Matrix (with placeholder states/variants) for the user to review.
+If `# Grain` in the Design issue is empty, invoke **`grain`** skill — **Mode — Define** before Step 4. Persist returned `# Grain` and `# Tokens` via `issue` after user agreement in Step 5. Mode details and close gate: `.cursor/skills/grain/SKILL.md` — do not duplicate Define flow here.
 
-### Step 4: User agreement
+If `# Grain` is already filled, skip.
+
+### Step 4: Display
+
+Show in chat: Grain summary, Tokens summary, proposed slice list, and Component Matrix placeholders.
+
+### Step 5: User agreement
 
 Present a clear yes / edit / no on the plan. Prefer grounded discussion over an empty prompt.
 
-- **yes** — the plan is locked in this workflow. Proceed to Step 5.
+- **yes** — the plan is locked in this workflow. Proceed to Step 6.
 - **edit** — the user provides specific edits. Update the plan and ask again.
 - **no** — the plan is rejected. Return to Step 2 with the user's feedback.
 
-### Step 5: Hand off body content to the caller
+### Step 6: Hand off body content to the caller
 
 After **yes**, return to the caller with the content below ready to persist (the caller writes the Design issue — do not raw-edit the issue from this file).
 
-**Filled in Step 5:**
+**Filled in Step 6:**
 
-- `## Slices` section (plan): the slice list as checkboxes (all `[ ]`)
-- `## Style Guide` (under `# Design Spec`): initial values (Color, Typography, Spacing)
-- `## Component Matrix`: components for the default screen, placeholder states/variants
+- `# Grain` and `# Tokens`: from grain Define (Step 3)
+- `## Slices` under `# Plan`: the slice list as checkboxes (all `[ ]`)
+- `## Component Matrix` (under `# Screen`): components for the default screen, placeholder states/variants
 
-**NOT filled in Step 5 (left as `(none)` or empty):**
+**NOT filled in Step 6 (left as `(none)` or empty):**
 
 - `## Implementation Matrix`: filled when discussed during run (hook/API decisions often emerge from discussing the design)
 
-The body structure after Step 5:
+The body structure after Step 6:
 
 ```markdown
 ... existing plan sections (Goal, Reference, What, Constraints) ...
 
+# Plan (進捗管理)
+
 ## Slices
 
 - [ ] Slice 1: Chrome
 - [ ] Slice 2: Browse tasks
-- [ ] Slice 3: Add task
+      ...
+
+# Wireframe (default screen)
+
+...
 
 ---
 
-# Design Spec (app)
+# Grain
 
-## Style Guide
+### Grain-stable
+
+| Axis | Choice |
+...
+
+### Behavioral temperament
+
+| Axis | Choice |
+...
+
+---
+
+# Tokens
+
+### Color
 
 | Token | Value | Use |
-| Brand | #3B82F6 | app theme, primary CTA |
-| ... (initial values)
+...
+
+### Typography
+
+...
+
+### Spacing
+
+...
+
+### Radius
+
+...
+
+---
+
+# Screen
 
 ## Component Matrix
 
 | File | Default | States | Variants |
-| header.tsx | ✓ | default | — |
-| ... (placeholder states for default screen components)
+...
 
 ## Implementation Matrix
 
 (none — to be filled after discuss / slices)
-
----
-
-# Design Progress
-
-## Slices
-
-- [ ] Slice 1: Chrome
-- [ ] Slice 2: Browse tasks
-- [ ] Slice 3: Add task
-
-## Notes
 ```
 
 ## Design protocol

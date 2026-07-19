@@ -12,6 +12,8 @@ Improve the existing product with the same two-step discipline as Forge: lock a 
 
 ## On entry
 
+**Harness handshake (required):** Read `.cursor/skills/issue/SKILL.md`, then `issue/references/refine-template.md`. Gate blocks `gh issue` writes until `issue` and `issueTemplate` are true in state.
+
 Inspect the repo and open issues first (Spec, Design, Forge, Refine if any). Then present **Context / Understanding / Proposal** in one message — your reading of where the project is, not a question dump.
 
 Typical states (use as anchors in Understanding):
@@ -34,5 +36,6 @@ Revise until the user agrees which mode applies. Do not ask “① or ②?” wi
 1. Confirm the Refine issue has an agreed slice list. If not, return to Mode ①.
 2. Before any product code edit, Read `.cursor/skills/implement/SKILL.md` to obtain permission to code, then run `implement` skill.
 3. Take **one vertical slice** → verify → get user agreement → update the Refine issue via `issue` skill. Repeat. Prefer draft-then-grow over horizontal splits (refactor everything, then test everything).
+4. For UX/visual polish slices, or when the product diverges from Design `# Grain` / `# Tokens`, invoke **`grain`** (Audit, Improve, or Define for a major re-skin). Fold returned briefs into the implement unit.
 
-Hand off to `issue` / `feasibility` / `implement` by name — do not copy their contents here.
+Hand off to `issue` / `feasibility` / `grain` / `implement` by name — do not copy their contents here.
