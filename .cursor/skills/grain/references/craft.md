@@ -1,6 +1,6 @@
 # Implementation craft
 
-Quality floor when grain is expressed in code. Read during **Improve** and **Create** after axes and tokens are set.
+Quality floor when grain is expressed in code. `grain` reads this during **Improve** and **Create** to shape briefs; the **caller** applies it when shipping the brief.
 
 Grain decides _character_; craft keeps execution precise and consistent.
 

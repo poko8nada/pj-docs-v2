@@ -34,5 +34,6 @@ Revise until the user agrees which mode applies. Do not ask “① or ②?” wi
 1. Confirm the Forge issue has an agreed slice list. If not, return to Mode ①.
 2. Before any product code edit, Read `.cursor/skills/implement/SKILL.md` to obtain permission to code, then run `implement` skill.
 3. Take **one vertical slice** → verify → get user agreement → update the Forge issue via `issue` skill. Repeat. Prefer draft-then-grow over horizontal splits (all APIs, then all UI).
+4. After UI slices that add interactivity, or when surface drifts from Design `# Grain` / `# Tokens`, invoke **`grain`** (Audit or Improve). Fold returned briefs into the next implement unit or a follow-up slice.
 
-Hand off to `issue` / `feasibility` / `implement` by name — do not copy their contents here.
+Hand off to `issue` / `feasibility` / `grain` / `implement` by name — do not copy their contents here.

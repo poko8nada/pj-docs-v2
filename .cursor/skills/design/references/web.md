@@ -75,7 +75,7 @@ A 1:1 section-to-slice mapping is too fine. A "all sections per slice" mapping i
 
 ### Step 3: Grain
 
-If `# Grain` in the Design issue is empty, invoke **`grain`** skill — **Mode — Define** before Step 4. Persist returned `# Grain` and `# Tokens` via `issue` after user agreement in Step 5.
+If `# Grain` in the Design issue is empty, invoke **`grain`** skill — **Mode — Define** before Step 4. Persist returned `# Grain` and `# Tokens` via `issue` after user agreement in Step 5. Mode details and close gate: `.cursor/skills/grain/SKILL.md` — do not duplicate Define flow here.
 
 If `# Grain` is already filled, skip.
 
@@ -320,7 +320,6 @@ The design phase is done when:
 - `# Grain`, `# Tokens`, and `# Screen` are filled (Web Type, Section Matrix, Page Structure, Implementation Matrix)
 - The screen renders correctly in the browser
 - The user has confirmed the design direction
-- **`grain` Mode — Audit** has been run (recommended) and critical findings addressed or noted in Plan Notes
 
 After all of the above, return to the caller for Design issue close / Spec lifecycle comments.
 

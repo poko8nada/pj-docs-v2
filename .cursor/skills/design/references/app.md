@@ -48,7 +48,7 @@ Think about what the user sees on the default screen. Group related components i
 
 ### Step 3: Grain
 
-If `# Grain` in the Design issue is empty, invoke **`grain`** skill — **Mode — Define** before Step 4. Persist returned `# Grain` and `# Tokens` via `issue` after user agreement in Step 5.
+If `# Grain` in the Design issue is empty, invoke **`grain`** skill — **Mode — Define** before Step 4. Persist returned `# Grain` and `# Tokens` via `issue` after user agreement in Step 5. Mode details and close gate: `.cursor/skills/grain/SKILL.md` — do not duplicate Define flow here.
 
 If `# Grain` is already filled, skip.
 

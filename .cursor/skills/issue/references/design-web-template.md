@@ -12,7 +12,7 @@ Create thin (empty sections). The `design` skill + `references/web.md` produce c
 ### Principles
 
 - Design aligns on product screen design through the Wireframe, `# Screen`, and slice-built thinking surface.
-- `# Grain` and `# Tokens` come from `grain` Mode — Define; design persists them via `issue`. Do not invent tokens without grain.
+- `# Grain` and `# Tokens` come from `grain` (soft skill) Mode — Define; design persists them via `issue`. Do not invent tokens without grain.
 - `# Screen` (Web Type, Page Structure, Section Matrix, Implementation Matrix) is product composition — design owns it; grain does not fill these.
 - The Plan (Slices) is in the body. Slices are vertical user-facing concerns (e.g., "Hero", "Features"). One slice includes all sections for that concern, the page composition update, and the comment blocks.
 - How to slice and build the thinking surface: `.cursor/skills/design/references/web.md`. This template only holds the body shape.

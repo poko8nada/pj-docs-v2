@@ -1,18 +1,17 @@
 ---
 name: grain
 description: >-
-  Defines, audits, and implements product surface character — visual ornamentation (あしらい),
-  first-impression clarity, and interaction feel — through style axes, not upfront color or font
-  picks. Runs Define, Audit, Improve, and Create modes; output is UI code. Use when setting visual
-  direction, reviewing web or app look-and-feel, improving scroll and click UX, auditing whether
-  first-time visitors understand the product at a glance, or before Design `# Tokens`.
+  Soft skill: defines, audits, and briefs product surface character — visual ornamentation
+  (あしらい), first-impression clarity, and interaction feel — through style axes, not upfront
+  color or font picks. Callable from any phase. Returns # Grain, # Tokens, audit findings, or
+  implementation briefs to the caller. Does not invoke implement or phase skills.
 ---
 
 # grain
 
 **Grain** is the product's surface character: how it looks, how it reads at first glance, and how it feels to scroll, click, and navigate. Grain is not a palette or type stack — those are derived _after_ the style language is agreed.
 
-Soft skill: callable standalone or one-way from `design` before locking `# Tokens`. Output is **direct UI creation or improvement**, or markdown blocks (`# Grain`, `# Tokens`) returned to the caller — not a separate brief file.
+Soft skill: same layer as `feasibility`, `readme`, and `issue`. Callable from any work phase or standalone. **Self-contained** — do not invoke phase skills or `issue`. Return outputs to the caller; the caller persists and ships when the phase agrees scope.
 
 ## Backbone: three levels
 
@@ -31,15 +30,45 @@ Always evaluate Visceral and Behavioral separately. Good looks must not mask con
 - Mode choice (Define / Audit / Improve / Create)
 - Style language on the three levels (axes + temperament)
 - Audit: five-second clarity, visual organization, cognitive load, interaction — see [references/audit.md](references/audit.md)
-- Implementation craft when shipping UI — see [references/craft.md](references/craft.md)
+- Craft guidance in briefs — see [references/craft.md](references/craft.md)
 - Audit findings with Observation → Impact → Suggestion
-- UI code changes that express the agreed grain
 - Deriving color, typography, and spacing tokens **from** axes (last step in Define)
+- Close gate: Mode — Audit before returning to caller (see below)
 
 ## What you do not own
 
-- Phase entry or Design issue lifecycle — `design` / `issue`
-- Slice planning or Section Matrix — `design`
+- Phase entry, mode ①/②, or phase close conditions
+- Issue create/update / lifecycle — `issue` via the caller
+- Slice planning, Section Matrix, or `# Screen` — `design`
+- Product code — caller ships agreed briefs when the phase is ready
+- Invoking `implement`, `issue`, or phase skills from grain
+
+## When called
+
+**From a phase skill with mode already scoped** (e.g. design needs Define before `# Tokens`): confirm mode in one short line if useful, then run it.
+
+**Standalone / mode unclear:** present **Context / Understanding / Proposal**, pick a mode, revise until agreed.
+
+### By phase (typical triggers)
+
+| Phase      | When to invoke grain                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| **Spec**   | Rare. Goal/audience implies strong brand register — note for later Define only                    |
+| **Design** | `# Grain` empty → **Define**. Surface drift or polish → **Audit** / **Improve**                   |
+| **Forge**  | New UI surface; interactivity landed → **Audit**. Drift from `# Grain` → **Define** / **Improve** |
+| **Refine** | UX/visual polish slice → **Audit** / **Improve**. Major re-skin → **Define**                      |
+| **Chore**  | Exceptional — only when the chore is explicitly grain-doc or audit scope                          |
+
+Design invokes grain most often (before `# Tokens`, during surface work). That is orchestration, not ownership — other phases may invoke grain the same way.
+
+## Close gate
+
+Every grain session **must** end with **Mode — Audit** before returning to the caller.
+
+- **Audit-only invoke:** findings delivered = grain done.
+- **Define / Improve / Create:** run Audit on the target surface (or the brief's scope), then return Audit findings together with any prior output.
+
+This close gate is internal to grain. It does not set or block any phase's close conditions.
 
 ## On entry
 
@@ -47,48 +76,44 @@ Inspect the repo and open issues first (Spec, Design if any), then pick a mode f
 
 Typical states (anchors for Understanding):
 
-- Spec or Design issue exists, no agreed grain yet → propose **Mode — Define**
-- UI exists, user wants review → propose **Mode — Audit** (Define first if grain is unknown and findings need a target)
+- No agreed grain yet → propose **Mode — Define**
+- UI exists, user wants review → propose **Mode — Audit**
 - Audit done or user named fixes → propose **Mode — Improve**
-- Grain agreed, new surface to build → propose **Mode — Create**
-- Called from `design` before `# Tokens` or slices → **Mode — Define**, return `# Grain` + `# Tokens` to caller
+- Grain agreed, new surface to specify → propose **Mode — Create**
 
-Revise until the user agrees the mode. If Improve or Create runs without agreed grain, propose axes in chat and get **yes** / **edit** before coding.
+Revise until the user agrees the mode. If Improve or Create runs without agreed grain, propose axes in chat and get **yes** / **edit** before briefing.
 
 ## Typical paths
 
-| Goal                                       | Path                                                       |
-| ------------------------------------------ | ---------------------------------------------------------- |
-| New screen or section                      | Define → Create                                            |
-| Existing UI, unknown quality               | Audit → (optional Improve)                                 |
-| Existing UI, known issues                  | Improve (Define first if grain unclear)                    |
-| Design phase, `# Grain` empty                 | Define → return `# Grain` + `# Tokens` to caller         |
-| Polish only, grain already in Design issue    | Audit or Improve — skip Define if issue body is sufficient |
+| Goal                         | Path                                    |
+| ---------------------------- | --------------------------------------- |
+| New style language           | Define → Audit (close gate)             |
+| Existing UI, unknown quality | Audit (done) or Audit → Improve → Audit |
+| Known fixes                  | Improve → Audit                         |
+| New surface spec             | Create → Audit                          |
 
 Audit alone does not require Improve. Define alone does not require Create.
 
 ## Mode — Define
 
-**When:** No agreed style language; or caller needs grain before `# Tokens`.
-
-**Prerequisite:** None. Issue-driven context preferred when issues exist (see Flow).
+**When:** No agreed style language; or caller needs `# Grain` / `# Tokens` before composition work.
 
 **Flow:**
 
 1. **Inspect issues** — list and read open Spec and Design issues (`gh` when available). Extract Goal, audience, constraints, and any existing `# Grain` / `# Tokens`.
 2. **Fallback context** — if no issues: repo UI, planning docs, user description.
-3. **Ground proposal** — state what Goal/direction implies for grain before showing axes. Propose **grain-stable** axes and behavioral temperament first (see Decision layers in [references/axes.md](references/axes.md)); compact table or spectrum; no color hex.
+3. **Ground proposal** — state what Goal/direction implies for grain. Propose **grain-stable** axes and behavioral temperament first (see [references/axes.md](references/axes.md)); compact table or spectrum; no color hex.
 4. User agrees: **yes** / **edit** / **no** (revise on edit or no).
 5. Derive **tokens** from agreed grain-stable choices — color, typography, spacing, radius numbers — last step only.
-6. Return `# Grain` and `# Tokens` markdown blocks to the caller for persistence. If standalone, apply tokens in code and proceed to Create or stop per user.
+6. Return `# Grain` and `# Tokens` markdown blocks. Then run **Close gate** (Audit).
 
 Do not lock fonts by brand name until axes are agreed. Describe typographic _role_ first (e.g. "quiet body, assertive display").
 
-**Done when:** Grain-stable axes and behavioral temperament agreed; tokens derived (or returned to caller for issue persistence).
+**Done when:** Axes and tokens agreed; Audit run; all output returned to caller.
 
 ## Mode — Audit
 
-**When:** User wants existing UI reviewed; or sanity-check before ship.
+**When:** User wants existing UI reviewed; or close gate after another mode.
 
 **Prerequisite:** Target UI identifiable (code path, screenshot, or description).
 
@@ -100,58 +125,110 @@ Do not lock fonts by brand name until axes are agreed. Describe typographic _rol
    - Visual organization (hierarchy, Gestalt)
    - Cognitive load and IA (choice count, disclosure, wayfinding)
    - Icon discipline (text-first, labels, standard symbols only)
-   - Interaction and motion (behavioral)
+   - Interaction and motion (behavioral) — limited on static thinking surfaces; full check when interactivity exists
    - Aesthetic-usability trap (looks good but confuses?)
 3. Report per level. Format each finding: **Observation → Impact → Suggestion**
 4. End with prioritized fixes (critical / warning / suggestion).
 
-**Done when:** Findings delivered with priority order. No code unless user asks for Improve.
+**Done when:** Findings delivered with priority order.
 
 ## Mode — Improve
 
-**When:** User wants fixes; or Audit findings to implement.
+**When:** User wants fixes briefed; or Audit findings to address.
+
+**Prerequisite:** Grain agreed (from Define, Design issue, or one-line user confirmation).
+
+**Flow:**
+
+1. Confirm grain (recap axes or cite Design issue `# Grain`).
+2. Read [references/craft.md](references/craft.md) for the quality floor.
+3. Produce an **Improve brief** (format below) — concrete targets, changes on each level, verify steps.
+4. Run **Close gate** (Audit) on the same target.
+
+**Done when:** Improve brief and Audit findings returned to caller.
+
+## Mode — Create
+
+**When:** New section, screen, or component surface to specify with agreed grain.
 
 **Prerequisite:** Grain agreed (from Define, Design issue, or one-line user confirmation).
 
 **Flow:**
 
 1. Confirm grain (recap axes or cite Design issue).
-2. Read [references/craft.md](references/craft.md) for the implementation quality floor.
-3. Read `.cursor/skills/implement/SKILL.md` to obtain permission, then run `implement` skill.
-4. Change UI code directly. Match project stack and conventions.
-5. Confirm message: changed files, what shifted on each level, how to verify (browser / scroll / click path).
+2. Read [references/craft.md](references/craft.md).
+3. Produce a **Create brief** (format below) — structure, styling per tokens, boundaries. Do not invent grain mid-brief.
+4. Run **Close gate** (Audit) on scope (existing adjacent UI or described target).
 
-**Done when:** Agreed fixes shipped and user can verify.
+**Done when:** Create brief and Audit findings returned to caller.
 
-## Mode — Create
+## Output formats
 
-**When:** New section, screen, or component surface to build with agreed grain.
+### `# Grain` and `# Tokens` (from Define)
 
-**Prerequisite:** Grain agreed (from Define, Design issue, or one-line user confirmation).
+Return markdown blocks for the caller to persist via `issue`. Shape matches Design issue template sections.
 
-**Flow:** Same as Improve steps 1–5. Build from the first pixel; do not invent grain mid-implementation.
+### Improve brief
 
-**Done when:** New surface renders; grain visible on visceral and behavioral levels.
+```markdown
+## Grain — Improve brief
+
+### Target
+
+- paths / components / surfaces
+
+### Changes
+
+- Visceral: ...
+- Behavioral: ...
+
+### Verify
+
+- browser / scroll / click path the caller should use to confirm the brief
+```
+
+### Create brief
+
+```markdown
+## Grain — Create brief
+
+### Surface
+
+- what to build (section, screen, component)
+
+### Structure
+
+- layout, hierarchy, key elements
+
+### Styling
+
+- per `# Tokens` and craft.md
+
+### Verify
+
+- browser / scroll / click path the caller should use to confirm the brief
+```
+
+### Audit (close gate)
+
+Findings per [references/audit.md](references/audit.md). Append after any brief or Define output in the same return.
 
 ## Handoffs
 
-| Need                            | Skill       |
-| ------------------------------- | ----------- |
-| Code permission and build rules | `implement` |
-
-Grain does not invoke phase skills (`design`, `issue`). Callers persist returned `# Grain` / `# Tokens` blocks.
+Grain does not invoke other skills. Return all output to the **caller** (phase skill or user). The caller persists via `issue` and ships briefs when the phase agrees scope.
 
 ## Anti-patterns
 
 - Starting with color swatches or font lists
 - Defining grain without reading Spec / Design issues when they exist
-- Declaring grain "done" without five-second clarity check
+- Declaring grain "done" without Close gate Audit
 - Polishing visuals while CTA or purpose is unclear
 - Animation longer than ~400ms on frequent interactions (see [references/audit.md](references/audit.md))
-- Producing a markdown brief instead of shipping UI when user asked to create or improve
+- Invoking `issue` or phase skills from grain
+- Editing product code from grain — return a brief instead
 
 ## References
 
 - [references/axes.md](references/axes.md) — style axes, interaction temperament, token derivation
 - [references/audit.md](references/audit.md) — clarity, visual organization, cognitive load, icons, interaction, trap
-- [references/craft.md](references/craft.md) — spacing, depth, typography, controls, icon discipline, motion
+- [references/craft.md](references/craft.md) — spacing, depth, typography, controls (for briefs; caller applies in code)
