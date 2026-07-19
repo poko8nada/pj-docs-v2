@@ -295,6 +295,17 @@ try {
       command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a & pnpm test:run',
     });
     assert('locked set-label bg deny', outBg.permission === 'deny', JSON.stringify(outBg));
+
+    const outNl = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a\npnpm test:run',
+    });
+    assert(
+      'locked set-label newline then pnpm deny',
+      outNl.permission === 'deny',
+      JSON.stringify(outNl),
+    );
   }
 
   // 6. track phase — 既存 discussion を forge に更新（新規ファイルは増やさない）
@@ -1590,6 +1601,28 @@ try {
       command: cmd,
     });
     assert('design gh process-sub heredoc allow', out.permission === 'allow', JSON.stringify(out));
+
+    // 改行を潰すと `git status\npnpm` が git 1セグメント扱いになり bypass する
+    const outBypass = run('gate.mjs', {
+      ...heredocBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git status\npnpm test',
+    });
+    assert(
+      'multiline git then pnpm denies (no newline collapse bypass)',
+      outBypass.permission === 'deny',
+      JSON.stringify(outBypass),
+    );
+    const outBypassGh = run('gate.mjs', {
+      ...heredocBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'gh issue list\npnpm test',
+    });
+    assert(
+      'multiline gh then pnpm denies (no newline collapse bypass)',
+      outBypassGh.permission === 'deny',
+      JSON.stringify(outBypassGh),
+    );
 
     // implement 前の pnpm は従来どおり deny。文言に実 phase が出ること
     const outPnpm = run('gate.mjs', {

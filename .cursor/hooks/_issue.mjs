@@ -54,7 +54,7 @@ export function isSpecFlowPhase(phase) {
 
 export function isIssueReady(state) {
   if (!isSpecFlowPhase(state?.phase)) return true;
-  return state.unlock?.issue === true && state.unlock?.issueTemplate === true;
+  return state?.unlock?.issue === true && state?.unlock?.issueTemplate === true;
 }
 
 export function templateHintForPhase(phase) {

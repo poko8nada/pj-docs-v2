@@ -288,12 +288,13 @@ function stripProcessAndCommandSubstitutions(command) {
 
 /**
  * allowlist 判定用にシェル構文ノイズを潰す。
- * heredoc 除去後に残る改行で `)` が単独セグメントになり DENY になるのを防ぐ。
+ * heredoc / `<(...)` / `$(...)` を落とす。改行は残す（複数行の境界を消すと bypass になる）。
+ * 残った `()` はトークン化を壊すのでスペースにする（例: `(echo ok)`）。
  */
 function normalizeShellForAllowlist(command) {
   let cleaned = stripQuotesAndHeredoc(String(command ?? ''));
   cleaned = stripProcessAndCommandSubstitutions(cleaned);
-  cleaned = cleaned.replace(/\n+/g, ' ');
+  cleaned = cleaned.replace(/[()]/g, ' ');
   return cleaned;
 }
 
@@ -479,7 +480,7 @@ function isSetLabelShellCommand(command) {
   const cleaned = normalizeShellForAllowlist(command).trim();
   if (!cleaned) return false;
   // 複合コマンドは不可（単体の set-label のみ常時 allow）。`&` は `&&` より後で判定
-  if (/&&|\|\||;|\||&/.test(cleaned)) return false;
+  if (/&&|\|\||;|\n|\||&/.test(cleaned)) return false;
   return /(?:^|[\s/])node(?:\s+|$).*\.cursor\/skills\/label\/scripts\/set-label\.mjs(?:\s|$)/.test(
     cleaned,
   );
@@ -489,7 +490,7 @@ function isAllowedWithoutCodeUnlock(command, inWorkPhase) {
   if (isSetLabelShellCommand(command)) return true;
   const cleaned = normalizeShellForAllowlist(command);
   const segments = cleaned
-    .split(/&&|\|\||;|\|/)
+    .split(/&&|\|\||;|\n|\|/)
     .map((s) => s.trim())
     .filter(Boolean);
   if (segments.length === 0) return true;
