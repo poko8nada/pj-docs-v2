@@ -177,7 +177,7 @@ try {
     const st = readState();
     assert(
       'first prompt is discussion',
-      st.phase === 'discussion' && st.implement === null,
+      st.phase === 'discussion' && st.unlock.implement === null,
       JSON.stringify(st),
     );
     assert('updatedAt is JST offset', st.updatedAt.endsWith('+09:00'), st.updatedAt);
@@ -295,6 +295,17 @@ try {
       command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a & pnpm test:run',
     });
     assert('locked set-label bg deny', outBg.permission === 'deny', JSON.stringify(outBg));
+
+    const outNl = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a\npnpm test:run',
+    });
+    assert(
+      'locked set-label newline then pnpm deny',
+      outNl.permission === 'deny',
+      JSON.stringify(outNl),
+    );
   }
 
   // 6. track phase — 既存 discussion を forge に更新（新規ファイルは増やさない）
@@ -315,9 +326,9 @@ try {
     assert(
       'phase is forge',
       st.phase === 'forge' &&
-        st.implement === false &&
-        st.issue === false &&
-        st.issueTemplate === false,
+        st.unlock.implement === false &&
+        st.unlock.issue === false &&
+        st.unlock.issueTemplate === false,
       JSON.stringify(st),
     );
   }
@@ -374,7 +385,12 @@ try {
     trackReadIssueSkill(base);
     assert(
       'issue skill read sets issue true',
-      loadState(root, id).issue === true,
+      loadState(root, id).unlock.issue === true,
+      JSON.stringify(loadState(root, id)),
+    );
+    assert(
+      'issue skill recorded in read.skills',
+      loadState(root, id).read.skills?.includes('issue'),
       JSON.stringify(loadState(root, id)),
     );
 
@@ -393,7 +409,7 @@ try {
     const stReady = loadState(root, id);
     assert(
       'issue handshake complete',
-      stReady.issue === true && stReady.issueTemplate === true,
+      stReady.unlock.issue === true && stReady.unlock.issueTemplate === true,
       JSON.stringify(stReady),
     );
 
@@ -425,7 +441,7 @@ try {
     const st = readState();
     assert(
       'discussion implement stays null',
-      st.phase === 'discussion' && st.implement === null,
+      st.phase === 'discussion' && st.unlock.implement === null,
       JSON.stringify(st),
     );
     const out2 = run('gate.mjs', {
@@ -457,7 +473,7 @@ try {
     const st = loadState(root, id);
     assert(
       'legacy discussion false normalizes to null',
-      st.phase === 'discussion' && st.implement === null,
+      st.phase === 'discussion' && st.unlock.implement === null,
       JSON.stringify(st),
     );
   }
@@ -528,18 +544,20 @@ try {
   {
     trackReadTsRef(base);
     assert(
-      'readRefs records typescript.md',
-      loadState(root, id).readRefs?.includes('typescript.md'),
+      'read.refs records typescript.md',
+      loadState(root, id).read.refs?.includes('typescript.md'),
       JSON.stringify(loadState(root, id)),
     );
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore typo' });
     const st = readState();
     assert(
-      'phase switch resets implement and readRefs',
+      'phase switch resets implement and read',
       st.phase === 'chore' &&
-        st.implement === false &&
-        Array.isArray(st.readRefs) &&
-        st.readRefs.length === 0,
+        st.unlock.implement === false &&
+        Array.isArray(st.read.refs) &&
+        st.read.refs.length === 0 &&
+        Array.isArray(st.read.skills) &&
+        st.read.skills.length === 0,
       JSON.stringify(st),
     );
 
@@ -551,8 +569,9 @@ try {
     trackReadTsRef(base);
     assert(
       'chore unlock + ref before re-entry',
-      loadState(root, id).implement === true &&
-        loadState(root, id).readRefs?.includes('typescript.md'),
+      loadState(root, id).unlock.implement === true &&
+        loadState(root, id).read.refs?.includes('typescript.md') &&
+        loadState(root, id).read.skills?.includes('implement'),
       JSON.stringify(loadState(root, id)),
     );
     run('track.mjs', {
@@ -562,11 +581,13 @@ try {
     });
     const stRe = readState();
     assert(
-      'same-phase re-entry resets implement and readRefs',
+      'same-phase re-entry resets implement and read',
       stRe.phase === 'chore' &&
-        stRe.implement === false &&
-        Array.isArray(stRe.readRefs) &&
-        stRe.readRefs.length === 0,
+        stRe.unlock.implement === false &&
+        Array.isArray(stRe.read.refs) &&
+        stRe.read.refs.length === 0 &&
+        Array.isArray(stRe.read.skills) &&
+        stRe.read.skills.length === 0,
       JSON.stringify(stRe),
     );
   }
@@ -582,7 +603,7 @@ try {
     const st = loadState(root, id);
     assert(
       'resume keeps forge+implement',
-      st.phase === 'forge' && st.implement === true,
+      st.phase === 'forge' && st.unlock.implement === true,
       JSON.stringify(st),
     );
     assert(
@@ -622,15 +643,18 @@ try {
     const name = findStateFileName(root, id);
     assert('inject mentions Gate state', ctx.includes('Gate state'), ctx.slice(0, 200));
     assert('inject includes live review.files', ctx.includes('review.files:'), ctx.slice(0, 400));
-    assert('inject includes live readRefs', ctx.includes('readRefs:'), ctx.slice(0, 400));
+    assert('inject includes live read.skills', ctx.includes('read.skills:'), ctx.slice(0, 400));
+    assert('inject includes live read.refs', ctx.includes('read.refs:'), ctx.slice(0, 400));
     assert(
       'inject includes live issue handshake',
-      ctx.includes('issue:') && ctx.includes('issueTemplate:'),
+      ctx.includes('unlock.issue:') && ctx.includes('unlock.issueTemplate:'),
       ctx.slice(0, 400),
     );
     assert(
       'inject mentions refs gate',
-      ctx.includes('Gate rules') && ctx.includes('readRefs') && ctx.includes('issueTemplate'),
+      ctx.includes('Gate rules') &&
+        ctx.includes('read.refs') &&
+        ctx.includes('unlock.issueTemplate'),
       ctx.slice(0, 400),
     );
     assert('inject mentions dated state path', Boolean(name && ctx.includes(name)), name);
@@ -702,7 +726,7 @@ try {
     const st = loadState(root, readId);
     assert(
       'preToolUse Read sets implement true',
-      st.phase === 'forge' && st.implement === true,
+      st.phase === 'forge' && st.unlock.implement === true,
       JSON.stringify(st),
     );
   }
@@ -721,7 +745,7 @@ try {
     const st = loadState(root, readId);
     assert(
       'preToolUse ReadFile sets implement true',
-      st.phase === 'chore' && st.implement === true,
+      st.phase === 'chore' && st.unlock.implement === true,
       JSON.stringify(st),
     );
   }
@@ -753,7 +777,7 @@ try {
       const st = loadState(root, envId);
       assert(
         'CURSOR_TRANSCRIPT_PATH unlocks implement',
-        st.phase === 'chore' && st.implement === true,
+        st.phase === 'chore' && st.unlock.implement === true,
         JSON.stringify(st),
       );
     } finally {
@@ -809,7 +833,7 @@ try {
     });
     assert(
       'integration without sticky stays locked',
-      loadState(root, realId).implement !== true,
+      loadState(root, realId).unlock.implement !== true,
       JSON.stringify(loadState(root, realId)),
     );
 
@@ -821,7 +845,7 @@ try {
     let st = loadState(root, realId);
     assert(
       'integration starts chore locked',
-      st.phase === 'chore' && st.implement === false,
+      st.phase === 'chore' && st.unlock.implement === false,
       JSON.stringify(st),
     );
     assert(
@@ -839,7 +863,7 @@ try {
     st = loadState(root, realId);
     assert(
       'integration sticky unlocks without payload id',
-      st.implement === true,
+      st.unlock.implement === true,
       JSON.stringify(st),
     );
 
@@ -851,7 +875,7 @@ try {
     });
     assert(
       'integration re-entry locks',
-      loadState(root, realId).implement === false,
+      loadState(root, realId).unlock.implement === false,
       JSON.stringify(loadState(root, realId)),
     );
 
@@ -864,12 +888,12 @@ try {
     st = loadState(root, realId);
     assert(
       'integration sticky wins over contaminated transcript',
-      st.implement === true,
+      st.unlock.implement === true,
       JSON.stringify(st),
     );
     assert(
       'integration stale id state untouched',
-      loadState(root, staleId).implement !== true,
+      loadState(root, staleId).unlock.implement !== true,
       JSON.stringify(loadState(root, staleId)),
     );
 
@@ -1049,7 +1073,7 @@ try {
     const stCd = loadState(root, cdId);
     assert(
       'cd test conversation unlocked',
-      stCd.phase === 'chore' && stCd.implement === true,
+      stCd.phase === 'chore' && stCd.unlock.implement === true,
       JSON.stringify(stCd),
     );
 
@@ -1532,6 +1556,179 @@ try {
       'css write after css.md allow',
       allowCss.permission === 'allow',
       JSON.stringify(allowCss),
+    );
+  }
+
+  // 21. design + issue ready: gh issue edit with process-sub heredoc allows
+  //     （旧バグ: heredoc 除去後の改行で `)` が単独セグメント → DENY_SHELL）
+  {
+    const heredocId = 'heredoc00-0000-4000-8000-000000000001';
+    const heredocBase = {
+      conversation_id: heredocId,
+      workspace_roots: [root],
+      cwd: root,
+    };
+    run('track.mjs', {
+      ...heredocBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/design heredoc allow',
+    });
+    trackReadIssueSkill(heredocBase);
+    trackRead(heredocBase, '.cursor/skills/issue/references/design-app-template.md');
+    const st = loadState(root, heredocId);
+    assert(
+      'heredoc case issue ready',
+      st.phase === 'design' && st.unlock.issue === true && st.unlock.issueTemplate === true,
+      JSON.stringify(st),
+    );
+
+    const cmd = [
+      "gh issue edit 6 --body-file <(cat <<'EOF'",
+      '# Grain',
+      'foo | bar',
+      '# Tokens',
+      'a | b',
+      'EOF',
+      ") && gh issue comment 6 --body \"$(cat <<'EOF'",
+      '## update | note',
+      'EOF',
+      ')"',
+    ].join('\n');
+
+    const out = run('gate.mjs', {
+      ...heredocBase,
+      hook_event_name: 'beforeShellExecution',
+      command: cmd,
+    });
+    assert('design gh process-sub heredoc allow', out.permission === 'allow', JSON.stringify(out));
+
+    // 改行を潰すと `git status\npnpm` が git 1セグメント扱いになり bypass する
+    const outBypass = run('gate.mjs', {
+      ...heredocBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git status\npnpm test',
+    });
+    assert(
+      'multiline git then pnpm denies (no newline collapse bypass)',
+      outBypass.permission === 'deny',
+      JSON.stringify(outBypass),
+    );
+    const outBypassGh = run('gate.mjs', {
+      ...heredocBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'gh issue list\npnpm test',
+    });
+    assert(
+      'multiline gh then pnpm denies (no newline collapse bypass)',
+      outBypassGh.permission === 'deny',
+      JSON.stringify(outBypassGh),
+    );
+
+    // implement 前の pnpm は従来どおり deny。文言に実 phase が出ること
+    const outPnpm = run('gate.mjs', {
+      ...heredocBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm test',
+    });
+    const msg = String(outPnpm.agent_message ?? '');
+    assert(
+      'design pnpm deny names phase',
+      outPnpm.permission === 'deny' && msg.includes('phase=design'),
+      JSON.stringify(outPnpm),
+    );
+    assert('design pnpm deny does not claim discussion', !msg.includes('In discussion:'), msg);
+
+    const outWrite = run('gate.mjs', {
+      ...heredocBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/foo.ts') },
+    });
+    const writeMsg = String(outWrite.agent_message ?? '');
+    assert(
+      'design Write deny names phase+implement',
+      outWrite.permission === 'deny' &&
+        writeMsg.includes('phase=design') &&
+        writeMsg.includes('implement'),
+      JSON.stringify(outWrite),
+    );
+    assert(
+      'design Write deny does not say Default phase is discussion',
+      !writeMsg.includes('Default phase is discussion'),
+      writeMsg,
+    );
+  }
+
+  // 22. sessionStart inject: 前会話 sticky があっても payload の state を出し、sticky を更新
+  {
+    clearSticky();
+    const prevId = 'stickyprv-0000-4000-8000-000000000001';
+    const newId = 'stickynew-0000-4000-8000-000000000002';
+    writeFileSync(
+      join(stateTmp, `20260719-120000+0900__${prevId}.json`),
+      JSON.stringify(
+        {
+          phase: 'chore',
+          implement: true,
+          issue: null,
+          issueTemplate: false,
+          review: { files: [] },
+          check: { pending: [] },
+          readRefs: [],
+          label: 'prev',
+          updatedAt: formatJstIso(),
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+    writeFileSync(
+      join(stateTmp, `20260719-130000+0900__${newId}.json`),
+      JSON.stringify(
+        {
+          phase: 'discussion',
+          implement: null,
+          issue: null,
+          issueTemplate: false,
+          review: { files: [] },
+          check: { pending: [] },
+          readRefs: [],
+          label: 'new',
+          updatedAt: formatJstIso(),
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+    // 前会話を sticky に残す
+    writeFileSync(
+      lastPromptIdPath(root),
+      `${JSON.stringify({ id: prevId, updatedAt: formatJstIso() }, null, 2)}\n`,
+    );
+
+    const out = run('inject-context.mjs', {
+      conversation_id: newId,
+      session_id: newId,
+      workspace_roots: [root],
+      cwd: root,
+      hook_event_name: 'sessionStart',
+      is_background_agent: false,
+    });
+    const ctx = out.additional_context || '';
+    assert(
+      'inject prefers new conversation over sticky',
+      ctx.includes(newId) && ctx.includes('phase: discussion') && ctx.includes('label: new'),
+      ctx.slice(0, 600),
+    );
+    assert(
+      'inject does not show previous sticky chore unlock',
+      !ctx.includes('phase: chore') && !ctx.includes('label: prev'),
+      ctx.slice(0, 600),
+    );
+    assert(
+      'inject refreshes sticky to new id',
+      readLastPromptId(root) === newId,
+      String(readLastPromptId(root)),
     );
   }
 } finally {

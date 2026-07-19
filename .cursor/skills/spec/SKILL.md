@@ -12,7 +12,7 @@ Lock product design through discussion, then record it as a **thick Spec issue**
 
 ## On entry
 
-**Harness handshake (required):** Read `.cursor/skills/issue/SKILL.md`, then `issue/references/spec-template.md`. Gate blocks `gh issue` writes until `issue` and `issueTemplate` are true in state.
+**Harness handshake (required):** Read `.cursor/skills/issue/SKILL.md`, then `issue/references/spec-template.md`. Gate blocks `gh issue` writes until both Reads are done.
 
 Inspect the repo and open issues first (Spec if any; planning docs if no Spec yet). Then present **Context / Understanding / Proposal** in one message — your reading of where the project is, not a question dump.
 

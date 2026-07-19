@@ -12,7 +12,7 @@ Agree on product screen design by building a realistic default/home screen. The 
 
 ## On entry
 
-**Harness handshake (required):** Read `.cursor/skills/issue/SKILL.md`, then `issue/references/design-app-template.md` or `design-web-template.md` (pick one). Gate blocks `gh issue` writes until `issue` and `issueTemplate` are true in state.
+**Harness handshake (required):** Read `.cursor/skills/issue/SKILL.md`, then `issue/references/design-app-template.md` or `design-web-template.md` (pick one). Gate blocks `gh issue` writes until both Reads are done.
 
 Inspect the repo and open issues first (Spec, Design if any). Then present **Context / Understanding / Proposal** in one message — your reading of where the project is, not a question dump. Confirm **app vs web** in that Proposal when it matters.
 
@@ -36,6 +36,8 @@ Revise until the user agrees the next move. Do not ask “app or web?” with no
 5. Before any thinking-surface code edit, Read `.cursor/skills/implement/SKILL.md` to obtain permission to code, then run `implement` skill.
 6. As slice plans and `# Screen` sections are agreed, persist them via `issue` skill. One vertical slice at a time when building the screen — user agreement between slices.
 7. During surface work, invoke **`grain`** (Audit / Improve) when visceral drift or polish needs a grain pass. Grain's close gate (Audit) is internal to grain — not a Design phase close condition.
+
+**Browser check:** Use the `cmux-browser` skill. Prefer an existing cmux surface and an already-running dev server. If the server is down, read `package.json` scripts and start the right one (prefer `dev`), then open/use cmux.
 
 Hand off to `issue` / `implement` / `grain` / `feasibility` by name — do not copy their contents here. Feasibility only when Design introduces technical choices beyond the Spec (by default if locking new stack/UI library decisions).
 

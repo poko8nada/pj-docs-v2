@@ -9,7 +9,7 @@ description: >-
 
 Build exactly the unit the caller already agreed with the user. The plan (or chore scope) is source of truth — do not reopen settled questions, do not expand scope.
 
-**Read this file before editing product/harness code** — that Read is the permission handshake required by work phase skills (and by the gate when enabled). In `discussion`, `implement` is `null` (not applicable); reading this file there does not unlock code.
+**Read this file before editing product/harness code** — that Read is the permission handshake required by work phase skills (and by the gate when enabled). In `discussion`, reading this file does not unlock code.
 
 ## What you own
 
@@ -45,7 +45,7 @@ Read the reference files relevant to the task. Internalize — do not summarize 
 - Markdown (`.md` / `.mdc`): `references/markdown.md`
 - `.mjs` / `.cjs`: no reference required
 
-The harness **blocks** edits to those paths until the matching reference has been Read in the current work unit (`readRefs` in gate state). Deny messages name the file to Read. Any phase trigger (including same-phase re-entry) clears `readRefs` and sets `implement: false`.
+The harness **blocks** edits to those paths until the matching reference has been Read in the current work unit. Deny messages name the file to Read. Any phase trigger (including same-phase re-entry) clears that Read progress — Read this skill and the needed references again.
 
 ## Step 2 — Build
 
@@ -90,7 +90,7 @@ rg -n 'NOTE:' <changed files>
 
 ## Step 6 — Before commit
 
-When `review.files` is non-empty (harness shows this in gate state):
+When the harness shows files pending pre-commit review:
 
 1. Run **`notes` skill — Commit check** (`.cursor/skills/notes/scripts/list-removed.mjs`). Do not commit until the user OKs any removed NOTE lines.
 2. Run **`/pre-commit-reviewer`**. The hook injects each `review.files` path with `git diff HEAD` (or full content if new/untracked), then clears `files`. The reviewer focuses on that injection (readonly; no git). `git add` order does not matter. Harness blocks `git commit` only while `review.files` is non-empty. Re-edits refill `files`. Only reviewer launch or a successful commit clears `files` (empty commit attempts do not).

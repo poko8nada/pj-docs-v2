@@ -23,7 +23,7 @@ Typical states (use as anchors in Understanding):
 - Returned from a work phase → restate what was agreed in that phase and what is now open; wait for user before re-entering work
 - Request is clearly tiny harness/meta fix → say user should invoke `/chore`, not stretch discussion
 
-When the session topic is clear (or changes), set a short state `label` via the `label` skill — allowed here; do not invent a slug if the topic is still fuzzy.
+When the session topic is still fuzzy, do not invent a `label` slug yet.
 
 Revise until the user agrees the next move. Do not drift into implementation.
 
@@ -31,11 +31,12 @@ Revise until the user agrees the next move. Do not drift into implementation.
 
 1. **Discuss** — goal, constraints, trade-offs. Edit root-level `*.md` only when it helps the conversation (gate allows).
 2. **Research** — `feasibility` when stack/approach needs cited investigation; read issues with read-only `gh`/`git`.
-3. **Hand off** — when a deliverable or code change is needed, name the right phase skill and stop. User invokes it explicitly.
+3. **Label** — Before handing off (or earlier once the topic is clear), run the `label` skill (`node .cursor/skills/label/scripts/set-label.mjs <slug>`). Required before naming the next phase for the user. Skip only while the topic is still fuzzy.
+4. **Hand off** — when a deliverable or code change is needed, name the right phase skill and stop. User invokes it explicitly.
 
 ## Hard limits
 
-- Do **not** Read `.cursor/skills/implement/SKILL.md` for code — `implement` is not applicable in this phase (`implement: null` in gate state).
+- Do **not** Read `.cursor/skills/implement/SKILL.md` for code — that handshake does not apply in this phase.
 - Do **not** create or update GitHub issues here — that belongs in work phases via `issue` skill after user entry.
 - Do **not** run mutating `gh`/`git`, `pnpm`, or other shell that changes the repo.
 

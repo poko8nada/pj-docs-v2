@@ -12,7 +12,7 @@ Turn Spec + Design into working product: lock a slice plan, then implement it.
 
 ## On entry
 
-**Harness handshake (required):** Read `.cursor/skills/issue/SKILL.md`, then `issue/references/forge-template.md`. Gate blocks `gh issue` writes until `issue` and `issueTemplate` are true in state.
+**Harness handshake (required):** Read `.cursor/skills/issue/SKILL.md`, then `issue/references/forge-template.md`. Gate blocks `gh issue` writes until both Reads are done.
 
 Inspect the repo and open issues first (Spec, Design, Forge if any). Then present **Context / Understanding / Proposal** in one message — your reading of where the project is, not a question dump.
 
@@ -37,5 +37,7 @@ Revise until the user agrees which mode applies. Do not ask “① or ②?” wi
 2. Before any product code edit, Read `.cursor/skills/implement/SKILL.md` to obtain permission to code, then run `implement` skill.
 3. Take **one vertical slice** → verify → get user agreement → update the Forge issue via `issue` skill. Repeat. Prefer draft-then-grow over horizontal splits (all APIs, then all UI).
 4. After UI slices that add interactivity, or when surface drifts from Design `# Grain` / `# Tokens`, invoke **`grain`** (Audit or Improve). Fold returned briefs into the next implement unit or a follow-up slice.
+
+**Browser check:** Use the `cmux-browser` skill. Prefer an existing cmux surface and an already-running dev server. If the server is down, read `package.json` scripts and start the right one (prefer `dev`), then open/use cmux.
 
 Hand off to `issue` / `feasibility` / `grain` / `implement` by name — do not copy their contents here.

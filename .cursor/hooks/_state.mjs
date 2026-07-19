@@ -13,7 +13,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeReadRefs } from './_refs.mjs';
 
@@ -122,8 +122,10 @@ export function resolveConversationIdFromPayload(payload) {
 
 /**
  * state キー解決（新）:
- * - beforeSubmitPrompt → 常に payload（呼び出し側が sticky を更新）
+ * - beforeSubmitPrompt / sessionStart → 常に payload
+ *   （sessionStart で sticky 優先だと前会話の Gate state を inject してしまう）
  * - それ以外 → sticky `last-prompt-id` 優先、無ければ payload フォールバック
+ *   （ツール hooks の conversation_id / transcript_path 汚染対策）
  *
  * @returns {{ id: string, via: string }}
  */
@@ -131,7 +133,7 @@ export function resolveConversationId(payload) {
   const event = String(payload?.hook_event_name ?? '');
   const fromPayload = resolveConversationIdFromPayload(payload);
 
-  if (event === 'beforeSubmitPrompt') {
+  if (event === 'beforeSubmitPrompt' || event === 'sessionStart') {
     return fromPayload;
   }
 
@@ -255,16 +257,49 @@ export function normalizeReview(review) {
   return { files };
 }
 
-/** @returns {{ phase: string, implement: boolean | null, issue: boolean | null, issueTemplate: boolean, review: ReturnType<typeof defaultReview>, check: ReturnType<typeof defaultCheck>, readRefs: string[], label: string, updatedAt: string }} */
+/** Read した `.cursor/skills/<name>/SKILL.md` の name（重複なし） */
+export function normalizeSkills(skills) {
+  if (!Array.isArray(skills)) return [];
+  return [
+    ...new Set(
+      skills
+        .map((s) => String(s).trim())
+        .filter((s) => s.length > 0 && s.length <= 64 && /^[a-zA-Z0-9._-]+$/.test(s)),
+    ),
+  ];
+}
+
+export function defaultUnlock(phase = PHASE_DISCUSSION) {
+  const p = normalizePhase(phase);
+  return {
+    implement: normalizeImplement(p, null),
+    issue: normalizeIssue(p, null),
+    issueTemplate: normalizeIssueTemplate(p, false),
+  };
+}
+
+export function defaultRead() {
+  return { skills: [], refs: [] };
+}
+
+/**
+ * @returns {{
+ *   phase: string,
+ *   unlock: { implement: boolean | null, issue: boolean | null, issueTemplate: boolean },
+ *   read: { skills: string[], refs: string[] },
+ *   review: ReturnType<typeof defaultReview>,
+ *   check: ReturnType<typeof defaultCheck>,
+ *   label: string,
+ *   updatedAt: string
+ * }}
+ */
 export function defaultState() {
   return {
     phase: PHASE_DISCUSSION,
-    implement: null,
-    issue: null,
-    issueTemplate: false,
+    unlock: defaultUnlock(PHASE_DISCUSSION),
+    read: defaultRead(),
     review: defaultReview(),
     check: defaultCheck(),
-    readRefs: [],
     label: '',
     updatedAt: formatJstIso(),
   };
@@ -306,20 +341,77 @@ export function normalizeIssueTemplate(phase, issueTemplate) {
   return issueTemplate === true;
 }
 
+export function normalizeUnlock(phase, unlock) {
+  const src = unlock && typeof unlock === 'object' ? unlock : {};
+  return {
+    implement: normalizeImplement(phase, src.implement),
+    issue: normalizeIssue(phase, src.issue),
+    issueTemplate: normalizeIssueTemplate(phase, src.issueTemplate),
+  };
+}
+
+export function normalizeRead(read) {
+  const src = read && typeof read === 'object' ? read : {};
+  return {
+    skills: normalizeSkills(src.skills),
+    refs: normalizeReadRefs(src.refs),
+  };
+}
+
+/**
+ * 旧 flat（implement / issue / readRefs）と新（unlock / read）の両方を正規化形へ。
+ * @param {Record<string, unknown>} raw
+ * @param {string} phase
+ */
+function coerceUnlockRead(raw, phase) {
+  const hasNested = raw.unlock != null || raw.read != null;
+  if (hasNested) {
+    const unlockSrc =
+      raw.unlock && typeof raw.unlock === 'object'
+        ? raw.unlock
+        : {
+            implement: raw.implement,
+            issue: raw.issue,
+            issueTemplate: raw.issueTemplate,
+          };
+    const readSrc =
+      raw.read && typeof raw.read === 'object'
+        ? {
+            skills: raw.read.skills,
+            refs: raw.read.refs ?? raw.readRefs,
+          }
+        : { skills: raw.skills, refs: raw.readRefs };
+    return {
+      unlock: normalizeUnlock(phase, unlockSrc),
+      read: normalizeRead(readSrc),
+    };
+  }
+  return {
+    unlock: normalizeUnlock(phase, {
+      implement: raw.implement,
+      issue: raw.issue,
+      issueTemplate: raw.issueTemplate,
+    }),
+    read: normalizeRead({
+      skills: raw.skills,
+      refs: raw.readRefs,
+    }),
+  };
+}
+
 export function loadState(root, id) {
   const name = findStateFileName(root, id);
   if (!name) return defaultState();
   try {
     const raw = JSON.parse(readFileSync(join(stateDir(root), name), 'utf8'));
     const phase = normalizePhase(typeof raw.phase === 'string' ? raw.phase : PHASE_DISCUSSION);
+    const { unlock, read } = coerceUnlockRead(raw, phase);
     return {
       phase,
-      implement: normalizeImplement(phase, raw.implement),
-      issue: normalizeIssue(phase, raw.issue),
-      issueTemplate: normalizeIssueTemplate(phase, raw.issueTemplate),
+      unlock,
+      read,
       review: normalizeReview(raw.review),
       check: normalizeCheck(raw.check),
-      readRefs: normalizeReadRefs(raw.readRefs),
       label: normalizeLabel(raw.label),
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : defaultState().updatedAt,
     };
@@ -328,6 +420,18 @@ export function loadState(root, id) {
   }
 }
 
+/**
+ * @param {string} root
+ * @param {string} id
+ * @param {{
+ *   phase?: string,
+ *   unlock?: Partial<{ implement: boolean | null, issue: boolean | null, issueTemplate: boolean }>,
+ *   read?: Partial<{ skills: string[], refs: string[] }>,
+ *   review?: unknown,
+ *   check?: unknown,
+ *   label?: string
+ * }} state
+ */
 export function saveState(root, id, state) {
   if (isUnknownConversationId(id)) return loadState(root, id);
   const dir = stateDir(root);
@@ -335,17 +439,27 @@ export function saveState(root, id, state) {
   const path = statePath(root, id);
   const prev = loadState(root, id);
   const phase = normalizePhase(state.phase ?? prev.phase);
+
+  const unlockPatch = state.unlock && typeof state.unlock === 'object' ? state.unlock : {};
+  const readPatch = state.read && typeof state.read === 'object' ? state.read : {};
+
   const next = {
     phase,
-    implement: normalizeImplement(phase, state.implement ?? prev.implement),
-    issue: normalizeIssue(phase, state.issue !== undefined ? state.issue : prev.issue),
-    issueTemplate: normalizeIssueTemplate(
-      phase,
-      state.issueTemplate !== undefined ? state.issueTemplate : prev.issueTemplate,
-    ),
+    unlock: normalizeUnlock(phase, {
+      implement:
+        unlockPatch.implement !== undefined ? unlockPatch.implement : prev.unlock.implement,
+      issue: unlockPatch.issue !== undefined ? unlockPatch.issue : prev.unlock.issue,
+      issueTemplate:
+        unlockPatch.issueTemplate !== undefined
+          ? unlockPatch.issueTemplate
+          : prev.unlock.issueTemplate,
+    }),
+    read: normalizeRead({
+      skills: readPatch.skills !== undefined ? readPatch.skills : prev.read.skills,
+      refs: readPatch.refs !== undefined ? readPatch.refs : prev.read.refs,
+    }),
     review: normalizeReview(state.review ?? prev.review),
     check: normalizeCheck(state.check ?? prev.check),
-    readRefs: normalizeReadRefs(state.readRefs !== undefined ? state.readRefs : prev.readRefs),
     label: normalizeLabel(state.label !== undefined ? state.label : prev.label),
     updatedAt: formatJstIso(),
   };
@@ -365,7 +479,7 @@ export function markReviewDirty(root, id, filePath) {
   const rel = relative(root, abs).split(sep).join('/');
   const review = normalizeReview(prev.review);
   if (rel && !review.files.includes(rel)) review.files.push(rel);
-  return saveState(root, id, { phase: prev.phase, implement: prev.implement, review });
+  return saveState(root, id, { phase: prev.phase, review });
 }
 
 /**
@@ -376,7 +490,6 @@ export function clearReviewFiles(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, {
     phase: prev.phase,
-    implement: prev.implement,
     review: defaultReview(),
   });
 }
@@ -386,35 +499,53 @@ export function resetReview(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, {
     phase: prev.phase,
-    implement: prev.implement,
     review: defaultReview(),
-    readRefs: prev.readRefs,
+  });
+}
+
+/** `.cursor/skills/<name>/SKILL.md` なら name、否则 null */
+export function skillNameFromPath(root, filePath) {
+  if (!filePath) return null;
+  const abs = resolve(isAbsolute(filePath) ? filePath : resolve(root, String(filePath)));
+  const rel = relative(root, abs);
+  if (!rel || rel.startsWith('..') || rel.includes(`..${sep}`)) return null;
+  const posix = rel.split(sep).join('/');
+  const m = posix.match(/^\.cursor\/skills\/([^/]+)\/SKILL\.md$/i);
+  return m ? m[1] : null;
+}
+
+/** SKILL.md Read を read.skills に記録（重複なし） */
+export function markReadSkill(root, id, skillName) {
+  const prev = loadState(root, id);
+  const skills = normalizeSkills([...(prev.read?.skills ?? []), skillName]);
+  return saveState(root, id, {
+    phase: prev.phase,
+    read: { skills, refs: prev.read.refs },
   });
 }
 
 /** implement/references の Read を記録 */
 export function markReadRef(root, id, refBasename) {
   const prev = loadState(root, id);
-  const readRefs = normalizeReadRefs([...(prev.readRefs ?? []), refBasename]);
+  const refs = normalizeReadRefs([...(prev.read?.refs ?? []), refBasename]);
   return saveState(root, id, {
     phase: prev.phase,
-    implement: prev.implement,
-    review: prev.review,
-    check: prev.check,
-    readRefs,
+    read: { skills: prev.read.skills, refs },
   });
 }
 
-/** フェーズ入場・再入場で reference 既読をクリア */
-export function clearReadRefs(root, id) {
+/** フェーズ入場・再入場で read 既読をクリア */
+export function clearRead(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, {
     phase: prev.phase,
-    implement: prev.implement,
-    review: prev.review,
-    check: prev.check,
-    readRefs: [],
+    read: defaultRead(),
   });
+}
+
+/** @deprecated clearRead を使う */
+export function clearReadRefs(root, id) {
+  return clearRead(root, id);
 }
 
 /** implement 解禁後の checkable 編集を溜める（stop で一括 format/lint/typecheck） */
@@ -426,8 +557,6 @@ export function markCheckPending(root, id, filePath) {
   if (rel && !check.pending.includes(rel)) check.pending.push(rel);
   return saveState(root, id, {
     phase: prev.phase,
-    implement: prev.implement,
-    review: prev.review,
     check,
   });
 }
@@ -437,8 +566,6 @@ export function resetCheck(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, {
     phase: prev.phase,
-    implement: prev.implement,
-    review: prev.review,
     check: defaultCheck(),
   });
 }
@@ -484,7 +611,7 @@ export function purgeStaleStates(root, now = Date.now()) {
 
 export function isUnlocked(state) {
   const phase = normalizePhase(state?.phase);
-  return WORK_PHASES.has(phase) && state?.implement === true;
+  return WORK_PHASES.has(phase) && state?.unlock?.implement === true;
 }
 
 /** パスがゲート state 配下か（エージェント編集禁止用） */
