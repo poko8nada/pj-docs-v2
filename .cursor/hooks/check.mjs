@@ -8,6 +8,7 @@
  * | beforeSubmitPrompt | leftover pending をフラッシュ（stop 漏れの保険） |
  */
 import { buildCheckFollowup, runFormatLint } from './_check.mjs';
+import { logHookIds } from './_id-log.mjs';
 import {
   conversationId,
   isUnlocked,
@@ -76,6 +77,7 @@ function handleBeforeSubmitPrompt(root, payload) {
 
 async function main() {
   const payload = await readStdinJson();
+  logHookIds(payload, 'check.mjs');
   const root = workspaceRoot(payload);
   const event = payload.hook_event_name ?? '';
 

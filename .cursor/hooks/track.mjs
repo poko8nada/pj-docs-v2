@@ -21,6 +21,7 @@ import {
 } from './_review.mjs';
 import { implementRefBasename } from './_refs.mjs';
 import { isCheckablePath } from './_check.mjs';
+import { logHookIds } from './_id-log.mjs';
 import {
   conversationId,
   defaultReview,
@@ -39,6 +40,7 @@ import {
   saveState,
   WORK_PHASES,
   workspaceRoot,
+  writeLastPromptId,
 } from './_state.mjs';
 
 const PHASE_RE = /(?:^|[\s`])\/(discussion|spec|design|forge|refine|chore)(?=[\s`/]|$)/i;
@@ -114,6 +116,8 @@ function maybeMarkReadRef(root, payload) {
 
 function handleBeforeSubmitPrompt(root, payload) {
   const id = conversationId(payload);
+  // ツール hooks は汚染されうるので、発話で確定した id を sticky にする
+  writeLastPromptId(root, id);
   const prompt = String(payload.prompt ?? '');
 
   if (BOOTSTRAP_OFF_RE.test(prompt)) {
@@ -227,6 +231,7 @@ function handleAfterShellExecution(root, payload) {
 
 async function main() {
   const payload = await readStdinJson();
+  logHookIds(payload, 'track.mjs');
   const root = workspaceRoot(payload);
   const event = payload.hook_event_name ?? '';
   const toolName = payload.tool_name ?? '';

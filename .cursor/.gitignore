@@ -1,5 +1,5 @@
 plans/
-hooks/probe-phase-entry.log.jsonl
+hooks/probe/
 hooks/state/
 hooks/.smoke-tmp/
 hooks/.bootstrap

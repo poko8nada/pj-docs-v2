@@ -40,7 +40,9 @@ export function workspaceRoot(payload) {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** transcript パスから conversation UUID を抽出 */
+/**
+ * transcript パスから conversation UUID を抽出
+ */
 export function idFromTranscriptPath(transcriptPath) {
   if (!transcriptPath || typeof transcriptPath !== 'string') return null;
   const stem = basename(transcriptPath, '.jsonl');
@@ -50,18 +52,96 @@ export function idFromTranscriptPath(transcriptPath) {
   return null;
 }
 
+/** state 配下: 直近 beforeSubmitPrompt で確定した conversation id（ツール hooks 用） */
+export const LAST_PROMPT_ID_FILENAME = 'last-prompt-id';
+
+export function lastPromptIdPath(root) {
+  return join(stateDir(root), LAST_PROMPT_ID_FILENAME);
+}
+
+/** @returns {string | null} */
+export function readLastPromptId(root) {
+  try {
+    const raw = readFileSync(lastPromptIdPath(root), 'utf8').trim();
+    if (!raw) return null;
+    if (raw.startsWith('{')) {
+      const parsed = JSON.parse(raw);
+      const id = typeof parsed?.id === 'string' ? parsed.id.trim() : '';
+      return id && !isUnknownConversationId(id) ? id : null;
+    }
+    return !isUnknownConversationId(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+/** beforeSubmitPrompt で解決した id を sticky として残す（unknown は書かない） */
+export function writeLastPromptId(root, id) {
+  if (isUnknownConversationId(id)) return null;
+  const dir = stateDir(root);
+  mkdirSync(dir, { recursive: true });
+  const next = {
+    id: String(id),
+    updatedAt: formatJstIso(),
+  };
+  writeFileSync(lastPromptIdPath(root), `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  return next;
+}
+
 /**
- * state キー。transcript を正とし、無ければ conversation_id / session_id。
- * どちらも無ければ `unknown`（save しない・編集不可）。
+ * ペイロード／env だけから ID を解く（sticky なし）。
+ * beforeSubmitPrompt の sticky 更新元、および sticky 未設定時のフォールバック。
  */
-export function conversationId(payload) {
+export function resolveConversationIdFromPayload(payload) {
   const fromPayload = idFromTranscriptPath(payload?.transcript_path);
-  if (fromPayload) return fromPayload;
+  if (fromPayload) return { id: fromPayload, via: 'payload.transcript_path' };
   const fromTranscriptEnv = idFromTranscriptPath(process.env.CURSOR_TRANSCRIPT_PATH);
-  if (fromTranscriptEnv) return fromTranscriptEnv;
-  if (payload?.conversation_id) return String(payload.conversation_id);
-  if (payload?.session_id) return String(payload.session_id);
-  return 'unknown';
+  if (fromTranscriptEnv) return { id: fromTranscriptEnv, via: 'env.CURSOR_TRANSCRIPT_PATH' };
+  if (payload?.conversation_id) {
+    return { id: String(payload.conversation_id), via: 'payload.conversation_id' };
+  }
+  if (payload?.session_id) return { id: String(payload.session_id), via: 'payload.session_id' };
+  return { id: 'unknown', via: 'unknown' };
+}
+
+/*
+ * --- 旧: 全イベントで payload をそのまま state キーにする ---
+ * 無効化理由 (2026-07-19): Cursor が tool / beforeReadFile / Shell の hooks に
+ * 別セッションの transcript_path・conversation_id を渡す汚染が観測された。
+ * 発話 (beforeSubmitPrompt) や Shell の CURSOR_CONVERSATION_ID は正しいのに、
+ * ツール系だけ旧 ID になり implement unlock が死ぬ。
+ * 参照用に残す（挙動は resolveConversationIdFromPayload と同じ）:
+ *
+ * export function resolveConversationId_legacyPayloadOnly(payload) {
+ *   return resolveConversationIdFromPayload(payload);
+ * }
+ */
+
+/**
+ * state キー解決（新）:
+ * - beforeSubmitPrompt → 常に payload（呼び出し側が sticky を更新）
+ * - それ以外 → sticky `last-prompt-id` 優先、無ければ payload フォールバック
+ *
+ * @returns {{ id: string, via: string }}
+ */
+export function resolveConversationId(payload) {
+  const event = String(payload?.hook_event_name ?? '');
+  const fromPayload = resolveConversationIdFromPayload(payload);
+
+  if (event === 'beforeSubmitPrompt') {
+    return fromPayload;
+  }
+
+  const sticky = readLastPromptId(workspaceRoot(payload));
+  if (sticky) {
+    return { id: sticky, via: 'sticky.last-prompt-id' };
+  }
+  return fromPayload;
+}
+
+/** state キー。resolveConversationId の id のみ。 */
+export function conversationId(payload) {
+  return resolveConversationId(payload).id;
 }
 
 export function isUnknownConversationId(id) {

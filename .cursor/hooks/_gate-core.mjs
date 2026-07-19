@@ -15,6 +15,7 @@ import {
   isBootstrapMarkerPath,
   isShellWriteToBootstrapMarker,
 } from './_bootstrap.mjs';
+import { logHookIds } from './_id-log.mjs';
 import { commandIncludesGitCommit, denyReviewMessage } from './_review.mjs';
 import { denyRefsMessage, missingRefs, requiredRefsForPath } from './_refs.mjs';
 import {
@@ -496,6 +497,7 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
 }
 
 export async function handleGate(payload) {
+  logHookIds(payload, 'gate-core');
   const root = workspaceRoot(payload);
   const state = loadState(root, conversationId(payload));
   const unlocked = isUnlocked(state);

@@ -7,6 +7,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { logHookIds } from './_id-log.mjs';
 import {
   conversationId,
   loadState,
@@ -186,6 +187,7 @@ function buildContext(worktree, root, id, stateFileRel) {
 
 async function main() {
   const payload = await readStdinJson();
+  logHookIds(payload, 'inject-context');
 
   // background / subagent 相当はスキップ
   if (payload.is_background_agent === true) {
