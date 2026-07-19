@@ -37,6 +37,8 @@ Revise until the user agrees the next move. Do not ask “app or web?” with no
 6. As slice plans and `# Screen` sections are agreed, persist them via `issue` skill. One vertical slice at a time when building the screen — user agreement between slices.
 7. During surface work, invoke **`grain`** (Audit / Improve) when visceral drift or polish needs a grain pass. Grain's close gate (Audit) is internal to grain — not a Design phase close condition.
 
+**Browser check:** Use the `cmux-browser` skill. Prefer an existing cmux surface and an already-running dev server. If the server is down, read `package.json` scripts and start the right one (prefer `dev`), then open/use cmux.
+
 Hand off to `issue` / `implement` / `grain` / `feasibility` by name — do not copy their contents here. Feasibility only when Design introduces technical choices beyond the Spec (by default if locking new stack/UI library decisions).
 
 Prototype screens use **hardcoded data** (realistic + edge cases) — that is correct for this phase; do not push live data or forge-style “capability stubs” thinking onto the thinking surface.

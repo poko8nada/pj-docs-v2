@@ -38,4 +38,6 @@ Revise until the user agrees which mode applies. Do not ask “① or ②?” wi
 3. Take **one vertical slice** → verify → get user agreement → update the Forge issue via `issue` skill. Repeat. Prefer draft-then-grow over horizontal splits (all APIs, then all UI).
 4. After UI slices that add interactivity, or when surface drifts from Design `# Grain` / `# Tokens`, invoke **`grain`** (Audit or Improve). Fold returned briefs into the next implement unit or a follow-up slice.
 
+**Browser check:** Use the `cmux-browser` skill. Prefer an existing cmux surface and an already-running dev server. If the server is down, read `package.json` scripts and start the right one (prefer `dev`), then open/use cmux.
+
 Hand off to `issue` / `feasibility` / `grain` / `implement` by name — do not copy their contents here.

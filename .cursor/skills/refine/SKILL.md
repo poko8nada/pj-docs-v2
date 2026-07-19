@@ -38,4 +38,6 @@ Revise until the user agrees which mode applies. Do not ask “① or ②?” wi
 3. Take **one vertical slice** → verify → get user agreement → update the Refine issue via `issue` skill. Repeat. Prefer draft-then-grow over horizontal splits (refactor everything, then test everything).
 4. For UX/visual polish slices, or when the product diverges from Design `# Grain` / `# Tokens`, invoke **`grain`** (Audit, Improve, or Define for a major re-skin). Fold returned briefs into the implement unit.
 
+**Browser check:** Use the `cmux-browser` skill. Prefer an existing cmux surface and an already-running dev server. If the server is down, read `package.json` scripts and start the right one (prefer `dev`), then open/use cmux.
+
 Hand off to `issue` / `feasibility` / `grain` / `implement` by name — do not copy their contents here.
