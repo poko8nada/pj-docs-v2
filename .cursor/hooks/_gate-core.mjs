@@ -476,18 +476,26 @@ function isShellWriteToState(root, command) {
   return false;
 }
 
-function isSetLabelShellCommand(command) {
-  const cleaned = normalizeShellForAllowlist(command).trim();
+/** 1 セグメントが set-label 単体なら true（セグメント内に `&` 等があれば false） */
+function isSetLabelShellSegment(segment) {
+  const cleaned = String(segment ?? '').trim();
   if (!cleaned) return false;
-  // 複合コマンドは不可（単体の set-label のみ常時 allow）。`&` は `&&` より後で判定
+  // セグメント内の複合は不可。`&` は `&&` より後で判定
   if (/&&|\|\||;|\n|\||&/.test(cleaned)) return false;
   return /(?:^|[\s/])node(?:\s+|$).*\.cursor\/skills\/label\/scripts\/set-label\.mjs(?:\s|$)/.test(
     cleaned,
   );
 }
 
+/** コマンド全体が set-label 単体（複合なし）なら true */
+function isSetLabelShellCommand(command) {
+  const cleaned = normalizeShellForAllowlist(command).trim();
+  if (!cleaned) return false;
+  if (/&&|\|\||;|\n|\||&/.test(cleaned)) return false;
+  return isSetLabelShellSegment(cleaned);
+}
+
 function isAllowedWithoutCodeUnlock(command, inWorkPhase) {
-  if (isSetLabelShellCommand(command)) return true;
   const cleaned = normalizeShellForAllowlist(command);
   const segments = cleaned
     .split(/&&|\|\||;|\n|\|/)
@@ -495,6 +503,8 @@ function isAllowedWithoutCodeUnlock(command, inWorkPhase) {
     .filter(Boolean);
   if (segments.length === 0) return true;
   return segments.every((seg) => {
+    // set-label セグメントは常時 OK。残りは従来どおり
+    if (isSetLabelShellSegment(seg)) return true;
     const cmd = firstCommandToken(seg);
     if (!cmd) return true;
     if (READONLY_CMDS.has(cmd)) return true;

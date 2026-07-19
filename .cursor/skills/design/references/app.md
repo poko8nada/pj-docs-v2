@@ -2,22 +2,25 @@
 
 ## Principle
 
-The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. The conversation around the screen produces the real output: `# Screen` (component matrix), `# Grain` / `# Tokens` (via `grain`), and the slice plan in the [Design] issue body.
+The screen is not a prototype — it's a thinking surface. Components are written production-ready from the start. Hardcoded data only. The conversation around the screen produces the real output: `# Screen` (Default + All component matrices), `# Grain` / `# Tokens` (via `grain`), and the slice plan in the Design issue body.
 
 - Data is realistic and covers edge cases: very long strings, very short strings, missing optional fields, zero counts, mixed statuses, special characters
 - CSS hover/focus/active styles are included as normal — these are part of the component, not separate states
-- Interactive behavior (clicks, modals opening, drag-and-drop) is not implemented — the screen is static. **Except for what CSS can does.**
+- Interactive behavior (clicks, modals opening, drag-and-drop) is not implemented — the screen is static. **Except for what CSS can do.**
 - The goal is to see the layout, hierarchy, typography, spacing, and component structure in a realistic condition
+- Scope of the thinking surface is the **default / home screen only**
 
 `prototype/` is disposable. It exists to bootstrap alignment, not to be maintained. Once the product is working, the product is the source of truth — not the Design issue body, not the default screen. Delete `prototype/` when the product can speak for itself.
 
+A **slice** is a vertical user-facing concern used as **build order** after the Default matrix exists. One slice includes the components for that concern, the screen composition update, and comment blocks.
+
 ---
 
-## Prepare
+## Stages
 
-The prepare workflow consists of 6 steps.
+Do not slice before the Default matrix. Do not fill All matrix before building.
 
-### Step 1: Analyze
+### 1. Analyze
 
 Read `package.json` and config files. Determine the prototype location and the components directory.
 
@@ -29,120 +32,61 @@ Read `package.json` and config files. Determine the prototype location and the c
 
 Components live in the appropriate components directory (e.g., `components/`, `src/components/`).
 
-### Step 2: Identify slices
+Agree the locations in chat. No issue write required for Analyze alone.
 
-Think about what the user sees on the default screen. Group related components into slices by user-facing concern.
+### 2. Grain Define
+
+If `# Grain` in the Design issue is empty, invoke **`grain`** — **Mode — Define**. Persist `# Grain` and `# Tokens` via `issue` after user agreement (milestone). Skip if `# Grain` is already filled.
+
+Details: `.cursor/skills/grain/SKILL.md` — do not duplicate Define flow here.
+
+### 3. Default Component Matrix (plan)
+
+From Spec + Grain, list what belongs on the **default screen only**. Thin columns are enough:
+
+| File | Role |
+| ---- | ---- |
+
+Show in chat; agree yes / edit / no. Persist at a milestone (often with Grain, or at session end) — not after every tweak.
+
+Do **not** invent build order here. Do **not** fill All / Implementation matrices yet.
+
+### 4. Slices (build order)
+
+Looking at the agreed Default matrix, decide **in what order** to build. Group related components into slices by user-facing concern.
 
 **Example (task app):**
 
-- Slice 1: Chrome (Header + Footer + index.tsx placeholder)
+- Slice 1: Chrome (Header + Footer + index placeholder)
 - Slice 2: Browse tasks (TaskList + TaskItem + EmptyState)
 - Slice 3: Add task (AddTaskModal)
 
-**Common slice groupings:**
+**Common groupings:** view concern / create concern / edit-delete concern / detail concern.
 
-- View concern: list + items + empty state
-- Create concern: form + modal + submit button
-- Edit/delete concern: edit mode + confirm dialog
-- Detail concern: detail panel or drawer
+Agree the checklist in chat. Persist `## Slices` under `# Plan` at a milestone (session end is fine).
 
-### Step 3: Grain
+### 5. Build slices
 
-If `# Grain` in the Design issue is empty, invoke **`grain`** skill — **Mode — Define** before Step 4. Persist returned `# Grain` and `# Tokens` via `issue` after user agreement in Step 5. Mode details and close gate: `.cursor/skills/grain/SKILL.md` — do not duplicate Define flow here.
+One slice at a time, with user agreement between slices. For each slice:
 
-If `# Grain` is already filled, skip.
+1. Confirm the slice in chat
+2. Caller runs `implement` (after implement handshake)
+3. Write components in production location; compose on the default screen
+4. Browser-check when useful
+5. Optionally thicken Default matrix rows (states / variants) in chat — **issue persist at session end**, not every slice
 
-### Step 4: Display
+During build, invoke **`grain`** Audit / Improve when the surface drifts.
 
-Show in chat: Grain summary, Tokens summary, proposed slice list, and Component Matrix placeholders.
+### 6. Close inventory
 
-### Step 5: User agreement
+After slices for the default screen are done:
 
-Present a clear yes / edit / no on the plan. Prefer grounded discussion over an empty prompt.
-
-- **yes** — the plan is locked in this workflow. Proceed to Step 6.
-- **edit** — the user provides specific edits. Update the plan and ask again.
-- **no** — the plan is rejected. Return to Step 2 with the user's feedback.
-
-### Step 6: Hand off body content to the caller
-
-After **yes**, return to the caller with the content below ready to persist (the caller writes the Design issue — do not raw-edit the issue from this file).
-
-**Filled in Step 6:**
-
-- `# Grain` and `# Tokens`: from grain Define (Step 3)
-- `## Slices` under `# Plan`: the slice list as checkboxes (all `[ ]`)
-- `## Component Matrix` (under `# Screen`): components for the default screen, placeholder states/variants
-
-**NOT filled in Step 6 (left as `(none)` or empty):**
-
-- `## Implementation Matrix`: filled when discussed during run (hook/API decisions often emerge from discussing the design)
-
-The body structure after Step 6:
-
-```markdown
-... existing plan sections (Goal, Reference, What, Constraints) ...
-
-# Plan (進捗管理)
-
-## Slices
-
-- [ ] Slice 1: Chrome
-- [ ] Slice 2: Browse tasks
-      ...
-
-# Wireframe (default screen)
-
-...
+1. Reconcile **Default Component Matrix** with what the prototype actually contains (File / Default / States / Variants as needed)
+2. Fill **All Component Matrix** — everything the product needs, including components **not** built on the thinking surface
+3. Fill **Implementation Matrix** — hooks / APIs / files discussed but not prototyped
+4. Agree in chat; persist once via `issue`; Design may close
 
 ---
-
-# Grain
-
-### Grain-stable
-
-| Axis | Choice |
-...
-
-### Behavioral temperament
-
-| Axis | Choice |
-...
-
----
-
-# Tokens
-
-### Color
-
-| Token | Value | Use |
-...
-
-### Typography
-
-...
-
-### Spacing
-
-...
-
-### Radius
-
-...
-
----
-
-# Screen
-
-## Component Matrix
-
-| File | Default | States | Variants |
-...
-
-## Implementation Matrix
-
-(none — to be filled after discuss / slices)
-```
 
 ## Design protocol
 

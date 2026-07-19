@@ -19,14 +19,13 @@ import {
   isPreCommitReviewerContext,
   isReviewablePath,
 } from './_review.mjs';
-import { implementRefBasename } from './_refs.mjs';
-import { issueTemplateBasename, issueTemplateValidForPhase, ISSUE_SKILL_REL } from './_issue.mjs';
+import { skillRefIdFromPath } from './_refs.mjs';
+import { ISSUE_SKILL_REL } from './_issue.mjs';
 import { isCheckablePath } from './_check.mjs';
 import { logHookIds } from './_id-log.mjs';
 import {
   conversationId,
   defaultRead,
-  defaultReview,
   findStateFileName,
   isReviewBlocking,
   loadState,
@@ -130,21 +129,6 @@ function maybeUnlockIssue(root, payload) {
   });
 }
 
-/** issue/references のフェーズ対応テンプレ Read で issueTemplate を立てる */
-function maybeMarkIssueTemplate(root, payload) {
-  const filePath = filePathFromPayload(payload);
-  const ref = issueTemplateBasename(root, String(filePath ?? ''));
-  if (!ref) return;
-  const id = conversationId(payload);
-  const state = loadState(root, id);
-  if (!SPEC_FLOW_PHASES.has(state.phase)) return;
-  if (!issueTemplateValidForPhase(state.phase, ref)) return;
-  saveState(root, id, {
-    phase: state.phase,
-    unlock: { ...state.unlock, issueTemplate: true },
-  });
-}
-
 function maybeUnlockImplement(root, payload) {
   const filePath = filePathFromPayload(payload);
   if (!isImplementSkill(root, String(filePath))) return;
@@ -159,14 +143,12 @@ function maybeUnlockImplement(root, payload) {
   }
 }
 
-/** implement/references/*.md の Read を read.refs に記録（作業フェーズ中） */
+/** 任意 skill の references 配下 md Read → read.refs（`skill/name.md`） */
 function maybeMarkReadRef(root, payload) {
   const filePath = filePathFromPayload(payload);
-  const ref = implementRefBasename(root, String(filePath ?? ''));
+  const ref = skillRefIdFromPath(root, String(filePath ?? ''));
   if (!ref) return;
   const id = conversationId(payload);
-  const state = loadState(root, id);
-  if (!WORK_PHASES.has(state.phase)) return;
   markReadRef(root, id, ref);
 }
 
@@ -192,24 +174,18 @@ function handleBeforeSubmitPrompt(root, payload) {
   const phase = match[1].toLowerCase();
   const prev = loadState(root, id);
   let unlock;
-  let review = normalizeReview(prev.review);
+  // review.files はフェーズ変更・再入場でも残す（clear は reviewer / commit のみ）
+  const review = normalizeReview(prev.review);
   // phase 再入場: read はクリア（skills / refs）
   const read = defaultRead();
 
   if (phase === PHASE_DISCUSSION) {
-    unlock = { implement: null, issue: null, issueTemplate: false };
-    review = defaultReview();
+    unlock = { implement: null, issue: null };
   } else if (phase === 'chore') {
-    unlock = { implement: false, issue: null, issueTemplate: false };
-    if (prev.phase !== phase) {
-      review = defaultReview();
-    }
+    unlock = { implement: false, issue: null };
   } else {
     // spec / design / forge / refine
-    unlock = { implement: false, issue: false, issueTemplate: false };
-    if (prev.phase !== phase) {
-      review = defaultReview();
-    }
+    unlock = { implement: false, issue: false };
   }
 
   saveState(root, id, { phase, unlock, read, review });
@@ -321,7 +297,6 @@ async function main() {
   if (isReadEvent) {
     maybeMarkReadSkill(root, payload);
     maybeUnlockIssue(root, payload);
-    maybeMarkIssueTemplate(root, payload);
     maybeUnlockImplement(root, payload);
     maybeMarkReadRef(root, payload);
     if (event === 'postToolUse') return empty();

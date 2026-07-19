@@ -110,9 +110,12 @@ function readIssues(worktree) {
   );
 }
 
-/** Cursor 特有: ワークスペース root 固定（エージェントが cd / git -C しがち） */
+/** Cursor 特有: ワークスペース root 固定 + Shell のまとめ方 */
 function readShell() {
-  return 'Shell cwd is workspace root. Do not `cd` to root or `git -C <workspace-root>`. Subdir `cd` is fine.';
+  return [
+    'Shell cwd is workspace root. Do not `cd` to root or `git -C <workspace-root>`. Subdir `cd` is fine.',
+    'Prefer one logical action per Shell call. Related pipes or short chains for one job are fine; do not bundle unrelated steps into one command — use separate Shell calls (parallel when independent).',
+  ].join('\n');
 }
 
 /** Cursor 特有: このリポの検索／取得の優先順位（MCP / 組み込みツール） */
@@ -126,9 +129,9 @@ function readWeb() {
 /** ゲート要点を1か所に（詳細は各 skill / deny メッセージ） */
 function readGateRules() {
   return [
-    'Phase: default `discussion`. Work only after user `/spec|/design|/forge|/refine|/chore`. Code → Read `implement/SKILL.md` (`unlock.implement`). Spec-flow entry → Read `issue/SKILL.md` + phase template (`unlock.issue` / `unlock.issueTemplate`). Phase re-entry clears `read.skills` / `read.refs`. Broken → user `/bootstrap` only.',
-    'References: before gated edits, Read the matching `implement/references/*.md` (deny names the file; tracked in `read.refs`). Do not edit state files.',
-    'Review: `review.files` non-empty → commit blocked; `/pre-commit-reviewer` clears. `md` / `json` / `yaml` are not tracked.',
+    'Phase: default `discussion`. Work only after user `/spec|/design|/forge|/refine|/chore`. Code → Read `implement/SKILL.md` (`unlock.implement`). Spec-flow entry → Read `issue/SKILL.md` + phase template (`unlock.issue`; template in `read.refs` as `issue/<template>.md`). Phase re-entry clears `read.skills` / `read.refs`. Broken → user `/bootstrap` only.',
+    'References: before gated edits, Read the matching `implement/references/*.md` (deny names the file; tracked in `read.refs` as `implement/<name>.md`). Any `.cursor/skills/*/references/*.md` Read is recorded as `skill/name.md`. Do not edit state files.',
+    'Review: `review.files` non-empty → commit blocked; `/pre-commit-reviewer` clears. Persists across phase changes. `md` / `json` / `yaml` are not tracked.',
   ].join('\n');
 }
 
@@ -140,13 +143,12 @@ function readGateState(root, id, stateFileRel) {
   const read = state.read ?? { skills: [], refs: [] };
   return [
     `Gate state (hooks-only; do not edit): \`${stateFileRel}\``,
-    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `unlock.implement`: `null` in discussion; `false` = handshake pending; `true` = unlocked. Spec-flow: `unlock.issue` / `unlock.issueTemplate`. `read.skills` = Read of `.cursor/skills/*/SKILL.md` (deduped; cleared on phase re-entry).',
+    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `unlock.implement`: `null` in discussion; `false` = handshake pending; `true` = unlocked. Spec-flow: `unlock.issue` (template via `read.refs`). `read.skills` = Read of `.cursor/skills/*/SKILL.md`; `read.refs` = `skill/name.md` (both cleared on phase re-entry).',
     'Set `label` via `node .cursor/skills/label/scripts/set-label.mjs <label>`.',
     '',
     'Current values:',
     `phase: ${state.phase}`,
     `unlock.issue: ${unlock.issue}`,
-    `unlock.issueTemplate: ${unlock.issueTemplate}`,
     `unlock.implement: ${unlock.implement}`,
     `read.skills: ${JSON.stringify(read.skills ?? [])}`,
     `read.refs: ${JSON.stringify(read.refs ?? [])}`,

@@ -13,7 +13,9 @@ Create thin (empty Plan sections). The `refine` skill + `references/plan.md` pro
 
 - Refine improves existing product code. The deliverable is the code; the body holds the Plan.
 - Plan shape: What / How (optional) / Order & Verify / File changes / Rationale — how to write it is `.cursor/skills/refine/references/plan.md`. Do not invent a different structure here.
-- Slices are thin improvements with impact tiers: High / Medium / Low / Risky. Mark slices done in Order & Verify; update Notes at natural break points.
+- Mode ①: inventory improvements from code analysis (with tiers), then slice order — do not slice from an empty list.
+- Slices are thin improvements with impact tiers: High / Medium / Low / Risky.
+- Persist issue updates at **milestones** (Mode ① lock, session end, close) — not after every slice. Chat agreement stays per slice.
 - Hypothetical cleanups are not targets. Improvements are grounded in actual code analysis.
 
 ### Success Criteria
@@ -25,7 +27,9 @@ Create thin (empty Plan sections). The `refine` skill + `references/plan.md` pro
 ### Common Failure Modes
 
 - Improvements not grounded in actual code — hypothetical cleanups.
+- Slicing before an inventory with impact tiers.
 - Unprioritized list of improvements. Refactoring "the entire module" or "all auth code".
+- Commenting / editing the issue after every slice agreement.
 - New tests added ad-hoc across slices, or no test regression check before/after each slice.
 
 <!-- FOR AGENT — do not edit. Operating instructions. -->

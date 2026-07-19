@@ -51,15 +51,15 @@ Always evaluate Visceral and Behavioral separately. Good looks must not mask con
 
 ### By phase (typical triggers)
 
-| Phase      | When to invoke grain                                                                              |
-| ---------- | ------------------------------------------------------------------------------------------------- |
-| **Spec**   | Rare. Goal/audience implies strong brand register — note for later Define only                    |
-| **Design** | `# Grain` empty → **Define**. Surface drift or polish → **Audit** / **Improve**                   |
-| **Forge**  | New UI surface; interactivity landed → **Audit**. Drift from `# Grain` → **Define** / **Improve** |
-| **Refine** | UX/visual polish slice → **Audit** / **Improve**. Major re-skin → **Define**                      |
-| **Chore**  | Exceptional — only when the chore is explicitly grain-doc or audit scope                          |
+| Phase      | When to invoke grain                                                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Spec**   | Rare. Goal/audience implies strong brand register — note for later Define only                                                             |
+| **Design** | After Analyze, before Default matrix: `# Grain` empty → **Define**. Surface drift → **Audit** / **Improve**. Close inventory may use Audit |
+| **Forge**  | New UI surface; interactivity landed → **Audit**. Drift from `# Grain` → **Define** / **Improve**                                          |
+| **Refine** | UX/visual polish slice → **Audit** / **Improve**. Major re-skin → **Define**                                                               |
+| **Chore**  | Exceptional — only when the chore is explicitly grain-doc or audit scope                                                                   |
 
-Design invokes grain most often (before `# Tokens`, during surface work). That is orchestration, not ownership — other phases may invoke grain the same way.
+Design invokes grain for Define once before the Default matrix, then Audit/Improve during surface work. That is orchestration, not ownership — other phases may invoke grain the same way.
 
 ## Close gate
 

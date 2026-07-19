@@ -31,6 +31,11 @@ Skip **How** for one-offs. If present: pattern, why this way (rejected alternati
 
 ### Order & Verify
 
+Do not invent slices from nothing. Same idea as Design (Default matrix → then build order):
+
+1. **Inventory** — from Spec + Design `# Screen` (Default / All) + Step 1 reconcile, list the capabilities in scope (chat is fine; short bullets).
+2. **Slice order** — only then sequence those items into vertical slices.
+
 **Two separate rules — do not collapse them:**
 
 1. **Capability order (how humans learn by building)**  
