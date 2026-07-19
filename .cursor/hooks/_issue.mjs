@@ -54,7 +54,7 @@ export function isSpecFlowPhase(phase) {
 
 export function isIssueReady(state) {
   if (!isSpecFlowPhase(state?.phase)) return true;
-  return state.issue === true && state.issueTemplate === true;
+  return state.unlock?.issue === true && state.unlock?.issueTemplate === true;
 }
 
 export function templateHintForPhase(phase) {
@@ -72,10 +72,10 @@ export function templateHintForPhase(phase) {
   }
 }
 
-/** @param {{ phase?: string, issue?: boolean | null, issueTemplate?: boolean }} state */
+/** @param {{ phase?: string, unlock?: { issue?: boolean | null, issueTemplate?: boolean } }} state */
 export function denyIssueMessage(state) {
   if (!isSpecFlowPhase(state?.phase)) return '[gate-issue] unexpected phase';
-  if (state.issue !== true) {
+  if (state.unlock?.issue !== true) {
     return `[gate-issue] Phase entry requires Read of \`${ISSUE_SKILL_REL}\` first.`;
   }
   return `[gate-issue] Read the phase issue template: ${templateHintForPhase(state.phase)}.`;

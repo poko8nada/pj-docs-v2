@@ -9,11 +9,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { logHookIds } from './_id-log.mjs';
 import {
-  conversationId,
+  isUnknownConversationId,
   loadState,
   onSessionStart,
+  resolveConversationIdFromPayload,
   statePathRelative,
   workspaceRoot,
+  writeLastPromptId,
 } from './_state.mjs';
 
 // null = 無制限 / 数値 = 文字数で機械カット
@@ -124,8 +126,8 @@ function readWeb() {
 /** ゲート要点を1か所に（詳細は各 skill / deny メッセージ） */
 function readGateRules() {
   return [
-    'Phase: default `discussion`. Work only after user `/spec|/design|/forge|/refine|/chore`. Code → Read `implement/SKILL.md`. Trigger → `implement: false`, `readRefs: []`. Spec-flow entry → Read `issue/SKILL.md` + phase issue template (`issue` / `issueTemplate`). Broken → user `/bootstrap` only.',
-    'References: before gated edits, Read the matching `implement/references/*.md` (deny names the file). Do not edit state files.',
+    'Phase: default `discussion`. Work only after user `/spec|/design|/forge|/refine|/chore`. Code → Read `implement/SKILL.md` (`unlock.implement`). Spec-flow entry → Read `issue/SKILL.md` + phase template (`unlock.issue` / `unlock.issueTemplate`). Phase re-entry clears `read.skills` / `read.refs`. Broken → user `/bootstrap` only.',
+    'References: before gated edits, Read the matching `implement/references/*.md` (deny names the file; tracked in `read.refs`). Do not edit state files.',
     'Review: `review.files` non-empty → commit blocked; `/pre-commit-reviewer` clears. `md` / `json` / `yaml` are not tracked.',
   ].join('\n');
 }
@@ -134,20 +136,23 @@ function readGateState(root, id, stateFileRel) {
   const state = loadState(root, id);
   const review = state.review ?? { files: [] };
   const check = state.check ?? { pending: [] };
+  const unlock = state.unlock ?? {};
+  const read = state.read ?? { skills: [], refs: [] };
   return [
     `Gate state (hooks-only; do not edit): \`${stateFileRel}\``,
-    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `implement`: `null` in discussion; `false` = handshake pending; `true` = unlocked. `issue` / `issueTemplate`: Spec-flow entry handshake (`null` / `false` = pending).',
+    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `unlock.implement`: `null` in discussion; `false` = handshake pending; `true` = unlocked. Spec-flow: `unlock.issue` / `unlock.issueTemplate`. `read.skills` = Read of `.cursor/skills/*/SKILL.md` (deduped; cleared on phase re-entry).',
     'Set `label` via `node .cursor/skills/label/scripts/set-label.mjs <label>`.',
     '',
     'Current values:',
     `phase: ${state.phase}`,
-    `issue: ${state.issue}`,
-    `issueTemplate: ${state.issueTemplate}`,
-    `implement: ${state.implement}`,
+    `unlock.issue: ${unlock.issue}`,
+    `unlock.issueTemplate: ${unlock.issueTemplate}`,
+    `unlock.implement: ${unlock.implement}`,
+    `read.skills: ${JSON.stringify(read.skills ?? [])}`,
+    `read.refs: ${JSON.stringify(read.refs ?? [])}`,
     `label: ${state.label ? state.label : '(none)'}`,
     `review.files: ${JSON.stringify(review.files ?? [])}`,
     `check.pending: ${JSON.stringify(check.pending ?? [])}`,
-    `readRefs: ${JSON.stringify(state.readRefs ?? [])}`,
   ].join('\n');
 }
 
@@ -197,7 +202,10 @@ async function main() {
   }
 
   const root = workspaceRoot(payload);
-  const id = conversationId(payload);
+  // inject は sessionStart 専用。sticky は前会話の残りがありうるので常に payload。
+  const id = resolveConversationIdFromPayload(payload).id;
+  // 初回発話前のツール hooks もこの会話を見るよう sticky を即更新
+  if (!isUnknownConversationId(id)) writeLastPromptId(root, id);
   onSessionStart(root);
   const stateFileRel = statePathRelative(root, id);
 

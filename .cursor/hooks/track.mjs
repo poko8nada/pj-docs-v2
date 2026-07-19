@@ -5,7 +5,7 @@
  * | Event              | Action                                      |
  * |--------------------|---------------------------------------------|
  * | beforeSubmitPrompt | phase / bootstrap                           |
- * | Read*              | implement unlock + readRefs on references/*.md |
+ * | Read*              | unlock + read.skills / read.refs            |
  * | postToolUse Write* | review.pending + check.pending              |
  * | preToolUse Task         | inject review.files → reviewed on reviewer    |
  * | afterShellExecution     | git commit 成功 → review/check reset          |
@@ -25,6 +25,7 @@ import { isCheckablePath } from './_check.mjs';
 import { logHookIds } from './_id-log.mjs';
 import {
   conversationId,
+  defaultRead,
   defaultReview,
   findStateFileName,
   isReviewBlocking,
@@ -32,6 +33,7 @@ import {
   markCheckPending,
   markReviewDirty,
   markReadRef,
+  markReadSkill,
   clearReviewFiles,
   normalizeReview,
   normalizeCheck,
@@ -39,6 +41,7 @@ import {
   resetCheck,
   resetReview,
   saveState,
+  skillNameFromPath,
   SPEC_FLOW_PHASES,
   WORK_PHASES,
   workspaceRoot,
@@ -106,6 +109,15 @@ function isIssueSkill(root, filePath) {
   }
 }
 
+/** 任意の `.cursor/skills/<name>/SKILL.md` Read → read.skills */
+function maybeMarkReadSkill(root, payload) {
+  const filePath = filePathFromPayload(payload);
+  const name = skillNameFromPath(root, String(filePath ?? ''));
+  if (!name) return;
+  const id = conversationId(payload);
+  markReadSkill(root, id, name);
+}
+
 function maybeUnlockIssue(root, payload) {
   const filePath = filePathFromPayload(payload);
   if (!isIssueSkill(root, String(filePath))) return;
@@ -114,12 +126,7 @@ function maybeUnlockIssue(root, payload) {
   if (!SPEC_FLOW_PHASES.has(prev.phase)) return;
   saveState(root, id, {
     phase: prev.phase,
-    issue: true,
-    implement: prev.implement,
-    issueTemplate: prev.issueTemplate,
-    review: prev.review,
-    check: prev.check,
-    readRefs: prev.readRefs,
+    unlock: { ...prev.unlock, issue: true },
   });
 }
 
@@ -134,12 +141,7 @@ function maybeMarkIssueTemplate(root, payload) {
   if (!issueTemplateValidForPhase(state.phase, ref)) return;
   saveState(root, id, {
     phase: state.phase,
-    issue: state.issue,
-    issueTemplate: true,
-    implement: state.implement,
-    review: state.review,
-    check: state.check,
-    readRefs: state.readRefs,
+    unlock: { ...state.unlock, issueTemplate: true },
   });
 }
 
@@ -149,11 +151,15 @@ function maybeUnlockImplement(root, payload) {
   const id = conversationId(payload);
   const prev = loadState(root, id);
   if (WORK_PHASES.has(prev.phase)) {
-    saveState(root, id, { phase: prev.phase, implement: true, review: prev.review });
+    saveState(root, id, {
+      phase: prev.phase,
+      unlock: { ...prev.unlock, implement: true },
+      review: prev.review,
+    });
   }
 }
 
-/** implement/references/*.md の Read を readRefs に記録（作業フェーズ中） */
+/** implement/references/*.md の Read を read.refs に記録（作業フェーズ中） */
 function maybeMarkReadRef(root, payload) {
   const filePath = filePathFromPayload(payload);
   const ref = implementRefBasename(root, String(filePath ?? ''));
@@ -177,7 +183,7 @@ function handleBeforeSubmitPrompt(root, payload) {
   }
 
   if (!findStateFileName(root, id)) {
-    saveState(root, id, { phase: PHASE_DISCUSSION, implement: null });
+    saveState(root, id, { phase: PHASE_DISCUSSION, unlock: { implement: null } });
   }
 
   const match = prompt.match(PHASE_RE);
@@ -185,46 +191,35 @@ function handleBeforeSubmitPrompt(root, payload) {
 
   const phase = match[1].toLowerCase();
   const prev = loadState(root, id);
-  let implement;
-  let issue;
-  let issueTemplate;
+  let unlock;
   let review = normalizeReview(prev.review);
-  let readRefs = [...(prev.readRefs ?? [])];
+  // phase 再入場: read はクリア（skills / refs）
+  const read = defaultRead();
 
   if (phase === PHASE_DISCUSSION) {
-    implement = null;
-    issue = null;
-    issueTemplate = false;
+    unlock = { implement: null, issue: null, issueTemplate: false };
     review = defaultReview();
-    readRefs = [];
   } else if (phase === 'chore') {
-    // 作業単位の境界（issue ハンドシェイクは Spec-flow のみ）
-    implement = false;
-    issue = null;
-    issueTemplate = false;
-    readRefs = [];
+    unlock = { implement: false, issue: null, issueTemplate: false };
     if (prev.phase !== phase) {
       review = defaultReview();
     }
   } else {
     // spec / design / forge / refine
-    implement = false;
-    issue = false;
-    issueTemplate = false;
-    readRefs = [];
+    unlock = { implement: false, issue: false, issueTemplate: false };
     if (prev.phase !== phase) {
       review = defaultReview();
     }
   }
 
-  saveState(root, id, { phase, implement, issue, issueTemplate, review, readRefs });
+  saveState(root, id, { phase, unlock, read, review });
   return respond({ continue: true });
 }
 
 function maybeMarkCheckPending(root, payload) {
   const id = conversationId(payload);
   const state = loadState(root, id);
-  if (!WORK_PHASES.has(state.phase) || state.implement !== true) return;
+  if (!WORK_PHASES.has(state.phase) || state.unlock?.implement !== true) return;
 
   const filePath = filePathFromPayload(payload);
   if (!filePath || !isCheckablePath(root, String(filePath))) return;
@@ -238,7 +233,7 @@ function maybeMarkCheckPending(root, payload) {
 function maybeMarkReviewDirty(root, payload) {
   const id = conversationId(payload);
   const state = loadState(root, id);
-  if (!WORK_PHASES.has(state.phase) || state.implement !== true) return;
+  if (!WORK_PHASES.has(state.phase) || state.unlock?.implement !== true) return;
 
   const filePath = filePathFromPayload(payload);
   if (!filePath || !isReviewablePath(root, String(filePath))) return;
@@ -324,6 +319,7 @@ async function main() {
     ((event === 'preToolUse' || event === 'postToolUse') && isReadTool);
 
   if (isReadEvent) {
+    maybeMarkReadSkill(root, payload);
     maybeUnlockIssue(root, payload);
     maybeMarkIssueTemplate(root, payload);
     maybeUnlockImplement(root, payload);

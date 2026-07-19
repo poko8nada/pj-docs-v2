@@ -12,7 +12,7 @@ Turn Spec + Design into working product: lock a slice plan, then implement it.
 
 ## On entry
 
-**Harness handshake (required):** Read `.cursor/skills/issue/SKILL.md`, then `issue/references/forge-template.md`. Gate blocks `gh issue` writes until `issue` and `issueTemplate` are true in state.
+**Harness handshake (required):** Read `.cursor/skills/issue/SKILL.md`, then `issue/references/forge-template.md`. Gate blocks `gh issue` writes until both Reads are done.
 
 Inspect the repo and open issues first (Spec, Design, Forge if any). Then present **Context / Understanding / Proposal** in one message — your reading of where the project is, not a question dump.
 

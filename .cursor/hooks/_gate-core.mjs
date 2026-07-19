@@ -38,14 +38,26 @@ import {
 
 const WRITE_TOOLS = new Set(['Write', 'StrReplace', 'Delete', 'EditNotebook']);
 
-const DENY_CODE =
-  '[gate] Code edits require a work phase (/spec|/design|/forge|/refine|/chore) and Read of .cursor/skills/implement/SKILL.md. Default phase is discussion (no code).';
-
-const DENY_SHELL =
-  '[gate] Shell blocked. In discussion: read-only commands + read-only gh/git only. After a work phase: gh/git are allowed; other commands need implement Read.';
-
 const DENY_STATE =
   '[gate] Gate state files are hooks-only. Read is allowed; do not edit `.cursor/hooks/state/**`.';
+
+/** @param {string} phase */
+function denyCodeMessage(phase) {
+  const p = phase || 'discussion';
+  if (WORK_PHASES.has(p)) {
+    return `[gate] Code edits blocked (phase=${p}, implement≠true). Read .cursor/skills/implement/SKILL.md to unlock.`;
+  }
+  return `[gate] Code edits blocked (phase=${p}). Enter a work phase (/spec|/design|/forge|/refine|/chore), then Read .cursor/skills/implement/SKILL.md.`;
+}
+
+/** @param {string} phase */
+function denyShellMessage(phase) {
+  const p = phase || 'discussion';
+  if (WORK_PHASES.has(p)) {
+    return `[gate] Shell blocked (phase=${p}, implement≠true). gh/git are allowed; other commands need implement Read. Prefer --body-file path over <(cat <<EOF) if a gh/git command was denied unexpectedly.`;
+  }
+  return `[gate] Shell blocked (phase=${p}). Read-only commands + read-only gh/git only. Enter a work phase for gh/git writes; other commands need implement Read.`;
+}
 
 const DENY_BOOTSTRAP =
   '[gate] Bootstrap marker is hooks-only. User invokes /bootstrap or /bootstrap off.';
@@ -263,6 +275,28 @@ function stripQuotesAndHeredoc(command) {
   return cleaned;
 }
 
+/** `<(...)` / `$(...)` を除去（ネストは浅い繰り返しで落とす） */
+function stripProcessAndCommandSubstitutions(command) {
+  let cleaned = String(command ?? '');
+  for (let i = 0; i < 8; i += 1) {
+    const next = cleaned.replace(/<\([^)]*\)/g, ' ').replace(/\$\([^)]*\)/g, ' ');
+    if (next === cleaned) break;
+    cleaned = next;
+  }
+  return cleaned;
+}
+
+/**
+ * allowlist 判定用にシェル構文ノイズを潰す。
+ * heredoc 除去後に残る改行で `)` が単独セグメントになり DENY になるのを防ぐ。
+ */
+function normalizeShellForAllowlist(command) {
+  let cleaned = stripQuotesAndHeredoc(String(command ?? ''));
+  cleaned = stripProcessAndCommandSubstitutions(cleaned);
+  cleaned = cleaned.replace(/\n+/g, ' ');
+  return cleaned;
+}
+
 function tokenize(segment) {
   return segment.trim().split(/\s+/).filter(Boolean);
 }
@@ -442,10 +476,10 @@ function isShellWriteToState(root, command) {
 }
 
 function isSetLabelShellCommand(command) {
-  const cleaned = stripQuotesAndHeredoc(String(command ?? '')).trim();
+  const cleaned = normalizeShellForAllowlist(command).trim();
   if (!cleaned) return false;
   // 複合コマンドは不可（単体の set-label のみ常時 allow）。`&` は `&&` より後で判定
-  if (/&&|\|\||;|\n|\||&/.test(cleaned)) return false;
+  if (/&&|\|\||;|\||&/.test(cleaned)) return false;
   return /(?:^|[\s/])node(?:\s+|$).*\.cursor\/skills\/label\/scripts\/set-label\.mjs(?:\s|$)/.test(
     cleaned,
   );
@@ -453,9 +487,9 @@ function isSetLabelShellCommand(command) {
 
 function isAllowedWithoutCodeUnlock(command, inWorkPhase) {
   if (isSetLabelShellCommand(command)) return true;
-  const cleaned = stripQuotesAndHeredoc(String(command ?? ''));
+  const cleaned = normalizeShellForAllowlist(command);
   const segments = cleaned
-    .split(/&&|\|\||;|\n|\|/)
+    .split(/&&|\|\||;|\|/)
     .map((s) => s.trim())
     .filter(Boolean);
   if (segments.length === 0) return true;
@@ -507,7 +541,7 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
 
   if (unlocked) return allow();
   if (isAllowedWithoutCodeUnlock(command, inWorkPhase)) return allow();
-  return deny(DENY_SHELL);
+  return deny(denyShellMessage(state.phase));
 }
 
 export async function handleGate(payload) {
@@ -558,12 +592,12 @@ export async function handleGate(payload) {
   if (unlocked) {
     if (WRITE_TOOLS.has(toolName) && fileArg) {
       const required = requiredRefsForPath(root, String(fileArg));
-      const missing = missingRefs(state.readRefs ?? [], required);
+      const missing = missingRefs(state.read?.refs ?? [], required);
       if (missing.length > 0) return deny(denyRefsMessage(missing));
     }
     return allow();
   }
 
   if (fileArg && isRootMarkdown(root, String(fileArg))) return allow();
-  return deny(DENY_CODE);
+  return deny(denyCodeMessage(state.phase));
 }

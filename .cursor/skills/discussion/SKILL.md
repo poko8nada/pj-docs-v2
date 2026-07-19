@@ -35,7 +35,7 @@ Revise until the user agrees the next move. Do not drift into implementation.
 
 ## Hard limits
 
-- Do **not** Read `.cursor/skills/implement/SKILL.md` for code — `implement` is not applicable in this phase (`implement: null` in gate state).
+- Do **not** Read `.cursor/skills/implement/SKILL.md` for code — that handshake does not apply in this phase.
 - Do **not** create or update GitHub issues here — that belongs in work phases via `issue` skill after user entry.
 - Do **not** run mutating `gh`/`git`, `pnpm`, or other shell that changes the repo.
 
