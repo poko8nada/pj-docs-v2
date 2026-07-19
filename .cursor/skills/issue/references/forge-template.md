@@ -14,7 +14,7 @@ Create thin (empty Plan sections). The `forge` skill + `references/plan.md` prod
 - Forge turns Spec + Design into working product. The deliverable is the code; the body holds the Plan.
 - Plan shape: What / How (optional) / Order & Verify / File changes / Rationale — how to write it is `.cursor/skills/forge/references/plan.md`. Do not invent a different structure here.
 - Slices are vertical capabilities (one sitting, verifiable). Capability order and data fidelity are separate rules — see plan.md. Mark slices done in Order & Verify; update Notes at natural break points.
-- Design Spec is the source for component structure, Props, and TODOs. Read the Design issue before locking or implementing.
+- Design issue `# Screen` is the source for component structure, Props, and TODOs. `# Grain` and `# Tokens` set visual direction. Read the Design issue before locking or implementing.
 
 ### Success Criteria
 

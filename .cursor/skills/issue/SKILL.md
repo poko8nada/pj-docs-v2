@@ -37,7 +37,7 @@ Do **not** invent phase work or re-argue the plan here. If the caller already ha
 
 - **Spec** — thick product design (Goal / Scope / Architecture / decisions). One per project or version. Update body only when those shift; record why in a Spec comment.
 - **Phase issues** — Design / Forge / Refine are just-in-time; close when the phase work for that issue is done. Reference prior phase issue(s) and the codebase in the body.
-- **Create thin, fill as you go** — on create, body is the template with empty sections. Content is filled as the phase agrees (Design Spec sections, Forge/Refine Plan, slice checkboxes).
+- **Create thin, fill as you go** — on create, body is the template with empty sections. Content is filled as the phase agrees (`# Grain` / `# Tokens` / `# Screen` for Design, Forge/Refine Plan, slice checkboxes).
 - **Body is source of truth** for the phase’s durable output. Drift between body and agreed work is a failure mode.
 - **Comments** — living work log for lifecycle and material updates (see table). Issues are session-to-session memory; cite issue numbers in commits / PRs.
 

@@ -5,14 +5,14 @@ description: >-
   first-impression clarity, and interaction feel — through style axes, not upfront color or font
   picks. Runs Define, Audit, Improve, and Create modes; output is UI code. Use when setting visual
   direction, reviewing web or app look-and-feel, improving scroll and click UX, auditing whether
-  first-time visitors understand the product at a glance, or before Design Style Guide tokens.
+  first-time visitors understand the product at a glance, or before Design `# Tokens`.
 ---
 
 # grain
 
 **Grain** is the product's surface character: how it looks, how it reads at first glance, and how it feels to scroll, click, and navigate. Grain is not a palette or type stack — those are derived _after_ the style language is agreed.
 
-Soft skill: callable standalone or from `design` before locking Style Guide tokens. Output is **direct UI creation or improvement**, not a separate brief file.
+Soft skill: callable standalone or one-way from `design` before locking `# Tokens`. Output is **direct UI creation or improvement**, or markdown blocks (`# Grain`, `# Tokens`) returned to the caller — not a separate brief file.
 
 ## Backbone: three levels
 
@@ -51,7 +51,7 @@ Typical states (anchors for Understanding):
 - UI exists, user wants review → propose **Mode — Audit** (Define first if grain is unknown and findings need a target)
 - Audit done or user named fixes → propose **Mode — Improve**
 - Grain agreed, new surface to build → propose **Mode — Create**
-- Called from `design` before Style Guide or slices → **Mode — Define**, then return to caller
+- Called from `design` before `# Tokens` or slices → **Mode — Define**, return `# Grain` + `# Tokens` to caller
 
 Revise until the user agrees the mode. If Improve or Create runs without agreed grain, propose axes in chat and get **yes** / **edit** before coding.
 
@@ -62,25 +62,25 @@ Revise until the user agrees the mode. If Improve or Create runs without agreed 
 | New screen or section                      | Define → Create                                            |
 | Existing UI, unknown quality               | Audit → (optional Improve)                                 |
 | Existing UI, known issues                  | Improve (Define first if grain unclear)                    |
-| Design phase, no Style Guide yet           | Define → caller persists via `design` / `issue`            |
-| Polish only, grain already in Design issue | Audit or Improve — skip Define if issue body is sufficient |
+| Design phase, `# Grain` empty                 | Define → return `# Grain` + `# Tokens` to caller         |
+| Polish only, grain already in Design issue    | Audit or Improve — skip Define if issue body is sufficient |
 
 Audit alone does not require Improve. Define alone does not require Create.
 
 ## Mode — Define
 
-**When:** No agreed style language; or `design` needs grain before Style Guide tokens.
+**When:** No agreed style language; or caller needs grain before `# Tokens`.
 
-**Prerequisite:** None. Issue-driven context preferred (see Flow).
+**Prerequisite:** None. Issue-driven context preferred when issues exist (see Flow).
 
 **Flow:**
 
-1. **Inspect issues** — list and read open Spec and Design issues (`gh` / `issue` skill). Extract Goal, audience, constraints, and any existing Style Guide.
+1. **Inspect issues** — list and read open Spec and Design issues (`gh` when available). Extract Goal, audience, constraints, and any existing `# Grain` / `# Tokens`.
 2. **Fallback context** — if no issues: repo UI, planning docs, user description.
 3. **Ground proposal** — state what Goal/direction implies for grain before showing axes. Propose **grain-stable** axes and behavioral temperament first (see Decision layers in [references/axes.md](references/axes.md)); compact table or spectrum; no color hex.
 4. User agrees: **yes** / **edit** / **no** (revise on edit or no).
 5. Derive **tokens** from agreed grain-stable choices — color, typography, spacing, radius numbers — last step only.
-6. If caller is `design`, return token table for Design issue Style Guide via `issue`. If standalone, proceed to Create or stop per user.
+6. Return `# Grain` and `# Tokens` markdown blocks to the caller for persistence. If standalone, apply tokens in code and proceed to Create or stop per user.
 
 Do not lock fonts by brand name until axes are agreed. Describe typographic _role_ first (e.g. "quiet body, assertive display").
 
@@ -135,13 +135,11 @@ Do not lock fonts by brand name until axes are agreed. Describe typographic _rol
 
 ## Handoffs
 
-| Need                                  | Skill       |
-| ------------------------------------- | ----------- |
-| Code permission and build rules       | `implement` |
-| Thinking-surface slices, Design issue | `design`    |
-| Issue read / write (Spec, Design)     | `issue`     |
+| Need                            | Skill       |
+| ------------------------------- | ----------- |
+| Code permission and build rules | `implement` |
 
-From `design`: run **Mode — Define** (or confirm grain from Design issue) before filling Style Guide tokens or building slices that set visual direction.
+Grain does not invoke phase skills (`design`, `issue`). Callers persist returned `# Grain` / `# Tokens` blocks.
 
 ## Anti-patterns
 
