@@ -12,6 +12,8 @@ Improve the existing product with the same two-step discipline as Forge: lock a 
 
 ## On entry
 
+**Harness handshake (required):** Read `.cursor/skills/issue/SKILL.md`, then `issue/references/refine-template.md`. Gate blocks `gh issue` writes until `issue` and `issueTemplate` are true in state.
+
 Inspect the repo and open issues first (Spec, Design, Forge, Refine if any). Then present **Context / Understanding / Proposal** in one message — your reading of where the project is, not a question dump.
 
 Typical states (use as anchors in Understanding):

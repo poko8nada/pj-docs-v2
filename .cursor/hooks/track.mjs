@@ -20,6 +20,7 @@ import {
   isReviewablePath,
 } from './_review.mjs';
 import { implementRefBasename } from './_refs.mjs';
+import { issueTemplateBasename, issueTemplateValidForPhase, ISSUE_SKILL_REL } from './_issue.mjs';
 import { isCheckablePath } from './_check.mjs';
 import { logHookIds } from './_id-log.mjs';
 import {
@@ -38,6 +39,7 @@ import {
   resetCheck,
   resetReview,
   saveState,
+  SPEC_FLOW_PHASES,
   WORK_PHASES,
   workspaceRoot,
   writeLastPromptId,
@@ -93,6 +95,54 @@ function isImplementSkill(root, filePath) {
   }
 }
 
+function isIssueSkill(root, filePath) {
+  if (!filePath) return false;
+  try {
+    const abs = realpathSync(isAbsolute(filePath) ? filePath : resolve(root, filePath));
+    const target = realpathSync(join(root, ISSUE_SKILL_REL));
+    return abs === target;
+  } catch {
+    return false;
+  }
+}
+
+function maybeUnlockIssue(root, payload) {
+  const filePath = filePathFromPayload(payload);
+  if (!isIssueSkill(root, String(filePath))) return;
+  const id = conversationId(payload);
+  const prev = loadState(root, id);
+  if (!SPEC_FLOW_PHASES.has(prev.phase)) return;
+  saveState(root, id, {
+    phase: prev.phase,
+    issue: true,
+    implement: prev.implement,
+    issueTemplate: prev.issueTemplate,
+    review: prev.review,
+    check: prev.check,
+    readRefs: prev.readRefs,
+  });
+}
+
+/** issue/references のフェーズ対応テンプレ Read で issueTemplate を立てる */
+function maybeMarkIssueTemplate(root, payload) {
+  const filePath = filePathFromPayload(payload);
+  const ref = issueTemplateBasename(root, String(filePath ?? ''));
+  if (!ref) return;
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  if (!SPEC_FLOW_PHASES.has(state.phase)) return;
+  if (!issueTemplateValidForPhase(state.phase, ref)) return;
+  saveState(root, id, {
+    phase: state.phase,
+    issue: state.issue,
+    issueTemplate: true,
+    implement: state.implement,
+    review: state.review,
+    check: state.check,
+    readRefs: state.readRefs,
+  });
+}
+
 function maybeUnlockImplement(root, payload) {
   const filePath = filePathFromPayload(payload);
   if (!isImplementSkill(root, String(filePath))) return;
@@ -136,23 +186,38 @@ function handleBeforeSubmitPrompt(root, payload) {
   const phase = match[1].toLowerCase();
   const prev = loadState(root, id);
   let implement;
+  let issue;
+  let issueTemplate;
   let review = normalizeReview(prev.review);
   let readRefs = [...(prev.readRefs ?? [])];
 
   if (phase === PHASE_DISCUSSION) {
     implement = null;
+    issue = null;
+    issueTemplate = false;
     review = defaultReview();
     readRefs = [];
-  } else {
-    // 作業フェーズ入場・再入場＝作業単位の境界
+  } else if (phase === 'chore') {
+    // 作業単位の境界（issue ハンドシェイクは Spec-flow のみ）
     implement = false;
+    issue = null;
+    issueTemplate = false;
+    readRefs = [];
+    if (prev.phase !== phase) {
+      review = defaultReview();
+    }
+  } else {
+    // spec / design / forge / refine
+    implement = false;
+    issue = false;
+    issueTemplate = false;
     readRefs = [];
     if (prev.phase !== phase) {
       review = defaultReview();
     }
   }
 
-  saveState(root, id, { phase, implement, review, readRefs });
+  saveState(root, id, { phase, implement, issue, issueTemplate, review, readRefs });
   return respond({ continue: true });
 }
 
@@ -259,6 +324,8 @@ async function main() {
     ((event === 'preToolUse' || event === 'postToolUse') && isReadTool);
 
   if (isReadEvent) {
+    maybeUnlockIssue(root, payload);
+    maybeMarkIssueTemplate(root, payload);
     maybeUnlockImplement(root, payload);
     maybeMarkReadRef(root, payload);
     if (event === 'postToolUse') return empty();

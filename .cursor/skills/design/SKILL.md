@@ -12,6 +12,8 @@ Agree on product screen design by building a realistic default/home screen. The 
 
 ## On entry
 
+**Harness handshake (required):** Read `.cursor/skills/issue/SKILL.md`, then `issue/references/design-app-template.md` or `design-web-template.md` (pick one). Gate blocks `gh issue` writes until `issue` and `issueTemplate` are true in state.
+
 Inspect the repo and open issues first (Spec, Design if any). Then present **Context / Understanding / Proposal** in one message — your reading of where the project is, not a question dump. Confirm **app vs web** in that Proposal when it matters.
 
 Typical states (use as anchors in Understanding):

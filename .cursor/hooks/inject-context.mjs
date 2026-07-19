@@ -124,7 +124,7 @@ function readWeb() {
 /** ゲート要点を1か所に（詳細は各 skill / deny メッセージ） */
 function readGateRules() {
   return [
-    'Phase: default `discussion`. Work only after user `/spec|/design|/forge|/refine|/chore`. Code → Read `implement/SKILL.md`. Trigger → `implement: false`, `readRefs: []`. Broken → user `/bootstrap` only.',
+    'Phase: default `discussion`. Work only after user `/spec|/design|/forge|/refine|/chore`. Code → Read `implement/SKILL.md`. Trigger → `implement: false`, `readRefs: []`. Spec-flow entry → Read `issue/SKILL.md` + phase issue template (`issue` / `issueTemplate`). Broken → user `/bootstrap` only.',
     'References: before gated edits, Read the matching `implement/references/*.md` (deny names the file). Do not edit state files.',
     'Review: `review.files` non-empty → commit blocked; `/pre-commit-reviewer` clears. `md` / `json` / `yaml` are not tracked.',
   ].join('\n');
@@ -136,11 +136,13 @@ function readGateState(root, id, stateFileRel) {
   const check = state.check ?? { pending: [] };
   return [
     `Gate state (hooks-only; do not edit): \`${stateFileRel}\``,
-    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `implement`: `null` in discussion; `false` = handshake pending; `true` = unlocked.',
+    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `implement`: `null` in discussion; `false` = handshake pending; `true` = unlocked. `issue` / `issueTemplate`: Spec-flow entry handshake (`null` / `false` = pending).',
     'Set `label` via `node .cursor/skills/label/scripts/set-label.mjs <label>`.',
     '',
     'Current values:',
     `phase: ${state.phase}`,
+    `issue: ${state.issue}`,
+    `issueTemplate: ${state.issueTemplate}`,
     `implement: ${state.implement}`,
     `label: ${state.label ? state.label : '(none)'}`,
     `review.files: ${JSON.stringify(review.files ?? [])}`,

@@ -62,6 +62,14 @@ function trackRead(convBase, relPath) {
 function trackReadTsRef(convBase) {
   trackRead(convBase, '.cursor/skills/implement/references/typescript.md');
 }
+
+function trackReadIssueSkill(convBase) {
+  trackRead(convBase, '.cursor/skills/issue/SKILL.md');
+}
+
+function trackReadForgeTemplate(convBase) {
+  trackRead(convBase, '.cursor/skills/issue/references/forge-template.md');
+}
 const stateTmp = mkdtempSync(join(smokeTmpRoot, 'state-'));
 const id = 'test-conversation';
 
@@ -304,10 +312,17 @@ try {
       findStateFileName(root, id),
     );
     const st = readState();
-    assert('phase is forge', st.phase === 'forge' && st.implement === false, JSON.stringify(st));
+    assert(
+      'phase is forge',
+      st.phase === 'forge' &&
+        st.implement === false &&
+        st.issue === false &&
+        st.issueTemplate === false,
+      JSON.stringify(st),
+    );
   }
 
-  // 7. still deny Write after phase only — but gh/git writes unlock
+  // 7. still deny Write after phase only — gh issue write needs handshake; git writes unlock
   {
     const out = run('gate.mjs', {
       ...base,
@@ -317,12 +332,27 @@ try {
     });
     assert('phase-only Write deny', out.permission === 'deny', JSON.stringify(out));
 
+    const outGhList = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'gh issue list',
+    });
+    assert(
+      'spec-flow gh issue list allow before handshake',
+      outGhList.permission === 'allow',
+      JSON.stringify(outGhList),
+    );
+
     const outGh = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'gh issue create --title t --body b',
     });
-    assert('phase unlocks gh write', outGh.permission === 'allow', JSON.stringify(outGh));
+    assert(
+      'spec-flow gh issue create deny before handshake',
+      outGh.permission === 'deny' && String(outGh.agent_message).includes('[gate-issue]'),
+      JSON.stringify(outGh),
+    );
 
     const outGit = run('gate.mjs', {
       ...base,
@@ -337,6 +367,46 @@ try {
       command: 'pnpm test:run',
     });
     assert('phase-only pnpm still deny', outPnpm.permission === 'deny', JSON.stringify(outPnpm));
+  }
+
+  // 7b. issue handshake — skill Read, template Read, then gh issue write
+  {
+    trackReadIssueSkill(base);
+    assert(
+      'issue skill read sets issue true',
+      loadState(root, id).issue === true,
+      JSON.stringify(loadState(root, id)),
+    );
+
+    const outGhPartial = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'gh issue create --title t --body b',
+    });
+    assert(
+      'gh issue create deny before template',
+      outGhPartial.permission === 'deny' && String(outGhPartial.agent_message).includes('template'),
+      JSON.stringify(outGhPartial),
+    );
+
+    trackReadForgeTemplate(base);
+    const stReady = loadState(root, id);
+    assert(
+      'issue handshake complete',
+      stReady.issue === true && stReady.issueTemplate === true,
+      JSON.stringify(stReady),
+    );
+
+    const outGhReady = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'gh issue create --title t --body b',
+    });
+    assert(
+      'gh issue create allow after handshake',
+      outGhReady.permission === 'allow',
+      JSON.stringify(outGhReady),
+    );
   }
 
   // 8. discussion 中の implement Read はフラグを立てない／Write 不可
@@ -554,8 +624,13 @@ try {
     assert('inject includes live review.files', ctx.includes('review.files:'), ctx.slice(0, 400));
     assert('inject includes live readRefs', ctx.includes('readRefs:'), ctx.slice(0, 400));
     assert(
+      'inject includes live issue handshake',
+      ctx.includes('issue:') && ctx.includes('issueTemplate:'),
+      ctx.slice(0, 400),
+    );
+    assert(
       'inject mentions refs gate',
-      ctx.includes('Gate rules') && ctx.includes('readRefs'),
+      ctx.includes('Gate rules') && ctx.includes('readRefs') && ctx.includes('issueTemplate'),
       ctx.slice(0, 400),
     );
     assert('inject mentions dated state path', Boolean(name && ctx.includes(name)), name);

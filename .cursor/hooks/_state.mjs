@@ -25,6 +25,9 @@ export const PHASE_DISCUSSION = 'discussion';
 
 export const WORK_PHASES = new Set(['spec', 'design', 'forge', 'refine', 'chore']);
 
+/** chore 以外の Spec-flow 作業フェーズ（入場時 issue ハンドシェイク対象） */
+export const SPEC_FLOW_PHASES = new Set(['spec', 'design', 'forge', 'refine']);
+
 /** 最終更新からこの日数を超えた state を削除 */
 export const STATE_TTL_DAYS = 7;
 
@@ -252,11 +255,13 @@ export function normalizeReview(review) {
   return { files };
 }
 
-/** @returns {{ phase: string, implement: boolean | null, review: ReturnType<typeof defaultReview>, check: ReturnType<typeof defaultCheck>, readRefs: string[], label: string, updatedAt: string }} */
+/** @returns {{ phase: string, implement: boolean | null, issue: boolean | null, issueTemplate: boolean, review: ReturnType<typeof defaultReview>, check: ReturnType<typeof defaultCheck>, readRefs: string[], label: string, updatedAt: string }} */
 export function defaultState() {
   return {
     phase: PHASE_DISCUSSION,
     implement: null,
+    issue: null,
+    issueTemplate: false,
     review: defaultReview(),
     check: defaultCheck(),
     readRefs: [],
@@ -287,6 +292,20 @@ export function normalizeImplement(phase, implement) {
   return implement === true;
 }
 
+/** discussion / chore → null。Spec-flow → true/false のみ */
+export function normalizeIssue(phase, issue) {
+  const p = normalizePhase(phase);
+  if (!SPEC_FLOW_PHASES.has(p)) return null;
+  return issue === true;
+}
+
+/** discussion / chore → false（N/A）。Spec-flow → true/false のみ */
+export function normalizeIssueTemplate(phase, issueTemplate) {
+  const p = normalizePhase(phase);
+  if (!SPEC_FLOW_PHASES.has(p)) return false;
+  return issueTemplate === true;
+}
+
 export function loadState(root, id) {
   const name = findStateFileName(root, id);
   if (!name) return defaultState();
@@ -296,6 +315,8 @@ export function loadState(root, id) {
     return {
       phase,
       implement: normalizeImplement(phase, raw.implement),
+      issue: normalizeIssue(phase, raw.issue),
+      issueTemplate: normalizeIssueTemplate(phase, raw.issueTemplate),
       review: normalizeReview(raw.review),
       check: normalizeCheck(raw.check),
       readRefs: normalizeReadRefs(raw.readRefs),
@@ -317,6 +338,11 @@ export function saveState(root, id, state) {
   const next = {
     phase,
     implement: normalizeImplement(phase, state.implement ?? prev.implement),
+    issue: normalizeIssue(phase, state.issue !== undefined ? state.issue : prev.issue),
+    issueTemplate: normalizeIssueTemplate(
+      phase,
+      state.issueTemplate !== undefined ? state.issueTemplate : prev.issueTemplate,
+    ),
     review: normalizeReview(state.review ?? prev.review),
     check: normalizeCheck(state.check ?? prev.check),
     readRefs: normalizeReadRefs(state.readRefs !== undefined ? state.readRefs : prev.readRefs),

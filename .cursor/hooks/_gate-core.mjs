@@ -19,6 +19,12 @@ import { logHookIds } from './_id-log.mjs';
 import { commandIncludesGitCommit, denyReviewMessage } from './_review.mjs';
 import { denyRefsMessage, missingRefs, requiredRefsForPath } from './_refs.mjs';
 import {
+  commandIncludesGhIssueMutation,
+  denyIssueMessage,
+  isIssueReady,
+  isSpecFlowPhase,
+} from './_issue.mjs';
+import {
   conversationId,
   isReviewBlocking,
   isUnderStateDir,
@@ -486,6 +492,14 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
 
   if (commandIncludesGitCommit(command) && isReviewBlocking(state)) {
     return deny(denyReviewMessage(normalizeReview(state.review).files));
+  }
+
+  if (
+    isSpecFlowPhase(state.phase) &&
+    !isIssueReady(state) &&
+    commandIncludesGhIssueMutation(command)
+  ) {
+    return deny(denyIssueMessage(state));
   }
 
   // label script はどのフェーズでも許可（state は script が書く）
