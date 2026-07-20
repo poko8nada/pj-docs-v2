@@ -16,19 +16,18 @@ In `discussion`, reading this file does not unlock edits.
 
 Pick **at least one** file under `references/` before editing. The harness only checks that you Read one or more — choose what fits the change. Internalize; do not summarize in chat.
 
-| File            | When (examples)                                                 |
-| --------------- | --------------------------------------------------------------- |
-| `documents.md`  | `.md` / `.mdc` body shape (issue/README content → those skills) |
-| `logic.md`      | Pure functions, domain logic, `Result`                          |
-| `components.md` | UI, Tailwind/CSS, a11y                                          |
-| `html.md`       | Document markup / website HTML manners                          |
-| `state.md`      | Client state, `use*`                                            |
-| `api.md`        | HTTP / fetch boundaries                                         |
-| `data.md`       | Objects, JSON, persistence / schema thinking                    |
-| `test.md`       | `*.test.ts` / `*.test.tsx`                                      |
-| `shared.md`     | Cross-cutting (imports, exports, comments) — default if unsure  |
+| File            | When (examples)                                                              |
+| --------------- | ---------------------------------------------------------------------------- |
+| `documents.md`  | `.md` / `.mdc` body shape (issue/README content → those skills)              |
+| `logic.md`      | Pure functions, domain logic, `Result`                                       |
+| `components.md` | UI, Tailwind/CSS, a11y                                                       |
+| `html.md`       | Document markup / website HTML manners                                       |
+| `state.md`      | Client state, `use*`                                                         |
+| `api.md`        | HTTP / fetch boundaries                                                      |
+| `data.md`       | Objects, JSON, persistence / schema thinking                                 |
+| `shared.md`     | Cross-cutting (imports, exports, comments, test manners) — default if unsure |
 
-Examples: README typo → `documents`. New `useX` → `state`. Button styles → `components`. Page landmarks / semantic markup → `html`. New unit test → `test`. Pure helper → `logic`. Object/JSON/schema shape → `data`. Unsure → `shared`.
+Examples: README typo → `documents`. New `useX` → `state`. Button styles → `components`. Page landmarks / semantic markup → `html`. Unit test file → `shared`. Pure helper → `logic`. Object/JSON/schema shape → `data`. Unsure → `shared`.
 
 Phase re-entry clears Read progress — Read this skill and needed references again.
 

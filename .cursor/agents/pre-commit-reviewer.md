@@ -20,7 +20,6 @@ Read `.cursor/skills/rules/references/` files that apply to the changed files â€
 | `state.md`      | client state / `use*`            |
 | `api.md`        | HTTP / fetch                     |
 | `data.md`       | objects, JSON, persistence       |
-| `test.md`       | `*.test.ts(x)`                   |
 | `shared.md`     | cross-cutting; default if unsure |
 
 Use these as review criteria, not just style preference. Pick at least the refs that match the injection.

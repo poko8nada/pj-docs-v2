@@ -35,7 +35,7 @@ Revise until the user agrees which mode applies. Do not ask “① or ②?” wi
 
 1. Confirm the Forge issue has an agreed slice list. If not, return to Mode ①.
 2. Before any product code edit, Read `.cursor/skills/rules/SKILL.md` to obtain permission to edit, then follow `rules`.
-3. Take **one vertical slice** → verify → get user agreement in chat. Prefer draft-then-grow over horizontal splits (all APIs, then all UI). Repeat.
+3. Take **one vertical slice** → verify → get user agreement in chat. Prefer draft-then-grow over horizontal splits (all APIs, then all UI). Repeat. For Test / App expectations, follow the plan’s Test policy (error-path unit tests with the slice; App instead of e2e).
 4. After UI slices that add interactivity, or when surface drifts from Design `# Grain` / `# Tokens`, invoke **`grain`** (Audit or Improve). Fold returned briefs into the next edit unit or a follow-up slice.
 
 **Issue persist (Forge):** Prefer **milestones**, not per-slice chatter — same idea as Design:
