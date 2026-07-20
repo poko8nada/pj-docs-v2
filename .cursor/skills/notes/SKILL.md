@@ -26,7 +26,7 @@ Inline `NOTE:` comments capture work left in the codebase (user or agent). **Per
 **When:** user asks to memo / leave a NOTE; you need a breadcrumb for a later session.
 
 1. Add a single `NOTE:` line near the relevant code.
-2. Do not implement unless the user also asked for that (hand off to the work phase + `implement`).
+2. Do not implement unless the user also asked for that (hand off to the work phase + `rules`).
 
 ## Mode — Resolve
 
@@ -39,13 +39,13 @@ Inline `NOTE:` comments capture work left in the codebase (user or agent). **Per
    ```
 
 2. **Analyze & propose** — one block per note (context, understanding, proposal). No file edits until the user agrees.
-3. **Implement** — work phase + Read `implement/SKILL.md`, then apply agreed changes.
-4. **Delete** resolved `NOTE:` lines after the user confirms the implementation (not before).
+3. **Edit** — work phase + Read `rules/SKILL.md`, then apply agreed changes.
+4. **Delete** resolved `NOTE:` lines after the user confirms the changes (not before).
 5. Run **Commit check** (below) before `git commit`.
 
 ## Commit check (subroutine — not a separate user invocation)
 
-**When:** `git add` is done and you are about to `git commit` (Resolve end, or `implement` / `chore` committing).
+**When:** `git add` is done and you are about to `git commit` (Resolve end, or `rules` / `chore` committing).
 
 ```bash
 node .cursor/skills/notes/scripts/list-removed.mjs
@@ -58,5 +58,5 @@ Do not invoke Resolve for Commit check alone.
 
 ## Boundaries
 
-- Do not duplicate `implement` build rules — hand off to `implement` for code.
+- Do not duplicate `rules` edit rules — hand off to `rules` for code.
 - `lefthook` **pre-push** blocks push while any `NOTE:` remains in the repo (excluding `.cursor/skills/` docs). All pending notes must be resolved or removed before push.

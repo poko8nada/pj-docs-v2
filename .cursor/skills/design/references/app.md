@@ -70,7 +70,7 @@ Agree the checklist in chat. Persist `## Slices` under `# Plan` at a milestone (
 One slice at a time, with user agreement between slices. For each slice:
 
 1. Confirm the slice in chat
-2. Caller runs `implement` (after implement handshake)
+2. Caller follows `rules` (after rules handshake)
 3. Write components in production location; compose on the default screen
 4. Browser-check when useful
 5. Optionally thicken Default matrix rows (states / variants) in chat — **issue persist at session end**, not every slice

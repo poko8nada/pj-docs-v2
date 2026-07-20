@@ -29,6 +29,6 @@ Revise until the user agrees the next move. Do not ask “create or update?” w
 1. **Discuss** until Goal, Scope, Architecture, and material decisions are clear enough to write. Keep using Context / Understanding / Proposal as the discussion advances — not a single dump then silence.
 2. Before locking **technical** choices in the Spec (especially Stack), run `feasibility` skill by default (agent knowledge drifts).
 3. When the user agrees the Spec content, create or update the Spec issue via `issue` skill (template and lifecycle live there — do not copy them here).
-4. **No product code** in this phase. If code is ever required in this session, Read `.cursor/skills/implement/SKILL.md` to obtain permission, then run `implement` skill — treat that as exceptional.
+4. **No product code** in this phase. If code is ever required in this session, Read `.cursor/skills/rules/SKILL.md` to obtain permission, then follow `rules` — treat that as exceptional.
 
-Hand off to `issue` / `feasibility` / `implement` by name — do not copy their contents here.
+Hand off to `issue` / `feasibility` / `rules` by name — do not copy their contents here.

@@ -9,20 +9,27 @@ You review implementation AND tests together. You do not edit files.
 
 ## Rules (read before reviewing)
 
-Read `.cursor/skills/implement/references/` files that apply to the changed files — same as `implement` Step 1:
+Read `.cursor/skills/rules/references/` files that apply to the changed files — same catalog as `rules` skill:
 
-- TypeScript (`.ts` / `.tsx` / `.js` / `.jsx`): `references/typescript.md`
-- CSS / Tailwind: `references/css.md`
-- Tests (`.test.ts` / `.test.tsx`): `references/testing.md`
-- Markdown (`.md` / `.mdc`): `references/markdown.md`
+| File            | When                             |
+| --------------- | -------------------------------- |
+| `documents.md`  | `.md` / `.mdc`                   |
+| `logic.md`      | pure / domain logic              |
+| `components.md` | UI, CSS, a11y                    |
+| `html.md`       | document / website markup        |
+| `state.md`      | client state / `use*`            |
+| `api.md`        | HTTP / fetch                     |
+| `data.md`       | objects, JSON, persistence       |
+| `test.md`       | `*.test.ts(x)`                   |
+| `shared.md`     | cross-cutting; default if unsure |
 
-Use these as review criteria, not just style preference.
+Use these as review criteria, not just style preference. Pick at least the refs that match the injection.
 
 ## Review
 
 When invoked:
 
-1. Read applicable reference files above (matching extensions in the injection).
+1. Read applicable reference files above (matching the change in the injection).
 2. Use the harness injection under `[harness-review]`:
    - Each path has a `git diff HEAD` hunk, or full content if new/untracked.
    - **Focus on that injected text.** Do not run `git`. Do not Read whole files unless the injection says truncated and you need critical context.

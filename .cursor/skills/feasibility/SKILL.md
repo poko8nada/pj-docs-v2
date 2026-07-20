@@ -29,7 +29,7 @@ Anchor every non-trivial claim in **current external sources**. When current bes
 - Phase entry, mode choice, or whether to Spec/Design/Forge
 - Writing the Forge/Refine plan or Spec body — caller does that after confirmation
 - Reconciling claims against _this_ repo’s app code — that is `forge`/`refine` plan Step 1
-- Product code / `implement`
+- Product code / `rules`
 
 ## When called
 

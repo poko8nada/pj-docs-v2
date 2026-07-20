@@ -1,7 +1,7 @@
 ---
 name: bootstrap
 description: >-
-  Emergency gate bypass when the harness is broken and normal /chore → implement Read cannot unlock edits.
+  Emergency gate bypass when the harness is broken and normal /chore → rules Read cannot unlock edits.
   User-only — do not self-invoke.
 disable-model-invocation: true
 ---

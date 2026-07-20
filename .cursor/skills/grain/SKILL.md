@@ -4,7 +4,7 @@ description: >-
   Soft skill: defines, audits, and briefs product surface character — visual ornamentation
   (あしらい), first-impression clarity, and interaction feel — through style axes, not upfront
   color or font picks. Callable from any phase. Returns # Grain, # Tokens, audit findings, or
-  implementation briefs to the caller. Does not invoke implement or phase skills.
+  implementation briefs to the caller. Does not invoke rules or phase skills.
 ---
 
 # grain
@@ -41,7 +41,7 @@ Always evaluate Visceral and Behavioral separately. Good looks must not mask con
 - Issue create/update / lifecycle — `issue` via the caller
 - Slice planning, Section Matrix, or `# Screen` — `design`
 - Product code — caller ships agreed briefs when the phase is ready
-- Invoking `implement`, `issue`, or phase skills from grain
+- Invoking `rules`, `issue`, or phase skills from grain
 
 ## When called
 

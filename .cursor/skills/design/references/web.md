@@ -84,7 +84,7 @@ Agree the checklist in chat. Persist `## Slices` at a milestone (session end is 
 One slice at a time, with user agreement between slices. For each slice:
 
 1. Confirm the slice in chat
-2. Caller runs `implement` (after implement handshake)
+2. Caller follows `rules` (after rules handshake)
 3. Write sections in production location; compose on the default screen
 4. Responsive layout required; interactivity not implemented except CSS
 5. Browser-check when useful

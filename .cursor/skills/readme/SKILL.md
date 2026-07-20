@@ -21,7 +21,7 @@ Internal planning (Concept & Goals, Stack rationale, Architecture, Roadmap) belo
 ## What you do not own
 
 - Spec / Design / Forge / Refine body writing — `issue` + phase skills
-- Product or harness code — `implement` (after work-phase handshake)
+- Product or harness code — `rules` (after work-phase handshake)
 - Creating Spec just to park README leftovers — only when the user agrees
 
 ## On entry
@@ -100,7 +100,7 @@ Ask only when missing and material.
 ## Flow
 
 1. Agree Mode + Proposal with the user.
-2. Before editing `README.md`, ensure a work phase (`/chore` is enough for README-only) and Read `.cursor/skills/implement/SKILL.md`, then run `implement`.
+2. Before editing `README.md`, ensure a work phase (`/chore` is enough for README-only) and Read `.cursor/skills/rules/SKILL.md`, then follow `rules`.
 3. If relocating internal sections to Spec, use `issue` skill after the user agrees — do not invent a Spec rewrite without approval.
 4. Confirm: list what changed and what was moved or deferred.
 
@@ -110,4 +110,4 @@ Ask only when missing and material.
 - Do not leave Developer Notes / Stack blocks in README after Mode B if the user agreed to move them.
 - Root `README.md` only unless the user explicitly names another path.
 
-Hand off to `implement` / `issue` by name — do not copy their contents here.
+Hand off to `rules` / `issue` by name — do not copy their contents here.

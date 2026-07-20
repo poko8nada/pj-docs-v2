@@ -34,9 +34,9 @@ Revise until the user agrees which mode applies. Do not ask “① or ②?” wi
 ## Mode ② — Implement slices
 
 1. Confirm the Forge issue has an agreed slice list. If not, return to Mode ①.
-2. Before any product code edit, Read `.cursor/skills/implement/SKILL.md` to obtain permission to code, then run `implement` skill.
+2. Before any product code edit, Read `.cursor/skills/rules/SKILL.md` to obtain permission to edit, then follow `rules`.
 3. Take **one vertical slice** → verify → get user agreement in chat. Prefer draft-then-grow over horizontal splits (all APIs, then all UI). Repeat.
-4. After UI slices that add interactivity, or when surface drifts from Design `# Grain` / `# Tokens`, invoke **`grain`** (Audit or Improve). Fold returned briefs into the next implement unit or a follow-up slice.
+4. After UI slices that add interactivity, or when surface drifts from Design `# Grain` / `# Tokens`, invoke **`grain`** (Audit or Improve). Fold returned briefs into the next edit unit or a follow-up slice.
 
 **Issue persist (Forge):** Prefer **milestones**, not per-slice chatter — same idea as Design:
 
@@ -48,4 +48,4 @@ Do not comment or edit the body after every slice agreement. Chat agreement stay
 
 **Browser check:** Use the `cmux-browser` skill. Prefer an existing cmux surface and an already-running dev server. If the server is down, read `package.json` scripts and start the right one (prefer `dev`), then open/use cmux.
 
-Hand off to `issue` / `feasibility` / `grain` / `implement` by name — do not copy their contents here.
+Hand off to `issue` / `feasibility` / `grain` / `rules` by name — do not copy their contents here.

@@ -31,7 +31,7 @@ Do **not** invent phase work or re-argue the plan here. If the caller already ha
 - Phase entry, mode choice (①/②), or “should we Spec?” — that is the phase skill
 - How to write a Forge/Refine plan — `.cursor/skills/forge|refine/references/plan.md`
 - How to build the Design thinking surface — `design/references/app.md` / `web.md`
-- Product code — never; hand that to `implement` via the phase skill
+- Product edits — never; hand that to `rules` via the phase skill
 
 ## Principles
 

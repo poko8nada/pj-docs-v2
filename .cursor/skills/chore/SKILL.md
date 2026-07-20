@@ -25,7 +25,7 @@ Revise until the user agrees the scope. Do not start editing on a vague “fix s
 ## Flow
 
 1. Keep the change to **one concern**. No slice planning.
-2. Before any code or harness file edit, Read `.cursor/skills/implement/SKILL.md` to obtain permission to code, then run `implement` skill.
+2. Before any code or harness file edit, Read `.cursor/skills/rules/SKILL.md` to obtain permission to edit, then follow `rules`.
 3. Issue create/update is optional. If you touch issues, use `issue` skill.
 
-Hand off to `issue` / `implement` by name — do not copy their contents here.
+Hand off to `issue` / `rules` by name — do not copy their contents here.
