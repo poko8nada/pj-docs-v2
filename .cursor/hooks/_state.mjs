@@ -112,7 +112,7 @@ export function resolveConversationIdFromPayload(payload) {
  * 無効化理由 (2026-07-19): Cursor が tool / beforeReadFile / Shell の hooks に
  * 別セッションの transcript_path・conversation_id を渡す汚染が観測された。
  * 発話 (beforeSubmitPrompt) や Shell の CURSOR_CONVERSATION_ID は正しいのに、
- * ツール系だけ旧 ID になり implement unlock が死ぬ。
+ * ツール系だけ旧 ID になり rules unlock が死ぬ。
  * 参照用に残す（挙動は resolveConversationIdFromPayload と同じ）:
  *
  * export function resolveConversationId_legacyPayloadOnly(payload) {
@@ -274,7 +274,7 @@ export function normalizeSkills(skills, root = null) {
 export function defaultUnlock(phase = PHASE_DISCUSSION) {
   const p = normalizePhase(phase);
   return {
-    implement: normalizeImplement(p, null),
+    rules: normalizeRules(p, null),
     issue: normalizeIssue(p, null),
   };
 }
@@ -286,7 +286,7 @@ export function defaultRead() {
 /**
  * @returns {{
  *   phase: string,
- *   unlock: { implement: boolean | null, issue: boolean | null },
+ *   unlock: { rules: boolean | null, issue: boolean | null },
  *   read: { skills: string[], refs: string[] },
  *   review: ReturnType<typeof defaultReview>,
  *   check: ReturnType<typeof defaultCheck>,
@@ -322,10 +322,15 @@ function normalizePhase(phase) {
 }
 
 /** discussion → null。作業フェーズ → true/false のみ */
-export function normalizeImplement(phase, implement) {
+export function normalizeRules(phase, rules) {
   const p = normalizePhase(phase);
   if (p === PHASE_DISCUSSION) return null;
-  return implement === true;
+  return rules === true;
+}
+
+/** @deprecated use normalizeRules — 旧 state / 呼び出し互換 */
+export function normalizeImplement(phase, implement) {
+  return normalizeRules(phase, implement);
 }
 
 /** discussion / chore → null。Spec-flow → true/false のみ */
@@ -335,10 +340,16 @@ export function normalizeIssue(phase, issue) {
   return issue === true;
 }
 
+/** 旧 `unlock.implement` を `rules` に読み替える */
+function rulesFromUnlockSrc(src) {
+  if (src.rules !== undefined) return src.rules;
+  return src.implement;
+}
+
 export function normalizeUnlock(phase, unlock) {
   const src = unlock && typeof unlock === 'object' ? unlock : {};
   return {
-    implement: normalizeImplement(phase, src.implement),
+    rules: normalizeRules(phase, rulesFromUnlockSrc(src)),
     issue: normalizeIssue(phase, src.issue),
   };
 }
@@ -421,7 +432,7 @@ export function loadState(root, id) {
  * @param {string} id
  * @param {{
  *   phase?: string,
- *   unlock?: Partial<{ implement: boolean | null, issue: boolean | null }>,
+ *   unlock?: Partial<{ rules: boolean | null, implement: boolean | null, issue: boolean | null }>,
  *   read?: Partial<{ skills: string[], refs: string[] }>,
  *   review?: unknown,
  *   check?: unknown,
@@ -439,11 +450,18 @@ export function saveState(root, id, state) {
   const unlockPatch = state.unlock && typeof state.unlock === 'object' ? state.unlock : {};
   const readPatch = state.read && typeof state.read === 'object' ? state.read : {};
 
+  // rules 優先。旧呼び出しの implement パッチも受け付ける
+  const nextRules =
+    unlockPatch.rules !== undefined
+      ? unlockPatch.rules
+      : unlockPatch.implement !== undefined
+        ? unlockPatch.implement
+        : prev.unlock.rules;
+
   const next = {
     phase,
     unlock: normalizeUnlock(phase, {
-      implement:
-        unlockPatch.implement !== undefined ? unlockPatch.implement : prev.unlock.implement,
+      rules: nextRules,
       issue: unlockPatch.issue !== undefined ? unlockPatch.issue : prev.unlock.issue,
     }),
     read: normalizeRead(
@@ -467,7 +485,7 @@ export function isReviewBlocking(state) {
   return normalizeReview(state?.review).files.length > 0;
 }
 
-/** implement 解禁後の reviewable 編集を files に積む */
+/** rules 解禁後の reviewable 編集を files に積む */
 export function markReviewDirty(root, id, filePath) {
   const prev = loadState(root, id);
   const abs = resolve(filePath);
@@ -543,7 +561,7 @@ export function clearReadRefs(root, id) {
   return clearRead(root, id);
 }
 
-/** implement 解禁後の checkable 編集を溜める（stop で一括 format/lint/typecheck） */
+/** rules 解禁後の checkable 編集を溜める（stop で一括 format/lint/typecheck） */
 export function markCheckPending(root, id, filePath) {
   const prev = loadState(root, id);
   const abs = resolve(filePath);
@@ -606,7 +624,7 @@ export function purgeStaleStates(root, now = Date.now()) {
 
 export function isUnlocked(state) {
   const phase = normalizePhase(state?.phase);
-  return WORK_PHASES.has(phase) && state?.unlock?.implement === true;
+  return WORK_PHASES.has(phase) && state?.unlock?.rules === true;
 }
 
 /** パスがゲート state 配下か（エージェント編集禁止用） */

@@ -43,7 +43,7 @@ function writeMinimalState(extra = {}) {
     `${JSON.stringify(
       {
         phase: 'discussion',
-        implement: null,
+        rules: null,
         label: '',
         updatedAt: '2026-01-01T00:00:00+09:00',
         ...extra,

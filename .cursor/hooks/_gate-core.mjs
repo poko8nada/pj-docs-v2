@@ -45,18 +45,18 @@ const DENY_STATE =
 function denyCodeMessage(phase) {
   const p = phase || 'discussion';
   if (WORK_PHASES.has(p)) {
-    return `[gate] Code edits blocked (phase=${p}, implement≠true). Read .cursor/skills/implement/SKILL.md to unlock.`;
+    return `[gate] Edits blocked (phase=${p}, rules≠true). Read .cursor/skills/rules/SKILL.md to unlock.`;
   }
-  return `[gate] Code edits blocked (phase=${p}). Enter a work phase (/spec|/design|/forge|/refine|/chore), then Read .cursor/skills/implement/SKILL.md.`;
+  return `[gate] Edits blocked (phase=${p}). Enter a work phase (/spec|/design|/forge|/refine|/chore), then Read .cursor/skills/rules/SKILL.md.`;
 }
 
 /** @param {string} phase */
 function denyShellMessage(phase) {
   const p = phase || 'discussion';
   if (WORK_PHASES.has(p)) {
-    return `[gate] Shell blocked (phase=${p}, implement≠true). gh/git are allowed; other commands need implement Read. Prefer --body-file path over <(cat <<EOF) if a gh/git command was denied unexpectedly.`;
+    return `[gate] Shell blocked (phase=${p}, rules≠true). gh/git are allowed; other commands need rules Read. Prefer --body-file path over <(cat <<EOF) if a gh/git command was denied unexpectedly.`;
   }
-  return `[gate] Shell blocked (phase=${p}). Read-only commands + read-only gh/git only. Enter a work phase for gh/git writes; other commands need implement Read.`;
+  return `[gate] Shell blocked (phase=${p}). Read-only commands + read-only gh/git only. Enter a work phase for gh/git writes; other commands need rules Read.`;
 }
 
 const DENY_BOOTSTRAP =

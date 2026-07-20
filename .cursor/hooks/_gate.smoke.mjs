@@ -60,7 +60,7 @@ function trackRead(convBase, relPath) {
 }
 
 function trackReadTsRef(convBase) {
-  trackRead(convBase, '.cursor/skills/implement/references/typescript.md');
+  trackRead(convBase, '.cursor/skills/rules/references/shared.md');
 }
 
 function trackReadIssueSkill(convBase) {
@@ -182,7 +182,7 @@ try {
     const st = readState();
     assert(
       'first prompt is discussion',
-      st.phase === 'discussion' && st.unlock.implement === null,
+      st.phase === 'discussion' && st.unlock.rules === null,
       JSON.stringify(st),
     );
     assert('updatedAt is JST offset', st.updatedAt.endsWith('+09:00'), st.updatedAt);
@@ -342,7 +342,7 @@ try {
     assert(
       'phase is forge',
       st.phase === 'forge' &&
-        st.unlock.implement === false &&
+        st.unlock.rules === false &&
         st.unlock.issue === false &&
         st.unlock.issueTemplate === undefined,
       JSON.stringify(st),
@@ -443,7 +443,7 @@ try {
     );
   }
 
-  // 8. discussion 中の implement Read はフラグを立てない／Write 不可
+  // 8. discussion 中の rules Read はフラグを立てない／Write 不可
   {
     run('track.mjs', {
       ...base,
@@ -453,13 +453,13 @@ try {
     const out = run('track.mjs', {
       ...base,
       hook_event_name: 'beforeReadFile',
-      file_path: join(root, '.cursor/skills/implement/SKILL.md'),
+      file_path: join(root, '.cursor/skills/rules/SKILL.md'),
     });
-    assert('discussion implement-read allow file', out.permission === 'allow', JSON.stringify(out));
+    assert('discussion rules-read allow file', out.permission === 'allow', JSON.stringify(out));
     const st = readState();
     assert(
-      'discussion implement stays null',
-      st.phase === 'discussion' && st.unlock.implement === null,
+      'discussion rules stays null',
+      st.phase === 'discussion' && st.unlock.rules === null,
       JSON.stringify(st),
     );
     const out2 = run('gate.mjs', {
@@ -491,20 +491,20 @@ try {
     const st = loadState(root, id);
     assert(
       'legacy discussion false normalizes to null',
-      st.phase === 'discussion' && st.unlock.implement === null,
+      st.phase === 'discussion' && st.unlock.rules === null,
       JSON.stringify(st),
     );
   }
 
-  // 8b. forge のあと implement Read で解禁
+  // 8b. forge のあと rules Read で解禁
   {
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/forge go' });
     const out = run('track.mjs', {
       ...base,
       hook_event_name: 'beforeReadFile',
-      file_path: join(root, '.cursor/skills/implement/SKILL.md'),
+      file_path: join(root, '.cursor/skills/rules/SKILL.md'),
     });
-    assert('forge track-implement allow', out.permission === 'allow', JSON.stringify(out));
+    assert('forge track-rules allow', out.permission === 'allow', JSON.stringify(out));
     const denyNoRef = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
@@ -512,9 +512,9 @@ try {
       tool_input: { path: join(root, 'utils/foo.ts') },
     });
     assert(
-      'unlocked Write without typescript.md deny',
+      'unlocked Write without rules ref deny',
       denyNoRef.permission === 'deny' &&
-        String(denyNoRef.agent_message ?? '').includes('typescript.md'),
+        String(denyNoRef.agent_message ?? '').includes('rules/references'),
       JSON.stringify(denyNoRef),
     );
     trackReadTsRef(base);
@@ -558,20 +558,20 @@ try {
     assert('redirect into state deny', out.permission === 'deny', JSON.stringify(out));
   }
 
-  // 10. phase switch / re-entry resets implement + readRefs
+  // 10. phase switch / re-entry resets rules + readRefs
   {
     trackReadTsRef(base);
     assert(
-      'read.refs records implement/typescript.md',
-      loadState(root, id).read.refs?.includes('implement/typescript.md'),
+      'read.refs records rules/shared.md',
+      loadState(root, id).read.refs?.includes('rules/shared.md'),
       JSON.stringify(loadState(root, id)),
     );
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore typo' });
     const st = readState();
     assert(
-      'phase switch resets implement and read',
+      'phase switch resets rules and read',
       st.phase === 'chore' &&
-        st.unlock.implement === false &&
+        st.unlock.rules === false &&
         Array.isArray(st.read.refs) &&
         st.read.refs.length === 0 &&
         Array.isArray(st.read.skills) &&
@@ -582,14 +582,14 @@ try {
     run('track.mjs', {
       ...base,
       hook_event_name: 'beforeReadFile',
-      file_path: join(root, '.cursor/skills/implement/SKILL.md'),
+      file_path: join(root, '.cursor/skills/rules/SKILL.md'),
     });
     trackReadTsRef(base);
     assert(
       'chore unlock + ref before re-entry',
-      loadState(root, id).unlock.implement === true &&
-        loadState(root, id).read.refs?.includes('implement/typescript.md') &&
-        loadState(root, id).read.skills?.includes('implement'),
+      loadState(root, id).unlock.rules === true &&
+        loadState(root, id).read.refs?.includes('rules/shared.md') &&
+        loadState(root, id).read.skills?.includes('rules'),
       JSON.stringify(loadState(root, id)),
     );
     run('track.mjs', {
@@ -599,9 +599,9 @@ try {
     });
     const stRe = readState();
     assert(
-      'same-phase re-entry resets implement and read',
+      'same-phase re-entry resets rules and read',
       stRe.phase === 'chore' &&
-        stRe.unlock.implement === false &&
+        stRe.unlock.rules === false &&
         Array.isArray(stRe.read.refs) &&
         stRe.read.refs.length === 0 &&
         Array.isArray(stRe.read.skills) &&
@@ -623,7 +623,7 @@ try {
       ...persistBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
-      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+      tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
     writeFileSync(join(root, 'utils/_review-persist-probe.ts'), 'export const persistProbe = 1;\n');
     trackReadTsRef(persistBase);
@@ -678,8 +678,8 @@ try {
     onSessionStart(root);
     const st = loadState(root, id);
     assert(
-      'resume keeps forge+implement',
-      st.phase === 'forge' && st.unlock.implement === true,
+      'resume keeps forge+rules',
+      st.phase === 'forge' && st.unlock.rules === true,
       JSON.stringify(st),
     );
     assert(
@@ -734,7 +734,7 @@ try {
     assert('inject mentions dated state path', Boolean(name && ctx.includes(name)), name);
     assert('inject mentions discussion', ctx.includes('discussion'), '');
     assert('inject mentions JST naming', ctx.includes('+0900'), '');
-    assert('inject mentions implement null semantics', ctx.includes('`null`'), '');
+    assert('inject mentions rules null semantics', ctx.includes('`null`'), '');
   }
 
   // 14. ディレクトリ一覧が日付順（ファイル名ソート）
@@ -781,7 +781,7 @@ try {
     assert('transcript_path unlocks shell', out.permission === 'allow', JSON.stringify(out));
   }
 
-  // 16. preToolUse Read（tool_input.path）で implement 解禁
+  // 16. preToolUse Read（tool_input.path）で rules 解禁
   {
     const readId = 'pretooluse-read-id';
     const readBase = { conversation_id: readId, workspace_roots: [root], cwd: root };
@@ -790,22 +790,18 @@ try {
       ...readBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Read',
-      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+      tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
-    assert(
-      'preToolUse Read track-implement allow',
-      out.permission === 'allow',
-      JSON.stringify(out),
-    );
+    assert('preToolUse Read track-rules allow', out.permission === 'allow', JSON.stringify(out));
     const st = loadState(root, readId);
     assert(
-      'preToolUse Read sets implement true',
-      st.phase === 'forge' && st.unlock.implement === true,
+      'preToolUse Read sets rules true',
+      st.phase === 'forge' && st.unlock.rules === true,
       JSON.stringify(st),
     );
   }
 
-  // 16b. preToolUse ReadFile（Cursor 内部名）で implement 解禁
+  // 16b. preToolUse ReadFile（Cursor 内部名）で rules 解禁
   {
     const readId = 'pretooluse-readfile-id';
     const readBase = { conversation_id: readId, workspace_roots: [root], cwd: root };
@@ -814,12 +810,12 @@ try {
       ...readBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
-      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+      tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
     const st = loadState(root, readId);
     assert(
-      'preToolUse ReadFile sets implement true',
-      st.phase === 'chore' && st.unlock.implement === true,
+      'preToolUse ReadFile sets rules true',
+      st.phase === 'chore' && st.unlock.rules === true,
       JSON.stringify(st),
     );
   }
@@ -846,12 +842,12 @@ try {
         cwd: root,
         hook_event_name: 'preToolUse',
         tool_name: 'ReadFile',
-        tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+        tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
       });
       const st = loadState(root, envId);
       assert(
-        'CURSOR_TRANSCRIPT_PATH unlocks implement',
-        st.phase === 'chore' && st.unlock.implement === true,
+        'CURSOR_TRANSCRIPT_PATH unlocks rules',
+        st.phase === 'chore' && st.unlock.rules === true,
         JSON.stringify(st),
       );
     } finally {
@@ -896,18 +892,18 @@ try {
       cwd: root,
       transcript_path: join(smokeTmpRoot, 'agent-transcripts', staleId, `${staleId}.jsonl`),
     };
-    const implementPath = join(root, '.cursor/skills/implement/SKILL.md');
+    const rulesPath = join(root, '.cursor/skills/rules/SKILL.md');
     const probePath = join(root, '.cursor/hooks/_integration-probe.txt');
 
     run('track.mjs', {
       ...noId,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
-      tool_input: { path: implementPath },
+      tool_input: { path: rulesPath },
     });
     assert(
       'integration without sticky stays locked',
-      loadState(root, realId).unlock.implement !== true,
+      loadState(root, realId).unlock.rules !== true,
       JSON.stringify(loadState(root, realId)),
     );
 
@@ -919,7 +915,7 @@ try {
     let st = loadState(root, realId);
     assert(
       'integration starts chore locked',
-      st.phase === 'chore' && st.unlock.implement === false,
+      st.phase === 'chore' && st.unlock.rules === false,
       JSON.stringify(st),
     );
     assert(
@@ -932,12 +928,12 @@ try {
       ...noId,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
-      tool_input: { path: implementPath },
+      tool_input: { path: rulesPath },
     });
     st = loadState(root, realId);
     assert(
       'integration sticky unlocks without payload id',
-      st.unlock.implement === true,
+      st.unlock.rules === true,
       JSON.stringify(st),
     );
 
@@ -949,7 +945,7 @@ try {
     });
     assert(
       'integration re-entry locks',
-      loadState(root, realId).unlock.implement === false,
+      loadState(root, realId).unlock.rules === false,
       JSON.stringify(loadState(root, realId)),
     );
 
@@ -957,17 +953,17 @@ try {
       ...contaminated,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
-      tool_input: { path: implementPath },
+      tool_input: { path: rulesPath },
     });
     st = loadState(root, realId);
     assert(
       'integration sticky wins over contaminated transcript',
-      st.unlock.implement === true,
+      st.unlock.rules === true,
       JSON.stringify(st),
     );
     assert(
       'integration stale id state untouched',
-      loadState(root, staleId).unlock.implement !== true,
+      loadState(root, staleId).unlock.rules !== true,
       JSON.stringify(loadState(root, staleId)),
     );
 
@@ -1142,12 +1138,12 @@ try {
       ...cdBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
-      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+      tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
     const stCd = loadState(root, cdId);
     assert(
       'cd test conversation unlocked',
-      stCd.phase === 'chore' && stCd.unlock.implement === true,
+      stCd.phase === 'chore' && stCd.unlock.rules === true,
       JSON.stringify(stCd),
     );
 
@@ -1219,7 +1215,7 @@ try {
       ...reviewBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
-      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+      tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
     writeFileSync(join(root, 'utils/_review-probe.ts'), 'export const reviewProbe = 1;\n');
     writeFileSync(
@@ -1425,7 +1421,7 @@ try {
       ...checkBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
-      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+      tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
     run('track.mjs', {
       ...checkBase,
@@ -1527,7 +1523,7 @@ try {
     );
   }
 
-  // 23. readRefs gate: md / test / mjs
+  // 23. readRefs gate: 弱ゲート（rules/references を1つ以上）
   {
     const refsId = 'refs-gate-id';
     const refsBase = { conversation_id: refsId, workspace_roots: [root], cwd: root };
@@ -1540,7 +1536,7 @@ try {
       ...refsBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
-      tool_input: { path: join(root, '.cursor/skills/implement/SKILL.md') },
+      tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
 
     const denyMd = run('gate.mjs', {
@@ -1550,21 +1546,11 @@ try {
       tool_input: { path: join(root, 'docs/note.md') },
     });
     assert(
-      'md write without markdown.md deny',
-      denyMd.permission === 'deny' && String(denyMd.agent_message ?? '').includes('markdown.md'),
+      'md write without rules ref deny',
+      denyMd.permission === 'deny' &&
+        String(denyMd.agent_message ?? '').includes('at least one file') &&
+        String(denyMd.agent_message ?? '').includes('rules/references'),
       JSON.stringify(denyMd),
-    );
-    trackRead(refsBase, '.cursor/skills/implement/references/markdown.md');
-    const allowMd = run('gate.mjs', {
-      ...refsBase,
-      hook_event_name: 'preToolUse',
-      tool_name: 'Write',
-      tool_input: { path: join(root, 'docs/note.md') },
-    });
-    assert(
-      'md write after markdown.md allow',
-      allowMd.permission === 'allow',
-      JSON.stringify(allowMd),
     );
 
     const denyTest = run('gate.mjs', {
@@ -1574,26 +1560,23 @@ try {
       tool_input: { path: join(root, 'utils/foo.test.ts') },
     });
     assert(
-      'test write without testing.md deny',
-      denyTest.permission === 'deny' && String(denyTest.agent_message ?? '').includes('testing.md'),
+      'test write without rules ref deny',
+      denyTest.permission === 'deny' &&
+        String(denyTest.agent_message ?? '').includes('rules/references'),
       JSON.stringify(denyTest),
     );
-    assert(
-      'test deny does not require typescript.md',
-      !String(denyTest.agent_message ?? '').includes('typescript.md'),
-      JSON.stringify(denyTest),
-    );
-    trackRead(refsBase, '.cursor/skills/implement/references/testing.md');
-    const allowTest = run('gate.mjs', {
+
+    const denyCss = run('gate.mjs', {
       ...refsBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.test.ts') },
+      tool_input: { path: join(root, 'styles/app.css') },
     });
     assert(
-      'test write after testing.md allow',
-      allowTest.permission === 'allow',
-      JSON.stringify(allowTest),
+      'css write without rules ref deny',
+      denyCss.permission === 'deny' &&
+        String(denyCss.agent_message ?? '').includes('rules/references'),
+      JSON.stringify(denyCss),
     );
 
     const allowMjs = run('gate.mjs', {
@@ -1608,18 +1591,31 @@ try {
       JSON.stringify(allowMjs),
     );
 
-    const denyCss = run('gate.mjs', {
+    trackRead(refsBase, '.cursor/skills/rules/references/documents.md');
+    const allowMd = run('gate.mjs', {
       ...refsBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'styles/app.css') },
+      tool_input: { path: join(root, 'docs/note.md') },
     });
     assert(
-      'css write without css.md deny',
-      denyCss.permission === 'deny' && String(denyCss.agent_message ?? '').includes('css.md'),
-      JSON.stringify(denyCss),
+      'md write after any rules ref allow',
+      allowMd.permission === 'allow',
+      JSON.stringify(allowMd),
     );
-    trackRead(refsBase, '.cursor/skills/implement/references/css.md');
+
+    const allowTest = run('gate.mjs', {
+      ...refsBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/foo.test.ts') },
+    });
+    assert(
+      'test write after any rules ref allow',
+      allowTest.permission === 'allow',
+      JSON.stringify(allowTest),
+    );
+
     const allowCss = run('gate.mjs', {
       ...refsBase,
       hook_event_name: 'preToolUse',
@@ -1627,9 +1623,21 @@ try {
       tool_input: { path: join(root, 'styles/app.css') },
     });
     assert(
-      'css write after css.md allow',
+      'css write after any rules ref allow',
       allowCss.permission === 'allow',
       JSON.stringify(allowCss),
+    );
+
+    const allowTs = run('gate.mjs', {
+      ...refsBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/foo.ts') },
+    });
+    assert(
+      'ts write after any rules ref allow',
+      allowTs.permission === 'allow',
+      JSON.stringify(allowTs),
     );
   }
 
@@ -1701,7 +1709,7 @@ try {
       JSON.stringify(outBypassGh),
     );
 
-    // implement 前の pnpm は従来どおり deny。文言に実 phase が出ること
+    // rules 前の pnpm は従来どおり deny。文言に実 phase が出ること
     const outPnpm = run('gate.mjs', {
       ...heredocBase,
       hook_event_name: 'beforeShellExecution',
@@ -1723,10 +1731,10 @@ try {
     });
     const writeMsg = String(outWrite.agent_message ?? '');
     assert(
-      'design Write deny names phase+implement',
+      'design Write deny names phase+rules',
       outWrite.permission === 'deny' &&
         writeMsg.includes('phase=design') &&
-        writeMsg.includes('implement'),
+        writeMsg.includes('rules'),
       JSON.stringify(outWrite),
     );
     assert(

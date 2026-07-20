@@ -129,8 +129,8 @@ function readWeb() {
 /** ゲート要点を1か所に（詳細は各 skill / deny メッセージ） */
 function readGateRules() {
   return [
-    'Phase: default `discussion`. Work only after user `/spec|/design|/forge|/refine|/chore`. Code → Read `implement/SKILL.md` (`unlock.implement`). Spec-flow entry → Read `issue/SKILL.md` + phase template (`unlock.issue`; template in `read.refs` as `issue/<template>.md`). Phase re-entry clears `read.skills` / `read.refs`. Broken → user `/bootstrap` only.',
-    'References: before gated edits, Read the matching `implement/references/*.md` (deny names the file; tracked in `read.refs` as `implement/<name>.md`). Any `.cursor/skills/*/references/*.md` Read is recorded as `skill/name.md`. Do not edit state files.',
+    'Phase: default `discussion`. Work only after user `/spec|/design|/forge|/refine|/chore`. Edit → Read `rules/SKILL.md` (`unlock.rules`). Spec-flow entry → Read `issue/SKILL.md` + phase template (`unlock.issue`; template in `read.refs` as `issue/<template>.md`). Phase re-entry clears `read.skills` / `read.refs`. Broken → user `/bootstrap` only.',
+    'References: before gated edits, Read at least one `rules/references/*.md` (tracked in `read.refs` as `rules/<name>.md`). Any `.cursor/skills/*/references/*.md` Read is recorded as `skill/name.md`. Do not edit state files.',
     'Review: `review.files` non-empty → commit blocked; `/pre-commit-reviewer` clears. Persists across phase changes. `md` / `json` / `yaml` are not tracked.',
   ].join('\n');
 }
@@ -143,13 +143,13 @@ function readGateState(root, id, stateFileRel) {
   const read = state.read ?? { skills: [], refs: [] };
   return [
     `Gate state (hooks-only; do not edit): \`${stateFileRel}\``,
-    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `unlock.implement`: `null` in discussion; `false` = handshake pending; `true` = unlocked. Spec-flow: `unlock.issue` (template via `read.refs`). `read.skills` = Read of `.cursor/skills/*/SKILL.md`; `read.refs` = `skill/name.md` (both cleared on phase re-entry).',
+    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `unlock.rules`: `null` in discussion; `false` = handshake pending; `true` = unlocked. Spec-flow: `unlock.issue` (template via `read.refs`). `read.skills` = Read of `.cursor/skills/*/SKILL.md`; `read.refs` = `skill/name.md` (both cleared on phase re-entry).',
     'Set `label` via `node .cursor/skills/label/scripts/set-label.mjs <label>`.',
     '',
     'Current values:',
     `phase: ${state.phase}`,
     `unlock.issue: ${unlock.issue}`,
-    `unlock.implement: ${unlock.implement}`,
+    `unlock.rules: ${unlock.rules}`,
     `read.skills: ${JSON.stringify(read.skills ?? [])}`,
     `read.refs: ${JSON.stringify(read.refs ?? [])}`,
     `label: ${state.label ? state.label : '(none)'}`,

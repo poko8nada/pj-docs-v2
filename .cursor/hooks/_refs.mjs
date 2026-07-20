@@ -6,17 +6,13 @@ import { existsSync, readdirSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 const SKILLS_ROOT = '.cursor/skills';
-
-/** 旧 state 互換: implement の basename のみ */
-const LEGACY_IMPLEMENT_REF_NAMES = new Set([
-  'typescript.md',
-  'css.md',
-  'testing.md',
-  'markdown.md',
-]);
+const RULES_SKILL = 'rules';
 
 /** @type {RegExp} `skill/file.md` */
 const REF_ID_RE = /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+\.md$/;
+
+/** 弱ゲート: 「rules 配下を1つ以上」の sentinel（required 配列内） */
+export const ANY_RULES_REF = `${RULES_SKILL}/*`;
 
 function relPosix(root, filePath) {
   if (!filePath) return null;
@@ -62,9 +58,8 @@ export function discoverRefIds(root) {
  * @returns {string | null} `skill/name.md`
  */
 export function coerceRefId(raw) {
-  let id = String(raw ?? '').trim();
+  const id = String(raw ?? '').trim();
   if (!id) return null;
-  if (LEGACY_IMPLEMENT_REF_NAMES.has(id)) id = `implement/${id}`;
   if (!REF_ID_RE.test(id)) return null;
   return id;
 }
@@ -102,39 +97,53 @@ export function skillRefIdFromPath(root, filePath) {
 }
 
 /**
- * implement/references のみ（編集ゲート用）。互換 alias。
- * @returns {string | null} `implement/….md`
+ * 編集 path が rules-ref ゲート対象か（mjs/cjs は対象外）。
  */
-export function implementRefBasename(root, filePath) {
-  const id = skillRefIdFromPath(root, filePath);
-  if (!id || !id.startsWith('implement/')) return null;
-  return id;
+export function pathNeedsRulesRef(root, filePath) {
+  const posix = relPosix(root, filePath);
+  if (!posix) return false;
+  if (/\.(mjs|cjs)$/i.test(posix)) return false;
+  if (/\.test\.(ts|tsx)$/i.test(posix)) return true;
+  if (/\.css$/i.test(posix)) return true;
+  if (/\.mdc?$/i.test(posix)) return true;
+  if (/\.(ts|tsx|js|jsx)$/i.test(posix)) return true;
+  return false;
 }
 
 /**
- * 編集 path に必要な reference id 一覧（`implement/….md`）。
- * テストは testing のみ。mjs/cjs は不要。
+ * 編集 path に必要な reference 要件。
+ * 弱ゲート: 対象 path なら `rules/*`（どれか1つ）のみ。
  * @returns {string[]}
  */
 export function requiredRefsForPath(root, filePath) {
-  const posix = relPosix(root, filePath);
-  if (!posix) return [];
-  if (/\.test\.(ts|tsx)$/i.test(posix)) return ['implement/testing.md'];
-  if (/\.css$/i.test(posix)) return ['implement/css.md'];
-  if (/\.mdc?$/i.test(posix)) return ['implement/markdown.md'];
-  if (/\.(mjs|cjs)$/i.test(posix)) return [];
-  if (/\.(ts|tsx|js|jsx)$/i.test(posix)) return ['implement/typescript.md'];
-  return [];
+  if (!pathNeedsRulesRef(root, filePath)) return [];
+  return [ANY_RULES_REF];
 }
 
-/** @param {string[]} readRefs @param {string[]} required */
+/** read.refs に rules/ 配下が1つ以上あるか */
+export function hasAnyRulesRef(readRefs) {
+  return normalizeReadRefs(readRefs).some((r) => r.startsWith(`${RULES_SKILL}/`));
+}
+
+/**
+ * @param {string[]} readRefs
+ * @param {string[]} required
+ * @returns {string[]} missing（sentinel または具体 id）
+ */
 export function missingRefs(readRefs, required) {
+  if (!required.length) return [];
+  if (required.includes(ANY_RULES_REF)) {
+    return hasAnyRulesRef(readRefs) ? [] : [ANY_RULES_REF];
+  }
   const have = new Set(normalizeReadRefs(readRefs));
   return required.filter((r) => !have.has(r));
 }
 
-/** `implement/typescript.md` → `.cursor/skills/implement/references/typescript.md` */
+/** `rules/shared.md` → `.cursor/skills/rules/references/shared.md` */
 export function refIdToRelPath(refId) {
+  if (refId === ANY_RULES_REF) {
+    return `${SKILLS_ROOT}/${RULES_SKILL}/references/`;
+  }
   const id = coerceRefId(refId);
   if (!id) return null;
   const slash = id.indexOf('/');
@@ -145,6 +154,12 @@ export function refIdToRelPath(refId) {
 
 /** @param {string[]} missing */
 export function denyRefsMessage(missing) {
+  if (missing.includes(ANY_RULES_REF)) {
+    return (
+      `[gate-refs] Missing rules reference Read. ` +
+      `Read at least one file under \`${SKILLS_ROOT}/${RULES_SKILL}/references/\` before editing this path.`
+    );
+  }
   const list = missing
     .map((m) => {
       const rel = refIdToRelPath(m);
@@ -152,10 +167,7 @@ export function denyRefsMessage(missing) {
     })
     .join(', ');
   return (
-    `[gate-refs] Missing implement reference Read(s): ${list}. ` +
+    `[gate-refs] Missing rules reference Read(s): ${list}. ` +
     'Read the listed file(s) before editing this path.'
   );
 }
-
-/** @deprecated use discoverRefIds; kept for older imports */
-export const IMPLEMENT_REF_NAMES = LEGACY_IMPLEMENT_REF_NAMES;

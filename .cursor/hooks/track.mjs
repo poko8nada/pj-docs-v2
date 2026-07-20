@@ -86,11 +86,11 @@ function filePathFromPayload(payload) {
   );
 }
 
-function isImplementSkill(root, filePath) {
+function isRulesSkill(root, filePath) {
   if (!filePath) return false;
   try {
     const abs = realpathSync(isAbsolute(filePath) ? filePath : resolve(root, filePath));
-    const target = realpathSync(join(root, '.cursor/skills/implement/SKILL.md'));
+    const target = realpathSync(join(root, '.cursor/skills/rules/SKILL.md'));
     return abs === target;
   } catch {
     return false;
@@ -129,15 +129,15 @@ function maybeUnlockIssue(root, payload) {
   });
 }
 
-function maybeUnlockImplement(root, payload) {
+function maybeUnlockRules(root, payload) {
   const filePath = filePathFromPayload(payload);
-  if (!isImplementSkill(root, String(filePath))) return;
+  if (!isRulesSkill(root, String(filePath))) return;
   const id = conversationId(payload);
   const prev = loadState(root, id);
   if (WORK_PHASES.has(prev.phase)) {
     saveState(root, id, {
       phase: prev.phase,
-      unlock: { ...prev.unlock, implement: true },
+      unlock: { ...prev.unlock, rules: true },
       review: prev.review,
     });
   }
@@ -165,7 +165,7 @@ function handleBeforeSubmitPrompt(root, payload) {
   }
 
   if (!findStateFileName(root, id)) {
-    saveState(root, id, { phase: PHASE_DISCUSSION, unlock: { implement: null } });
+    saveState(root, id, { phase: PHASE_DISCUSSION, unlock: { rules: null } });
   }
 
   const match = prompt.match(PHASE_RE);
@@ -180,12 +180,12 @@ function handleBeforeSubmitPrompt(root, payload) {
   const read = defaultRead();
 
   if (phase === PHASE_DISCUSSION) {
-    unlock = { implement: null, issue: null };
+    unlock = { rules: null, issue: null };
   } else if (phase === 'chore') {
-    unlock = { implement: false, issue: null };
+    unlock = { rules: false, issue: null };
   } else {
     // spec / design / forge / refine
-    unlock = { implement: false, issue: false };
+    unlock = { rules: false, issue: false };
   }
 
   saveState(root, id, { phase, unlock, read, review });
@@ -195,7 +195,7 @@ function handleBeforeSubmitPrompt(root, payload) {
 function maybeMarkCheckPending(root, payload) {
   const id = conversationId(payload);
   const state = loadState(root, id);
-  if (!WORK_PHASES.has(state.phase) || state.unlock?.implement !== true) return;
+  if (!WORK_PHASES.has(state.phase) || state.unlock?.rules !== true) return;
 
   const filePath = filePathFromPayload(payload);
   if (!filePath || !isCheckablePath(root, String(filePath))) return;
@@ -209,7 +209,7 @@ function maybeMarkCheckPending(root, payload) {
 function maybeMarkReviewDirty(root, payload) {
   const id = conversationId(payload);
   const state = loadState(root, id);
-  if (!WORK_PHASES.has(state.phase) || state.unlock?.implement !== true) return;
+  if (!WORK_PHASES.has(state.phase) || state.unlock?.rules !== true) return;
 
   const filePath = filePathFromPayload(payload);
   if (!filePath || !isReviewablePath(root, String(filePath))) return;
@@ -297,7 +297,7 @@ async function main() {
   if (isReadEvent) {
     maybeMarkReadSkill(root, payload);
     maybeUnlockIssue(root, payload);
-    maybeUnlockImplement(root, payload);
+    maybeUnlockRules(root, payload);
     maybeMarkReadRef(root, payload);
     if (event === 'postToolUse') return empty();
     return allow();
