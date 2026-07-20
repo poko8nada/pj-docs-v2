@@ -9,6 +9,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isBootstrapActive } from './_bootstrap.mjs';
+import { playDenySound } from './_notify-deny.mjs';
 
 /** entry は _state に依存しない（state 壊れでも bootstrap 救済できるように） */
 const PROJECT_ROOT_FALLBACK = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -33,6 +34,7 @@ function allow() {
 }
 
 function deny(message) {
+  playDenySound();
   process.stdout.write(
     JSON.stringify({
       permission: 'deny',

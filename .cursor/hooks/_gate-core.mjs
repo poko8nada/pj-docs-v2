@@ -35,6 +35,7 @@ import {
   WORK_PHASES,
   workspaceRoot,
 } from './_state.mjs';
+import { playDenySound } from './_notify-deny.mjs';
 
 const WRITE_TOOLS = new Set(['Write', 'StrReplace', 'Delete', 'EditNotebook']);
 
@@ -157,6 +158,7 @@ function allow() {
 }
 
 function deny(message) {
+  playDenySound();
   process.stdout.write(
     JSON.stringify({
       permission: 'deny',
