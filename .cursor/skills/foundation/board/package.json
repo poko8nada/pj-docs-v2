@@ -1,0 +1,13 @@
+{
+  "name": "foundation-board",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "foundation:dev": "vite"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.2",
+    "tailwindcss": "^4.3.2",
+    "vite": "^8.1.5"
+  }
+}
