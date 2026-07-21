@@ -32,6 +32,8 @@ function shouldPlay() {
 export function playDenySound() {
   if (!shouldPlay()) return;
   try {
+    // タイマーは unref しない（短命 hook が DELAY 前に死ぬと音まで届かない）。
+    // afplay 起動後だけ child を unref し、再生完了まで親を待たせない。
     setTimeout(() => {
       try {
         const child = spawn('afplay', ['-v', '2', SOUND], {
@@ -42,7 +44,7 @@ export function playDenySound() {
       } catch {
         // fail-open
       }
-    }, DELAY_MS).unref?.();
+    }, DELAY_MS);
   } catch {
     // fail-open
   }
