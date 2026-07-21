@@ -1,21 +1,29 @@
 // foundation — メタ層（クローム）。
-// #board の中身には関知しない。浮遊ボタン(FAB)＋右ドロワーパネル＋ホバー補助線を生成し、
-// クリック→コメント、マーカ表示、編集時の POST /comments 保存を担う。
-// スタイルは style.css に任せる（Tailwind非依存）。クロームは製品と影/浮遊で区別する。
+// 見た目 HTML には関知しない。FAB＋backdrop＋右ドロワー＋ホバー補助線を body に生成し、
+// クリック→下書き、テキストが入って初めてコメント確定、POST /comments を担う。
+// ルートは document.body。クローム自身への操作は除外する。
 
 const SAVE_DEBOUNCE_MS = 400;
+const CHROME_SEL = '#meta, .vl-fab, .vl-backdrop, .vl-hover, .vl-marker';
 
-// 要素の安定キー。data-aid 優先、無ければ生成セレクタ（fallback・やや脆い）。
-function aidFor(el, board) {
-  if (el.dataset && el.dataset.aid) return el.dataset.aid;
-  return cssSelector(el, board);
+function isChrome(el) {
+  return Boolean(el && el.closest && el.closest(CHROME_SEL));
 }
 
-// 生成CSSセレクタ（data-aid 無し時の fallback）。nth-of-type 鎖で一意化。
-function cssSelector(el, board) {
+function hasText(c) {
+  return Boolean(c && String(c.text || '').trim());
+}
+
+// 要素の安定キー。data-aid 優先、無ければ生成セレクタ（fallback・やや脆い）。
+function aidFor(el, root) {
+  if (el.dataset && el.dataset.aid) return el.dataset.aid;
+  return cssSelector(el, root);
+}
+
+function cssSelector(el, root) {
   const parts = [];
   let node = el;
-  while (node && node.nodeType === 1 && node !== board) {
+  while (node && node.nodeType === 1 && node !== root) {
     let part = node.tagName.toLowerCase();
     if (node.id) {
       parts.unshift('#' + node.id);
@@ -32,19 +40,21 @@ function cssSelector(el, board) {
   return parts.join(' > ');
 }
 
-// data-aid 優先。aid が生成セレクタ（空白や #.: > を含む）のときだけ querySelector フォールバック。
-function findByAid(aid, board) {
-  const byData = board.querySelector('[data-aid="' + cssEscape(aid) + '"]');
-  if (byData) return byData;
+function findByAid(aid, root) {
+  const matches = root.querySelectorAll('[data-aid="' + cssEscape(aid) + '"]');
+  for (const el of matches) {
+    if (!isChrome(el)) return el;
+  }
   if (!/[\s>#:.]/.test(aid)) return null;
   try {
-    return board.querySelector(aid);
+    const el = root.querySelector(aid);
+    if (el && !isChrome(el)) return el;
+    return null;
   } catch {
     return null;
   }
 }
 
-// void 要素は子を持てないので marker を付けない。
 const VOID_TAGS = new Set([
   'img',
   'input',
@@ -69,51 +79,73 @@ function cssEscape(s) {
   return String(s).replace(/["\\]/g, '\\$&');
 }
 
-// 公開API。main.js から呼ばれる。
-export function initAnnotate({ board, comments }) {
-  // 状態: aid -> { aid, selector, text }
+function createHoverOverlay() {
+  const box = document.createElement('div');
+  box.className = 'vl-hover';
+  box.setAttribute('aria-hidden', 'true');
+  const label = document.createElement('span');
+  label.className = 'vl-hover-label';
+  box.append(label);
+  return box;
+}
+
+export function initAnnotate({ root, comments }) {
+  // 確定コメントのみ（テキストあり）。空は載せない。
   const state = new Map();
   for (const c of comments) {
+    if (!hasText(c)) continue;
     state.set(c.aid, { aid: c.aid, selector: c.selector || '', text: c.text || '' });
   }
 
-  // クロームDOMを生成（殺壳index.htmlには置かない）。
+  // クリック直後の下書き。テキストが付くまで state / comments.json に入れない。
+  let draft = null;
+
+  const backdrop = createBackdrop();
   const fab = createFab();
   const meta = createPanel();
   const hover = createHoverOverlay();
-  document.body.append(fab, meta, hover);
+  document.body.append(backdrop, fab, meta, hover);
 
   renderRows();
   renderMarkers();
   updateFabCount();
 
-  // クリックで対象要素を特定し、コメント行を用意してパネルを開く。
-  // 見本の <a href="#"> 等のデフォルト遷移を止める（アノテーションが主用途のため）。
-  board.addEventListener('click', (e) => {
-    if (e.target === board) return;
-    if (e.target.closest('.vl-marker')) return;
+  root.addEventListener('click', (e) => {
+    if (e.target === root) return;
+    if (isChrome(e.target)) return;
     e.preventDefault();
     const el = e.target;
-    const aid = aidFor(el, board);
-    if (!state.has(aid)) state.set(aid, { aid, selector: cssSelector(el, board), text: '' });
+    const aid = aidFor(el, root);
+    const selector = cssSelector(el, root);
+
+    discardEmptyDraft();
+
+    if (state.has(aid)) {
+      draft = null;
+      openPanel();
+      renderRows();
+      focusRow(aid);
+      return;
+    }
+
+    draft = { aid, selector, text: '' };
+    openPanel();
     renderRows();
     renderMarkers();
     updateFabCount();
-    openPanel();
     focusRow(aid);
   });
 
-  // ホバー補助線（dev tool風）。要素に入った瞬間に矩形とaidを表示。
   let currentHover = null;
-  board.addEventListener('mouseover', (e) => {
-    if (e.target === board) {
+  root.addEventListener('mouseover', (e) => {
+    if (e.target === root || isChrome(e.target)) {
       hideHover();
       return;
     }
     currentHover = e.target;
     showHover(e.target);
   });
-  board.addEventListener('mouseleave', hideHover);
+  root.addEventListener('mouseleave', hideHover);
   window.addEventListener(
     'scroll',
     () => {
@@ -123,6 +155,10 @@ export function initAnnotate({ board, comments }) {
   );
 
   function showHover(el) {
+    if (isChrome(el)) {
+      hideHover();
+      return;
+    }
     const r = el.getBoundingClientRect();
     hover.style.display = 'block';
     hover.style.left = r.left + window.scrollX + 'px';
@@ -130,21 +166,19 @@ export function initAnnotate({ board, comments }) {
     hover.style.width = r.width + 'px';
     hover.style.height = r.height + 'px';
     const label = hover.querySelector('.vl-hover-label');
-    if (label) label.textContent = aidFor(el, board);
+    if (label) label.textContent = aidFor(el, root);
   }
   function hideHover() {
     hover.style.display = 'none';
     currentHover = null;
   }
 
-  function createHoverOverlay() {
-    const box = document.createElement('div');
-    box.className = 'vl-hover';
-    box.setAttribute('aria-hidden', 'true');
-    const label = document.createElement('span');
-    label.className = 'vl-hover-label';
-    box.append(label);
-    return box;
+  function createBackdrop() {
+    const el = document.createElement('div');
+    el.className = 'vl-backdrop';
+    el.setAttribute('aria-hidden', 'true');
+    el.addEventListener('click', () => closePanel());
+    return el;
   }
 
   function createFab() {
@@ -186,16 +220,65 @@ export function initAnnotate({ board, comments }) {
   }
 
   function togglePanel() {
-    meta.classList.toggle('vl-open');
-    fab.dataset.open = meta.classList.contains('vl-open') ? 'true' : 'false';
+    if (meta.classList.contains('vl-open')) closePanel();
+    else openPanel();
   }
+
   function openPanel() {
     meta.classList.add('vl-open');
+    backdrop.classList.add('vl-open');
     fab.dataset.open = 'true';
+    backdrop.setAttribute('aria-hidden', 'false');
   }
+
   function closePanel() {
+    discardEmptyDraft();
+    pruneEmptyFromState();
     meta.classList.remove('vl-open');
+    backdrop.classList.remove('vl-open');
     fab.dataset.open = 'false';
+    backdrop.setAttribute('aria-hidden', 'true');
+    renderRows();
+    renderMarkers();
+    updateFabCount();
+    saveSoon();
+  }
+
+  function discardEmptyDraft() {
+    if (draft && !hasText(draft)) draft = null;
+  }
+
+  function pruneEmptyFromState() {
+    for (const [aid, c] of state.entries()) {
+      if (!hasText(c)) state.delete(aid);
+    }
+  }
+
+  /** 下書きに文字が入ったら state へ昇格。空に戻したら state から外す。行 DOM は壊さない。 */
+  function syncDraftOrState(aid, selector, text, rowEl) {
+    const entry = { aid, selector, text };
+    const wasCommitted = state.has(aid) && hasText(state.get(aid));
+    const nowCommitted = hasText(entry);
+
+    if (nowCommitted) {
+      state.set(aid, entry);
+      if (draft && draft.aid === aid) draft = null;
+    } else {
+      state.delete(aid);
+      draft = { aid, selector, text: '' };
+    }
+
+    if (rowEl) {
+      rowEl.classList.toggle('vl-row-draft', !nowCommitted);
+      const label = rowEl.querySelector('.vl-aid');
+      if (label) label.textContent = nowCommitted ? aid : aid + ' (draft)';
+    }
+
+    if (wasCommitted !== nowCommitted) {
+      renderMarkers();
+      updateFabCount();
+    }
+    saveSoon();
   }
 
   function focusRow(aid) {
@@ -206,22 +289,32 @@ export function initAnnotate({ board, comments }) {
     }
   }
 
+  function committedList() {
+    return Array.from(state.values()).filter(hasText);
+  }
+
   function renderRows() {
     const list = meta.querySelector('.vl-list');
     list.innerHTML = '';
-    if (state.size === 0) {
+    const committed = committedList();
+    const showDraft = draft && !state.has(draft.aid);
+
+    if (committed.length === 0 && !showDraft) {
       const empty = document.createElement('div');
       empty.className = 'vl-empty';
-      empty.textContent = 'ボード内の要素をクリックするとコメント行が追加されます。';
+      empty.textContent =
+        '要素をクリックして下書きを開き、文字を入れるとコメントになります。空のまま閉じると付きません。';
       list.append(empty);
       return;
     }
-    for (const c of state.values()) list.append(buildRow(c));
+
+    if (showDraft) list.append(buildRow(draft, true));
+    for (const c of committed) list.append(buildRow(c, false));
   }
 
-  function buildRow(c) {
+  function buildRow(c, isDraft) {
     const row = document.createElement('div');
-    row.className = 'vl-row';
+    row.className = 'vl-row' + (isDraft ? ' vl-row-draft' : '');
     row.dataset.aid = c.aid;
 
     const del = document.createElement('button');
@@ -230,6 +323,7 @@ export function initAnnotate({ board, comments }) {
     del.title = 'delete';
     del.textContent = '×';
     del.addEventListener('click', () => {
+      if (draft && draft.aid === c.aid) draft = null;
       state.delete(c.aid);
       renderRows();
       renderMarkers();
@@ -240,23 +334,23 @@ export function initAnnotate({ board, comments }) {
 
     const label = document.createElement('div');
     label.className = 'vl-aid';
-    label.textContent = c.aid;
+    label.textContent = isDraft ? c.aid + ' (draft)' : c.aid;
     row.append(label);
 
     const ta = document.createElement('textarea');
     ta.className = 'vl-text';
     ta.value = c.text || '';
-    ta.placeholder = 'comment…  (⌘/Ctrl + Enter で保存して閉じる)';
+    ta.placeholder = isDraft
+      ? 'コメントを書く…（空のまま閉じると付きません）'
+      : 'comment…  (⌘/Ctrl + Enter で保存して閉じる)';
     ta.addEventListener('input', () => {
-      c.text = ta.value;
-      saveSoon();
+      syncDraftOrState(c.aid, c.selector, ta.value, row);
     });
-    // Cmd/Ctrl + Enter で即保存してドロワーを閉じる。
     ta.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        c.text = ta.value;
-        saveNow().then(() => closePanel());
+        syncDraftOrState(c.aid, c.selector, ta.value, row);
+        if (hasText({ text: ta.value })) closePanel();
       }
     });
     row.append(ta);
@@ -265,16 +359,15 @@ export function initAnnotate({ board, comments }) {
   }
 
   function renderMarkers() {
-    const old = board.querySelectorAll('.vl-marker');
-    for (const m of old) m.remove();
-    for (const el of board.querySelectorAll('.vl-anchored, .vl-anchored-void')) {
+    for (const m of root.querySelectorAll('.vl-marker')) m.remove();
+    for (const el of root.querySelectorAll('.vl-anchored, .vl-anchored-void')) {
+      if (isChrome(el)) continue;
       el.classList.remove('vl-anchored', 'vl-anchored-void');
     }
 
-    for (const c of state.values()) {
-      const el = findByAid(c.aid, board);
+    for (const c of committedList()) {
+      const el = findByAid(c.aid, root);
       if (!el) continue;
-      // static のときだけ relative を付与（既存の absolute/fixed/sticky を壊さない）。
       const pos = getComputedStyle(el).position;
       if (pos === 'static') el.classList.add('vl-anchored');
       if (!canHostMarker(el)) {
@@ -290,10 +383,9 @@ export function initAnnotate({ board, comments }) {
 
   function updateFabCount() {
     const count = fab.querySelector('.vl-fab-count');
-    if (count) count.textContent = String(state.size);
+    if (count) count.textContent = String(committedList().length);
   }
 
-  // debounce 保存。状態を JSON にして POST /comments → Vite プラグインが comments.json 書込。
   let timer = null;
   function saveSoon() {
     if (timer) clearTimeout(timer);
@@ -305,11 +397,12 @@ export function initAnnotate({ board, comments }) {
       clearTimeout(timer);
       timer = null;
     }
-    const payload = JSON.stringify(Array.from(state.values()));
+    pruneEmptyFromState();
+    const payload = JSON.stringify(committedList());
     try {
       await fetch('/comments', { method: 'POST', body: payload });
     } catch {
-      // dev server が落ちている場合は黙って無視（リロードで再送される）。
+      // dev server が落ちている場合は黙って無視。
     }
   }
 }

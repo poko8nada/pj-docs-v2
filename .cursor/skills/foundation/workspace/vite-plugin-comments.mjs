@@ -1,11 +1,11 @@
 // foundation — comments.json を fs で読み書きする Vite プラグイン（dev専用）。
 // ブラウザは GET/POST /comments でデータを取得・保存する。これでユーザーの編集が fs に永続化される。
-// configureServer は dev server でのみ動く = ビルド（vite build）では無効。ボードは dev-only 設計。
+// configureServer は dev server でのみ動く = ビルド（vite build）では無効。
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const here = dirname(fileURLToPath(import.meta.url)); // .../board
+const here = dirname(fileURLToPath(import.meta.url)); // .../workspace
 const commentsFile = join(here, 'comments.json');
 
 export function commentsPlugin() {

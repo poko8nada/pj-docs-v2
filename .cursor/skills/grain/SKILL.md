@@ -1,27 +1,32 @@
 ---
 name: grain
 description: >-
-  Soft skill: defines, audits, and briefs product surface character — visual ornamentation
-  (あしらい), first-impression clarity, and interaction feel — through style axes, not upfront
-  color or font picks. Callable from any phase. Returns # Grain, # Tokens, audit findings, or
-  implementation briefs to the caller. Does not invoke rules or phase skills.
+  Soft skill: define, audit, and brief product surface character — visual ornamentation (あしらい), first-impression clarity, and interaction feel — through style axes, not upfront color or font picks.
+  Use from /work mainly on Build surfaces (Discover only lightly if needed). Soft — not a hard gate.
+  Writes findings/grain/ and returns Topic / Path / Why / Summary / Axes touched to the caller.
 ---
 
 # grain
 
-**Grain** is the product's surface character: how it looks, how it reads at first glance, and how it feels to scroll, click, and navigate. Grain is not a palette or type stack — those are derived _after_ the style language is agreed.
+**Grain** is the product's surface character: how it looks, how it reads at a glance, and how it feels to scroll, click, and navigate. Grain is not a palette or type stack — those are derived _after_ the style language is agreed.
 
-Soft skill: same layer as `feasibility`, `readme`, and `issue`. Callable from any work phase or standalone. **Self-contained** — do not invoke phase skills or `issue`. Return outputs to the caller; the caller persists and ships when the phase agrees scope.
+Soft skill — nothing hard-denies if skipped. Prefer running when there is a real surface to judge (product UI or a locked look). Write concrete output under `findings/grain/` (create that directory on first write if missing). Return a short handoff block to the caller. Do **not** create or edit GitHub issues from here.
+
+## How the caller slices this skill
+
+1. Agree **Mode** (On entry) — one sitting if needed.
+2. Within that Mode, each **Step** is one verifiable unit. Finish and agree a Step before the next.
+3. **Close gate Audit** is its own Step after Define / Improve / Create (required before persist).
+
+Do not merge later Steps into one silent pass unless the user explicitly allows a short path.
 
 ## Backbone: three levels
 
 Use Don Norman's three levels as the evaluation lens (details in [references/axes.md](references/axes.md)):
 
-| Level          | Question                                               | Grain owns                                           |
-| -------------- | ------------------------------------------------------ | ---------------------------------------------------- |
-| **Visceral**   | What does a first-time visitor understand at a glance? | Style axes, hierarchy, ornamentation, brand register |
-| **Behavioral** | Does use feel clear and pleasant?                      | Interaction temperament, microinteractions, motion   |
-| **Reflective** | What impression remains after use?                     | Trust signals, distinctiveness, self-image fit       |
+- **Visceral** — What does a first-time visitor understand at a glance? Owns: style axes, hierarchy, ornamentation, brand register.
+- **Behavioral** — Does use feel clear and pleasant? Owns: interaction temperament, microinteractions, motion.
+- **Reflective** — What impression remains after use? Owns: trust signals, distinctiveness, self-image fit.
 
 Always evaluate Visceral and Behavioral separately. Good looks must not mask confusion ([aesthetic-usability effect](https://lawsofux.com/aesthetic-usability-effect/)).
 
@@ -29,144 +34,165 @@ Always evaluate Visceral and Behavioral separately. Good looks must not mask con
 
 - Mode choice (Define / Audit / Improve / Create)
 - Style language on the three levels (axes + temperament)
-- Audit: five-second clarity, visual organization, cognitive load, interaction — see [references/audit.md](references/audit.md)
+- Audit — see [references/audit.md](references/audit.md)
 - Craft guidance in briefs — see [references/craft.md](references/craft.md)
-- Audit findings with Observation → Impact → Suggestion
-- Deriving color, typography, and spacing tokens **from** axes (last step in Define)
-- Close gate: Mode — Audit before returning to caller (see below)
+- Deriving tokens **from** axes (Define, after axes agree)
+- Writing confirmed output under `findings/grain/` (append-only)
+- Handoff fields for the caller
 
 ## What you do not own
 
-- Phase entry, mode ①/②, or phase close conditions
-- Issue create/update / lifecycle — `issue` via the caller
-- Slice planning, Section Matrix, or `# Screen` — `design`
-- Product code — caller ships agreed briefs when the phase is ready
-- Invoking `rules`, `issue`, or phase skills from grain
+- Whether this session should run — the caller decides
+- GitHub issue bodies or comments
+- Product or harness file edits outside `findings/grain/`
+- Shipping briefs into the product tree — the caller does that
 
-## When called
+## On entry — pick Mode
 
-**From a phase skill with mode already scoped** (e.g. design needs Define before `# Tokens`): confirm mode in one short line if useful, then run it.
+Inspect the repo and open `[Goal]` / `[Discover]` / `[Build]` when useful (read-only). Prefer the **target UI or look**. Present **Context / Understanding / Proposal** for the Mode.
 
-**Standalone / mode unclear:** present **Context / Understanding / Proposal**, pick a mode, revise until agreed.
+- No agreed style language → **Define**
+- UI / look exists, needs review → **Audit**
+- Fixes after Audit (or named polish) → **Improve**
+- Grain agreed, new surface to specify → **Create**
 
-### By phase (typical triggers)
+**Done when:** User agrees the Mode. Stop here if the caller is slicing.
 
-| Phase      | When to invoke grain                                                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Spec**   | Rare. Goal/audience implies strong brand register — note for later Define only                                                             |
-| **Design** | After Analyze, before Default matrix: `# Grain` empty → **Define**. Surface drift → **Audit** / **Improve**. Close inventory may use Audit |
-| **Forge**  | New UI surface; interactivity landed → **Audit**. Drift from `# Grain` → **Define** / **Improve**                                          |
-| **Refine** | UX/visual polish slice → **Audit** / **Improve**. Major re-skin → **Define**                                                               |
-| **Chore**  | Exceptional — only when the chore is explicitly grain-doc or audit scope                                                                   |
-
-Design invokes grain for Define once before the Default matrix, then Audit/Improve during surface work. That is orchestration, not ownership — other phases may invoke grain the same way.
-
-## Close gate
-
-Every grain session **must** end with **Mode — Audit** before returning to the caller.
-
-- **Audit-only invoke:** findings delivered = grain done.
-- **Define / Improve / Create:** run Audit on the target surface (or the brief's scope), then return Audit findings together with any prior output.
-
-This close gate is internal to grain. It does not set or block any phase's close conditions.
-
-## On entry
-
-Inspect the repo and open issues first (Spec, Design if any), then pick a mode from **Context / Understanding / Proposal** — not a bare mode question.
-
-Typical states (anchors for Understanding):
-
-- No agreed grain yet → propose **Mode — Define**
-- UI exists, user wants review → propose **Mode — Audit**
-- Audit done or user named fixes → propose **Mode — Improve**
-- Grain agreed, new surface to specify → propose **Mode — Create**
-
-Revise until the user agrees the mode. If Improve or Create runs without agreed grain, propose axes in chat and get **yes** / **edit** before briefing.
-
-## Typical paths
-
-| Goal                         | Path                                    |
-| ---------------------------- | --------------------------------------- |
-| New style language           | Define → Audit (close gate)             |
-| Existing UI, unknown quality | Audit (done) or Audit → Improve → Audit |
-| Known fixes                  | Improve → Audit                         |
-| New surface spec             | Create → Audit                          |
-
-Audit alone does not require Improve. Define alone does not require Create.
+Typical paths: Define → close-gate Audit; Audit alone; Improve → close-gate Audit; Create → close-gate Audit.
 
 ## Mode — Define
 
-**When:** No agreed style language; or caller needs `# Grain` / `# Tokens` before composition work.
+**When:** No agreed style language; or caller needs grain / tokens before surface work.
 
-**Flow:**
+### Step 1 — Inspect context
 
-1. **Inspect issues** — list and read open Spec and Design issues (`gh` when available). Extract Goal, audience, constraints, and any existing `# Grain` / `# Tokens`.
-2. **Fallback context** — if no issues: repo UI, planning docs, user description.
-3. **Ground proposal** — state what Goal/direction implies for grain. Propose **grain-stable** axes and behavioral temperament first (see [references/axes.md](references/axes.md)); compact table or spectrum; no color hex.
-4. User agrees: **yes** / **edit** / **no** (revise on edit or no).
-5. Derive **tokens** from agreed grain-stable choices — color, typography, spacing, radius numbers — last step only.
-6. Return `# Grain` and `# Tokens` markdown blocks. Then run **Close gate** (Audit).
+Read Goal / Discover / Build when present; prior `findings/grain/` or look paths. If thin: repo UI, planning docs, user description, cited look under `findings/foundation/`.
 
-Do not lock fonts by brand name until axes are agreed. Describe typographic _role_ first (e.g. "quiet body, assertive display").
+**Done when:** Context for axes is clear enough to propose. Stop if slicing.
 
-**Done when:** Axes and tokens agreed; Audit run; all output returned to caller.
+### Step 2 — Propose axes
+
+Propose **grain-stable** axes and behavioral temperament ([references/axes.md](references/axes.md)); compact table or spectrum; no color hex yet. Typographic _role_ first — do not lock font brand names yet. User **yes** / **edit** / **no**.
+
+**Done when:** Axes agreed. Stop if slicing.
+
+### Step 3 — Derive tokens
+
+Derive color, typography, spacing, radius from agreed axes. Show `# Grain` and `# Tokens` in chat. User **yes** / **edit** / **no**.
+
+**Done when:** Tokens agreed. Stop if slicing.
+
+### Step 4 — Close gate Audit
+
+Run **Mode — Audit** Steps on the target surface or brief scope (findings not written yet — fold into Step 5).
+
+**Done when:** Audit findings agreed in chat. Stop if slicing.
+
+### Step 5 — Persist and hand off
+
+Ensure `findings/grain/` exists; write `# Grain`, `# Tokens`, and Audit into `findings/grain/<dated-slug>.md`; return handoff.
+
+**Done when:** File written and handoff returned.
 
 ## Mode — Audit
 
-**When:** User wants existing UI reviewed; or close gate after another mode.
+**When:** Main review; or close gate after Define / Improve / Create.
 
-**Prerequisite:** Target UI identifiable (code path, screenshot, or description).
+**Prerequisite:** Target UI identifiable (code path, screenshot, look path, or description).
 
-**Flow:**
+### Step 1 — Inspect target
 
-1. Inspect target UI.
-2. Run all sections in [references/audit.md](references/audit.md):
-   - Five-second clarity (visceral)
-   - Visual organization (hierarchy, Gestalt)
-   - Cognitive load and IA (choice count, disclosure, wayfinding)
-   - Icon discipline (text-first, labels, standard symbols only)
-   - Interaction and motion (behavioral) — limited on static thinking surfaces; full check when interactivity exists
-   - Aesthetic-usability trap (looks good but confuses?)
-3. Report per level. Format each finding: **Observation → Impact → Suggestion**
-4. End with prioritized fixes (critical / warning / suggestion).
+Identify and inspect the surface.
 
-**Done when:** Findings delivered with priority order.
+**Done when:** Target is fixed. Stop if slicing.
+
+### Step 2 — Run audit
+
+Run [references/audit.md](references/audit.md). Each finding: **Observation → Impact → Suggestion**. End with prioritized fixes (critical / warning / suggestion). User **yes** / **edit** / **no**.
+
+**Done when:** Findings agreed in chat. Stop if slicing.
+
+### Step 3 — Persist and hand off
+
+**Main Audit only:** on **yes**, write `findings/grain/<dated-slug>.md`, return handoff.
+
+**Close-gate Audit** (after Define / Improve / Create): skip this Step — the parent Mode’s persist Step writes Audit with the rest.
+
+**Done when:** Main Audit → file + handoff. Close-gate → return to parent Mode.
 
 ## Mode — Improve
 
-**When:** User wants fixes briefed; or Audit findings to address.
+**When:** Fixes briefed; or Audit findings to address.
 
-**Prerequisite:** Grain agreed (from Define, Design issue, or one-line user confirmation).
+**Prerequisite:** Grain agreed (Define, prior findings, or one-line user confirmation).
 
-**Flow:**
+### Step 1 — Confirm grain
 
-1. Confirm grain (recap axes or cite Design issue `# Grain`).
-2. Read [references/craft.md](references/craft.md) for the quality floor.
-3. Produce an **Improve brief** (format below) — concrete targets, changes on each level, verify steps.
-4. Run **Close gate** (Audit) on the same target.
+Recap axes or cite `findings/grain/` Path.
 
-**Done when:** Improve brief and Audit findings returned to caller.
+**Done when:** Grain confirmed. Stop if slicing.
+
+### Step 2 — Improve brief
+
+Read [references/craft.md](references/craft.md). Produce **Improve brief** (format below). User **yes** / **edit** / **no**.
+
+**Done when:** Brief agreed. Stop if slicing.
+
+### Step 3 — Close gate Audit
+
+Run **Mode — Audit** Steps on the same target (persist deferred to Step 4).
+
+**Done when:** Audit findings agreed. Stop if slicing.
+
+### Step 4 — Persist and hand off
+
+Write brief + Audit to `findings/grain/<dated-slug>.md`; return handoff.
+
+**Done when:** File written and handoff returned.
 
 ## Mode — Create
 
-**When:** New section, screen, or component surface to specify with agreed grain.
+**When:** New section / screen / component with agreed grain.
 
-**Prerequisite:** Grain agreed (from Define, Design issue, or one-line user confirmation).
+**Prerequisite:** Grain agreed (Define, prior findings, or one-line user confirmation).
 
-**Flow:**
+### Step 1 — Confirm grain
 
-1. Confirm grain (recap axes or cite Design issue).
-2. Read [references/craft.md](references/craft.md).
-3. Produce a **Create brief** (format below) — structure, styling per tokens, boundaries. Do not invent grain mid-brief.
-4. Run **Close gate** (Audit) on scope (existing adjacent UI or described target).
+Recap axes or cite findings Path.
 
-**Done when:** Create brief and Audit findings returned to caller.
+**Done when:** Grain confirmed. Stop if slicing.
+
+### Step 2 — Create brief
+
+Read [references/craft.md](references/craft.md). Produce **Create brief** (format below). Do not invent grain mid-brief. User **yes** / **edit** / **no**.
+
+**Done when:** Brief agreed. Stop if slicing.
+
+### Step 3 — Close gate Audit
+
+Run **Mode — Audit** Steps on scope (persist deferred to Step 4).
+
+**Done when:** Audit findings agreed. Stop if slicing.
+
+### Step 4 — Persist and hand off
+
+Write brief + Audit to `findings/grain/<dated-slug>.md`; return handoff.
+
+**Done when:** File written and handoff returned.
 
 ## Output formats
 
-### `# Grain` and `# Tokens` (from Define)
+Same shapes in chat (before confirm) and in the findings MD.
 
-Return markdown blocks for the caller to persist via `issue`. Shape matches Design issue template sections.
+### `# Grain` and `# Tokens` (Define)
+
+```markdown
+# Grain
+…
+
+# Tokens
+…
+```
 
 ### Improve brief
 
@@ -174,17 +200,14 @@ Return markdown blocks for the caller to persist via `issue`. Shape matches Desi
 ## Grain — Improve brief
 
 ### Target
-
 - paths / components / surfaces
 
 ### Changes
-
 - Visceral: ...
 - Behavioral: ...
 
 ### Verify
-
-- browser / scroll / click path the caller should use to confirm the brief
+- browser / scroll / click path to confirm
 ```
 
 ### Create brief
@@ -193,39 +216,44 @@ Return markdown blocks for the caller to persist via `issue`. Shape matches Desi
 ## Grain — Create brief
 
 ### Surface
-
-- what to build (section, screen, component)
+- what to build
 
 ### Structure
-
 - layout, hierarchy, key elements
 
 ### Styling
-
-- per `# Tokens` and craft.md
+- per Tokens and craft.md
 
 ### Verify
-
-- browser / scroll / click path the caller should use to confirm the brief
+- browser / scroll / click path to confirm
 ```
 
-### Audit (close gate)
+### Audit
 
-Findings per [references/audit.md](references/audit.md). Append after any brief or Define output in the same return.
+Findings per [references/audit.md](references/audit.md). Append after Define / Improve / Create output in the same findings file.
 
-## Handoffs
+## Handoff (return to caller)
 
-Grain does not invoke other skills. Return all output to the **caller** (phase skill or user). The caller persists via `issue` and ships briefs when the phase agrees scope.
+```markdown
+- Topic: …
+- Path: findings/grain/<dated-slug>.md
+- Why:
+  - …
+- Summary: …   # optional; at most 3 lines
+- Axes touched: …   # optional; e.g. Look, Roadmap
+```
 
 ## Anti-patterns
 
 - Starting with color swatches or font lists
-- Defining grain without reading Spec / Design issues when they exist
-- Declaring grain "done" without Close gate Audit
+- Skipping Close gate Audit after Define / Improve / Create
 - Polishing visuals while CTA or purpose is unclear
 - Animation longer than ~400ms on frequent interactions (see [references/audit.md](references/audit.md))
-- Invoking `issue` or phase skills from grain
+- Editing GitHub issues from this skill
 - Editing product code from grain — return a brief instead
+- Overwriting prior `findings/grain/` files without user request
+- Skipping `findings/grain/` create on first write
+- Running later Steps without prior Step agreement when the caller expects sliced Steps
 
 ## References
 

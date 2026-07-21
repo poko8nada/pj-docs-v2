@@ -47,7 +47,7 @@ import {
   writeLastPromptId,
 } from './_state.mjs';
 
-const PHASE_RE = /(?:^|[\s`])\/(discussion|spec|design|forge|refine|chore)(?=[\s`/]|$)/i;
+const PHASE_RE = /(?:^|[\s`])\/(discussion|work|spec|design|forge|refine|chore)(?=[\s`/]|$)/i;
 const BOOTSTRAP_OFF_RE = /(?:^|[\s`])\/bootstrap\s+off(?=[\s`/]|$)/i;
 const BOOTSTRAP_ON_RE = /(?:^|[\s`])\/bootstrap(?=[\s`/]|$)/i;
 
@@ -184,7 +184,7 @@ function handleBeforeSubmitPrompt(root, payload) {
   } else if (phase === 'chore') {
     unlock = { rules: false, issue: null };
   } else {
-    // spec / design / forge / refine
+    // work / spec / design / forge / refine — issue handshake + rules
     unlock = { rules: false, issue: false };
   }
 

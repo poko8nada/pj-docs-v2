@@ -1,5 +1,5 @@
 /**
- * spec / design / forge / refine 入場時の issue ハンドシェイク。
+ * work / spec / design / forge / refine 入場時の issue ハンドシェイク。
  * issue/SKILL.md Read → unlock.issue: true。
  * フェーズテンプレ Read → read.refs に `issue/<template>.md`（isIssueReady が参照）。
  */
@@ -11,6 +11,9 @@ export const ISSUE_SKILL_REL = '.cursor/skills/issue/SKILL.md';
 const ISSUE_REFS_DIR = '.cursor/skills/issue/references';
 
 const ISSUE_TEMPLATE_NAMES = new Set([
+  'goal-template.md',
+  'discover-template.md',
+  'build-template.md',
   'spec-template.md',
   'design-app-template.md',
   'design-web-template.md',
@@ -20,6 +23,7 @@ const ISSUE_TEMPLATE_NAMES = new Set([
 
 /** @type {Record<string, string[]>} basename（`issue/` なし） */
 const PHASE_ISSUE_TEMPLATES = {
+  work: ['goal-template.md', 'discover-template.md', 'build-template.md'],
   spec: ['spec-template.md'],
   design: ['design-app-template.md', 'design-web-template.md'],
   forge: ['forge-template.md'],
@@ -78,6 +82,8 @@ export function isIssueReady(state) {
 
 export function templateHintForPhase(phase) {
   switch (phase) {
+    case 'work':
+      return `\`${ISSUE_REFS_DIR}/goal-template.md\`, \`${ISSUE_REFS_DIR}/discover-template.md\`, or \`${ISSUE_REFS_DIR}/build-template.md\``;
     case 'spec':
       return `\`${ISSUE_REFS_DIR}/spec-template.md\``;
     case 'design':

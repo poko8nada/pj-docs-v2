@@ -1,7 +1,19 @@
-/* foundation — Tailwind とクロームCSS。
-   @import "tailwindcss" を外しても #meta/.vl-* のクロームは壊れない（Tailwind非依存）。
-   クロームは製品と明確に区別するため、影と浮遊で表現する（製品の背景色は body には置かない）。 */
-@import "tailwindcss";
+/* foundation — コメント用クローム（FAB / backdrop / ドロワー / 補助線）。Tailwind 非依存。dev のみ読込。 */
+
+/* モーダル背景。開いているときだけ見える。クリックでドロワーを閉じる。 */
+.vl-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 17, 17, 0.35);
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease-out;
+}
+.vl-backdrop.vl-open {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 /* 浮遊ボタン（チャットボット風メタ）。製品の右下に固定で浮く。 */
 .vl-fab {
@@ -91,6 +103,10 @@
   margin-bottom: 8px;
   background: #fafafa;
 }
+#meta .vl-row-draft {
+  border-color: #111;
+  background: #fff;
+}
 #meta .vl-aid {
   font: 500 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
   color: #666;
@@ -139,14 +155,13 @@
   pointer-events: none;
   z-index: 9998;
 }
-#board .vl-anchored { position: relative; }
-/* void 要素向け: 子 marker の代わりに輪郭だけ示す */
-#board .vl-anchored-void {
+.vl-anchored { position: relative; }
+.vl-anchored-void {
   outline: 1px solid #111;
   outline-offset: 2px;
 }
 
-/* ホバー補助線（dev tool風）。pointer-events:none でクリック/ホバーを邪魔しない。 */
+/* ホバー補助線（dev tool風）。 */
 .vl-hover {
   position: absolute;
   display: none;
