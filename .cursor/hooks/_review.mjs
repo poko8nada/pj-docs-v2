@@ -7,8 +7,8 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { isBootstrapMarkerPath } from './_bootstrap.mjs';
 import { isUnderStateDir } from './_state.mjs';
 
-/** コード＋CSSのみ（md/json/yaml は Issue 下書き等で gate を汚さない） */
-const REVIEWABLE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|css)$/i;
+/** コード＋CSS＋HTMLのみ（md/json/yaml は Issue 下書き等で gate を汚さない） */
+const REVIEWABLE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|css|html)$/i;
 
 /** path ごとの diff／新規本文のソフト上限 */
 export const REVIEW_DIFF_MAX_PER_FILE = 8000;

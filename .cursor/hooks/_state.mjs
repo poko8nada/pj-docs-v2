@@ -291,6 +291,7 @@ export function defaultRead() {
  *   review: ReturnType<typeof defaultReview>,
  *   check: ReturnType<typeof defaultCheck>,
  *   label: string,
+ *   mentor: boolean,
  *   updatedAt: string
  * }}
  */
@@ -302,8 +303,14 @@ export function defaultState() {
     review: defaultReview(),
     check: defaultCheck(),
     label: '',
+    mentor: false,
     updatedAt: formatJstIso(),
   };
+}
+
+/** mentor レイヤー（明示 /mentor・/mentor off のみ） */
+export function normalizeMentor(value) {
+  return value === true;
 }
 
 /** 空文字可。英数字・._- のみ、最大 64（load 時の正規化用） */
@@ -420,6 +427,7 @@ export function loadState(root, id) {
       review: normalizeReview(raw.review),
       check: normalizeCheck(raw.check),
       label: normalizeLabel(raw.label),
+      mentor: normalizeMentor(raw.mentor),
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : defaultState().updatedAt,
     };
   } catch {
@@ -436,7 +444,8 @@ export function loadState(root, id) {
  *   read?: Partial<{ skills: string[], refs: string[] }>,
  *   review?: unknown,
  *   check?: unknown,
- *   label?: string
+ *   label?: string,
+ *   mentor?: boolean
  * }} state
  */
 export function saveState(root, id, state) {
@@ -474,6 +483,7 @@ export function saveState(root, id, state) {
     review: normalizeReview(state.review ?? prev.review),
     check: normalizeCheck(state.check ?? prev.check),
     label: normalizeLabel(state.label !== undefined ? state.label : prev.label),
+    mentor: normalizeMentor(state.mentor !== undefined ? state.mentor : prev.mentor),
     updatedAt: formatJstIso(),
   };
   writeFileSync(path, JSON.stringify(next, null, 2) + '\n', 'utf8');

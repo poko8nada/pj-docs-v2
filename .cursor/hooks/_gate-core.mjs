@@ -15,8 +15,9 @@ import {
   isBootstrapMarkerPath,
   isShellWriteToBootstrapMarker,
 } from './_bootstrap.mjs';
+import { DENY_MENTOR, isMentorCodeBlocked, isMentorDeniedPath } from './_mentor.mjs';
 import { logHookIds } from './_id-log.mjs';
-import { commandIncludesGitCommit, denyReviewMessage } from './_review.mjs';
+import { commandIncludesGitCommit, denyReviewMessage, isReviewablePath } from './_review.mjs';
 import { denyRefsMessage, missingRefs, requiredRefsForPath } from './_refs.mjs';
 import {
   commandIncludesGhIssueMutation,
@@ -524,8 +525,46 @@ function denyOutsidePathsInCommand(root, command) {
   return null;
 }
 
+/** Shell が reviewable（コード）path に触るか — mentor 抜け道防止 */
+function shellTouchesReviewable(root, command) {
+  for (const p of extractPathsFromCommand(command)) {
+    if (isReviewablePath(root, p)) return true;
+  }
+  // extractPaths は絶対/~ のみ。相対のコード path も拾う
+  let cleaned = command.replace(/<<-?\s*["']?(\w+)["']?[\s\S]*?\n\s*\1/g, '');
+  cleaned = cleaned.replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
+  const relRe =
+    /(?:^|[\s>|&;])((?:\.\.?\/)?[A-Za-z0-9._/-]*\.(?:ts|tsx|js|jsx|mjs|cjs|css|html))(?=[\s"'<>|&;]|$)/gi;
+  for (const m of cleaned.matchAll(relRe)) {
+    const p = m[1];
+    if (p && isReviewablePath(root, p)) return true;
+  }
+  return false;
+}
+
+/** リダイレクト／heredoc 書き込みがあるか（echo > file.ts 抜け防止） */
+function shellHasWriteRedirect(command) {
+  const cleaned = String(command ?? '').replace(
+    /<<-?\s*["']?(\w+)["']?[\s\S]*?\n\s*\1/g,
+    '<<HEREDOC',
+  );
+  if (/<<|>>?/.test(cleaned)) return true;
+  return false;
+}
+
+/**
+ * mentor 下で「読むだけ」とみなす Shell か。
+ * work phase の git/gh フル許可は使わない（inWorkPhase=false）。
+ * リダイレクト付きは読取扱いにしない。
+ */
+function isMentorReadonlyShell(command) {
+  if (shellHasWriteRedirect(command)) return false;
+  return isAllowedWithoutCodeUnlock(command, false);
+}
+
 function handleShell(payload, root, state, unlocked, inWorkPhase) {
   const command = String(payload.command ?? payload.tool_input?.command ?? '');
+  const id = conversationId(payload);
 
   if (isShellWriteToState(root, command)) return deny(DENY_STATE);
   if (isShellWriteToBootstrapMarker(root, command)) return deny(DENY_BOOTSTRAP);
@@ -551,6 +590,16 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
 
   // label script はどのフェーズでも許可（state は script が書く）
   if (isSetLabelShellCommand(command)) return allow();
+
+  // mentor: コード path に触る書き込みうる Shell は stub 無しでは deny
+  // （ls/cat・git/gh の read-only のみ例外。work の git 書き込みは例外にしない）
+  if (
+    isMentorCodeBlocked(root, state, id) &&
+    shellTouchesReviewable(root, command) &&
+    !isMentorReadonlyShell(command)
+  ) {
+    return deny(DENY_MENTOR);
+  }
 
   if (unlocked) return allow();
   if (isAllowedWithoutCodeUnlock(command, inWorkPhase)) return allow();
@@ -601,6 +650,13 @@ export async function handleGate(payload) {
   if (toolName === 'Read' || toolName === 'ReadFile') return allow();
 
   if (isBootstrapActive(root)) return allow();
+
+  const id = conversationId(payload);
+
+  // mentor: コード系 path の編集は stub 無しでは deny（通常 unlock より上）
+  if (WRITE_TOOLS.has(toolName) && fileArg && isMentorDeniedPath(root, state, id, fileArg)) {
+    return deny(DENY_MENTOR);
+  }
 
   if (unlocked) {
     if (WRITE_TOOLS.has(toolName) && fileArg) {

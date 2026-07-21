@@ -13,6 +13,7 @@
 import { realpathSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { disableBootstrap, enableBootstrap } from './_bootstrap.mjs';
+import { clearStubTurn, enableStubTurn, isMentorActive } from './_mentor.mjs';
 import {
   commandIncludesGitCommit,
   injectReviewFilesIntoTaskInput,
@@ -50,6 +51,9 @@ import {
 const PHASE_RE = /(?:^|[\s`])\/(discussion|work|chore)(?=[\s`/]|$)/i;
 const BOOTSTRAP_OFF_RE = /(?:^|[\s`])\/bootstrap\s+off(?=[\s`/]|$)/i;
 const BOOTSTRAP_ON_RE = /(?:^|[\s`])\/bootstrap(?=[\s`/]|$)/i;
+const MENTOR_OFF_RE = /(?:^|[\s`])\/mentor\s+off(?=[\s`/]|$)/i;
+const MENTOR_ON_RE = /(?:^|[\s`])\/mentor(?=[\s`/]|$)/i;
+const STUB_RE = /(?:^|[\s`])\/stub(?=[\s`/]|$)/i;
 
 const WRITE_TOOLS = new Set(['Write', 'StrReplace', 'Delete', 'EditNotebook']);
 
@@ -156,6 +160,8 @@ function handleBeforeSubmitPrompt(root, payload) {
   const id = conversationId(payload);
   // ツール hooks は汚染されうるので、発話で確定した id を sticky にする
   writeLastPromptId(root, id);
+  // stub は1ターン限り — 新発話の冒頭で必ず消す（state には載せない）
+  clearStubTurn(root);
   const prompt = String(payload.prompt ?? '');
 
   if (BOOTSTRAP_OFF_RE.test(prompt)) {
@@ -166,6 +172,20 @@ function handleBeforeSubmitPrompt(root, payload) {
 
   if (!findStateFileName(root, id)) {
     saveState(root, id, { phase: PHASE_DISCUSSION, unlock: { rules: null } });
+  }
+
+  if (MENTOR_OFF_RE.test(prompt)) {
+    const prev = loadState(root, id);
+    saveState(root, id, { phase: prev.phase, mentor: false });
+  } else if (MENTOR_ON_RE.test(prompt)) {
+    const prev = loadState(root, id);
+    saveState(root, id, { phase: prev.phase, mentor: true });
+  }
+
+  // mentor OFF の /stub はハーネス no-op（sticky を立てない）
+  const afterMentor = loadState(root, id);
+  if (STUB_RE.test(prompt) && isMentorActive(afterMentor)) {
+    enableStubTurn(root, id);
   }
 
   const match = prompt.match(PHASE_RE);
@@ -188,7 +208,8 @@ function handleBeforeSubmitPrompt(root, payload) {
     unlock = { rules: false, issue: false };
   }
 
-  saveState(root, id, { phase, unlock, read, review });
+  // mentor はフェーズ変更でも維持
+  saveState(root, id, { phase, unlock, read, review, mentor: prev.mentor });
   return respond({ continue: true });
 }
 

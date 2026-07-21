@@ -140,6 +140,7 @@ function readWeb() {
 function readGateRules() {
   return [
     'Phase: default `discussion`. Hands-on after user `/work` or `/chore`. Edit → Read `rules/SKILL.md` (`unlock.rules`). Issue writes only in `/work` (not code/findings alone): Read `issue/SKILL.md` + matching Goal/Discover/Build template (`unlock.issue`; template in `read.refs` as `issue/<template>.md`). Phase re-entry clears `read.skills` / `read.refs`. Broken → user `/bootstrap` only.',
+    'Mentor: `/mentor` (human-centered; code edits denied). `/stub` unlocks code for that one turn only while mentor is on — no-op if mentor is off. `/mentor off` leaves mentor. Does not change phase.',
     'References: before gated edits, Read at least one `rules/references/*.md` (tracked in `read.refs` as `rules/<name>.md`). Any `.cursor/skills/*/references/*.md` Read is recorded as `skill/name.md`. Do not edit state files.',
     'Review: `review.files` non-empty → commit blocked; `/pre-commit-reviewer` clears. Persists across phase changes. `md` / `json` / `yaml` are not tracked.',
   ].join('\n');
@@ -153,11 +154,12 @@ function readGateState(root, id, stateFileRel) {
   const read = state.read ?? { skills: [], refs: [] };
   return [
     `Gate state (hooks-only; do not edit): \`${stateFileRel}\``,
-    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `unlock.rules`: `null` in discussion; `false` = handshake pending; `true` = unlocked. `/work` `unlock.issue`: `false` until issue-skill Read when writing issues; then template via `read.refs`. `read.skills` = Read of `.cursor/skills/*/SKILL.md`; `read.refs` = `skill/name.md` (both cleared on phase re-entry).',
+    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `unlock.rules`: `null` in discussion; `false` = handshake pending; `true` = unlocked. `/work` `unlock.issue`: `false` until issue-skill Read when writing issues; then template via `read.refs`. `read.skills` = Read of `.cursor/skills/*/SKILL.md`; `read.refs` = `skill/name.md` (both cleared on phase re-entry). `mentor`: explicit `/mentor` / `/mentor off` only.',
     'Set `label` via `node .cursor/skills/label/scripts/set-label.mjs <label>`.',
     '',
     'Current values:',
     `phase: ${state.phase}`,
+    `mentor: ${state.mentor === true}`,
     `unlock.issue: ${unlock.issue}`,
     `unlock.rules: ${unlock.rules}`,
     `read.skills: ${JSON.stringify(read.skills ?? [])}`,
