@@ -140,6 +140,11 @@
   z-index: 9998;
 }
 #board .vl-anchored { position: relative; }
+/* void 要素向け: 子 marker の代わりに輪郭だけ示す */
+#board .vl-anchored-void {
+  outline: 1px solid #111;
+  outline-offset: 2px;
+}
 
 /* ホバー補助線（dev tool風）。pointer-events:none でクリック/ホバーを邪魔しない。 */
 .vl-hover {

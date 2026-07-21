@@ -32,14 +32,37 @@ function cssSelector(el, board) {
   return parts.join(' > ');
 }
 
+// data-aid 優先。aid が生成セレクタ（空白や #.: > を含む）のときだけ querySelector フォールバック。
 function findByAid(aid, board) {
   const byData = board.querySelector('[data-aid="' + cssEscape(aid) + '"]');
   if (byData) return byData;
+  if (!/[\s>#:.]/.test(aid)) return null;
   try {
     return board.querySelector(aid);
   } catch {
     return null;
   }
+}
+
+// void 要素は子を持てないので marker を付けない。
+const VOID_TAGS = new Set([
+  'img',
+  'input',
+  'br',
+  'hr',
+  'meta',
+  'link',
+  'area',
+  'base',
+  'col',
+  'embed',
+  'source',
+  'track',
+  'wbr',
+]);
+
+function canHostMarker(el) {
+  return el && el.nodeType === 1 && !VOID_TAGS.has(el.tagName.toLowerCase());
 }
 
 function cssEscape(s) {
@@ -244,11 +267,20 @@ export function initAnnotate({ board, comments }) {
   function renderMarkers() {
     const old = board.querySelectorAll('.vl-marker');
     for (const m of old) m.remove();
+    for (const el of board.querySelectorAll('.vl-anchored, .vl-anchored-void')) {
+      el.classList.remove('vl-anchored', 'vl-anchored-void');
+    }
 
     for (const c of state.values()) {
       const el = findByAid(c.aid, board);
       if (!el) continue;
-      el.classList.add('vl-anchored');
+      // static のときだけ relative を付与（既存の absolute/fixed/sticky を壊さない）。
+      const pos = getComputedStyle(el).position;
+      if (pos === 'static') el.classList.add('vl-anchored');
+      if (!canHostMarker(el)) {
+        el.classList.add('vl-anchored-void');
+        continue;
+      }
       const marker = document.createElement('span');
       marker.className = 'vl-marker';
       marker.title = c.aid;

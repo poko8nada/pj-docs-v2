@@ -1,146 +1,131 @@
 ---
 name: foundation
 description: >-
-  Soft skill: lock visual / brand foundation on a disposable HTML board viewed in cmux,
-  before Spec. Click-to-comment on any element; comments persist as JSON via a Vite dev
-  endpoint the browser POSTs to. Callable from discussion or any phase. Returns
-  `# Visual Lock` to the caller; no issue.
+  Soft skill: lock look on a disposable HTML board in cmux. Agent and user both
+  edit HTML/CSS; user click-comments go to JSON as a work queue; agent applies
+  them then clears the queue. Returns agreed HTML/CSS (or path) to the caller.
 ---
 
 # foundation
 
-Lock the product's visual / brand foundation **before** Spec, by looking at it. The board is a disposable HTML mood surface served by Vite and opened in cmux; the durable output is a short `# Visual Lock` block handed back to the caller. No issue is created here.
+Lock look **by looking at it** on a disposable Vite HTML board in cmux. Agent and user both edit the board. User comments (click → JSON) are a work queue: the agent applies them into HTML/CSS, then clears the queue. Durable output: the **agreed HTML/CSS** (board content, or a path the caller can take into the product).
 
-Soft skill: same layer as `feasibility`, `grain`, `readme`. Callable from `discussion` or any phase, standalone or before Spec. **Self-contained** — do not invoke phase skills or `issue`. Return outputs to the caller.
-
-## Position
-
-| Layer | Decides | Medium |
-| ----- | ------ | ------ |
-| **foundation** (this) | World / vibe / hero register / forbidden AI-look cluster | Image + HTML board, seen in cmux |
-| Spec | Goal / Scope / Architecture | Text issue |
-| grain | Axes → tokens (translates this layer) | Text |
-| Design | Screen composition / thinking surface | Production-stack code |
-
-`foundation` may run **before** Spec. When a Spec exists later, the caller folds `# Visual Lock` into the Spec's opening section by hand — this skill does not move it.
+Soft skill. **Self-contained** — return the agreed board to the caller; the caller persists and ships.
 
 ## What you own
 
-- The board workspace (`.cursor/skills/foundation/board/`) — a Vite project, separate from the repo root
-- `index.html` (the touched content / product) and `comments.json` (data)
-- `comments.json` CRUD on fs (agent reads/writes the file directly; the browser POSTs edits via the Vite dev endpoint)
-- Triggering `cmux reload` after the agent writes `comments.json`
-- The `# Visual Lock` block returned to the caller
+- The board workspace (`.cursor/skills/foundation/board/`) — Vite project, separate from the repo root
+- `#board` content in `index.html` (and board-local styles the look needs)
+- Reading `comments.json`, applying notes into the board, then clearing the queue
+- `cmux reload` after board or comments changes that the browser must show
+- Returning the agreed HTML/CSS (or path) to the caller
 
 ## What you do not own
 
-- Spec / Design issue creation or lifecycle — `issue` via the caller
-- grain axes or token derivation — `grain`
-- Production code / `rules` — caller ships
-- Invoking `issue`, `rules`, or phase skills from here
+- Issue create/update — caller
+- Production app tree / `rules` — caller ships the agreed look
+- Invoking phase skills, `issue`, `rules`, or other soft skills
 
-## File layout
+## When called
 
-```
-foundation/
-├── SKILL.md                  # ルートはこれだけ
-├── scripts/
-│   └── start.mjs             # 起動ラッパ（スキルルート・Cursor標準位置・プロジェクトルートから実行）
-└── board/                    # Viteプロジェクト（作業場・ルートとは別物）
-    ├── package.json          # vite / tailwindcss / @tailwindcss/vite
-    ├── vite.config.js        # tailwind() + commentsPlugin() / watch で comments.json 除外
-    ├── vite-plugin-comments.mjs  # GET/POST /comments → comments.json 読み書き（Viteプラグイン・dev専用）
-    ├── index.html            # 殺壳兼プロダクト: <div id="board"> 内に header/main/footer 見本。bodyは無装飾
-    ├── src/
-    │   ├── main.js           # ローダ: GET /comments → annotate 起動（中身は index.html 直書き・注入なし）
-    │   ├── annotate.js       # メタ層: FAB+ドロワー+ホバー補助線生成・クリック→コメント・Cmd+Enter保存
-    │   └── style.css         # @import "tailwindcss" + #meta/.vl-* クロームCSS
-    ├── comments.json         # fs正
-    └── .gitignore            # node_modules / dist / .vite
-```
+**From a phase / caller with scope already clear** (e.g. “lock this look”, comps attached, board topic settled): skip debate. One short confirm if useful, then Flow.
 
-2つの関心事は別ファイル：中身(`index.html`)・データ(`comments.json`)。クローム(`src/annotate.js`+`src/style.css`)はJS生成でラッパーを汚さない。中身編集でクロームを壊すことはない。
+**Standalone / what to put on the board unclear:** agree materials in chat (blank start vs screenshots/comps vs reuse open surface), then Flow. No phase-style Context / Understanding / Proposal ritual.
 
-### Wrapper vs product
+## Roles
 
-- `index.html` はラッパー兼プロダクト。`body` には色・クラスをつけない（製品の見え方に影響するため）。製品の色は `#board` が持つ。
-- `#board` は `<div>`（プロダクトルート）。その中に `<header>/<main>/<footer>` を直書きする。見本として初期配置済み。
-- クローム（`#meta` パネル・FAB・ホバー補助線）は `annotate.js` が `document.body` に生成する。`index.html` には置かない。
+| Who       | HTML/CSS (`#board`) | Comments (`comments.json`)                                      |
+| --------- | ------------------- | --------------------------------------------------------------- |
+| **User**  | May edit freely     | **Primary:** click elements → write notes in the drawer (queue) |
+| **Agent** | May edit freely     | Reads the queue; does not treat comments as durable docs        |
 
-### Chrome behavior (FAB + drawer + hover guide)
+Comments are a **work queue**, not a design document. After the agent applies a note into the board, remove **that entry only** (by `aid`); leave unapplied notes.
 
-- `#meta` は常時開きっぱなしのasideではなく、**右ドロワー**。既定は閉じて右に隠れている。
-- 右下の**浮遊ボタン（FAB・チャットボット風）**で開閉トグル。FABにコメント数バッジ。
-- **ボード要素をホバー**すると補助線＋aid名が表示される（ブラウザdev tool風・pointer-events:none で操作を邪魔しない）。
-- **ボード要素をクリック**すると該当要素のコメント行を用意し、パネルを開いて入力にフォーカス。
-- コメント入力中 **⌘/Ctrl + Enter** で即保存してドロワーを閉じる。閉じるボタン/FABでも閉じる。
-- クロームは製品と**影・浮遊**で視覚的に区別する（製品の背景色には依存しない）。
+## Flow
 
-## Conventions (must follow)
+1. **Start** — `node .cursor/skills/foundation/scripts/start.mjs` (project root). Reuse an existing cmux surface if it already shows the board.
+2. **Co-edit** — agent and user both change `#board` (hero, type, layout, …). Tailwind on the board is OK. Assign `data-aid` on meaningful units.
+   - **Optional:** screenshots or reference images — drop them onto `#board` and/or recreate the look in HTML/CSS. Not required; blank or type-only boards are fine.
+3. **Comment (user)** — user clicks a board element → drawer row → text. Saves to `comments.json` (auto-save, or ⌘/Ctrl+Enter to save-and-close).
+4. **Apply (agent)** — read `comments.json` → change HTML/CSS for the notes you handle → delete **only those** entries from the JSON (keep the rest) → `cmux reload` if the browser is stale.
+5. **Repeat** — co-edit and comment until the user confirms by eye.
+6. **Done** — hand off (below). This skill writes no issues.
 
-### `data-aid` — skill-specific attribute
+## Close gate
 
-- `data-aid="<id>"` is **this skill's** stable key for linking a board element to its comment.
-- The agent assigns `data-aid` to each element when writing `index.html` (the `#board` content). The user may add more.
-- If an element lacks `data-aid`, `annotate.js` falls back to a generated CSS selector (less stable across rewrites).
-- Document this for both sides: agent writes it, user sees it as the comment row label and as the hover-guide label.
+Done when:
 
-### Persistence (comments actually save)
+1. The user has confirmed the look by eye, and
+2. Handoff to the caller is complete, and
+3. `comments.json` is empty (every note applied or explicitly dropped with the user).
 
-- `comments.json` is the fs source of truth.
-- Browser edits → `annotate.js` POSTs `/comments` (debounced ~400ms) → `vite-plugin-comments.mjs` writes `comments.json`. Reload-safe; edits survive.
-- `comments.json` is excluded from Vite's file watcher, so POST writes do not trigger a reload storm.
-- Agent reads `comments.json` directly from fs (no `cmux eval` read needed). Agent writes `comments.json` directly, then runs `cmux browser surface:N reload` to push to the browser.
+Do not invent a finished look from an empty board. Do not leave applied comments sitting in JSON.
 
-### Tailwind (Vite-idiomatic, not a CDN bolt-on)
+## Handoff
 
-- Tailwind v4 via the first-party `@tailwindcss/vite` plugin; `src/style.css` has `@import "tailwindcss"`.
-- Chrome (`#meta` / `.vl-*`) is plain CSS in `src/style.css` and does **not** depend on Tailwind — removing the `@import` line never breaks the comment panel.
+Return to the caller, in chat, **both**:
 
-### Dev-only — do not build
+1. Path: `.cursor/skills/foundation/board/index.html` (and any board assets you added), and
+2. What to take: the `#board` markup (and board-local styles that define the look).
 
-- The board is a disposable alignment tool, never shipped. There is **no build script**.
-- `vite-plugin-comments.mjs` uses `configureServer`, which only runs in `vite dev`. A `vite build` would produce a static bundle with no `/comments` endpoint — edits could not save. So `vite build` is out of scope.
+Caller folds that into the product. The board is a workshop — clear or delete when the product surface carries the look. `comments.json` stays session-only (gitignored).
 
-## Startup (one command, from project root)
+## Startup
 
 ```
 node .cursor/skills/foundation/scripts/start.mjs
 ```
 
-The wrapper:
-1. Installs `board/` deps via `pnpm --ignore-workspace --dir <board> install` if `node_modules` is missing (does **not** touch the project root's `package.json`).
-2. Starts Vite (`pnpm --ignore-workspace --dir <board> run foundation:dev`) on `http://127.0.0.1:5173`.
-3. Polls the port, then runs `cmux browser open <url>`.
-4. Stays foreground; Ctrl-C stops Vite and exits.
+Optional: `FOUNDATION_PORT=5174` if `5173` is taken.
 
-Do **not** run bare `pnpm dev` — it collides with the project root's own scripts. Always use the wrapper.
+The wrapper installs board deps when needed, runs `foundation:dev`, opens cmux, stays foreground until Ctrl-C. Use this wrapper — not the project root's `pnpm dev`.
 
-## Flow
+## Conventions
 
-1. **Start** — run the wrapper above. Reuse an existing cmux surface if one already shows the board.
-2. **Collect** — drop reference images / hero comps / type tryouts into `index.html` (the `#board` content). Author freely with Tailwind utilities; assign `data-aid` per element.
-3. **Annotate** — user clicks any board element → a comment row appears in `#meta`; edit the textarea (auto-saves, or ⌘/Ctrl+Enter to save-and-close). The agent may also click via cmux CLI (those edits auto-save too).
-4. **Sync** — agent reads `comments.json` from fs; if the agent writes it, run `cmux reload` to reflect in the browser.
-5. **Lock** — when the user says "this vibe" by eye, return `# Visual Lock` (short): reference image paths, forbidden cluster, hero register, 1-line vibe. The board workspace is disposable; delete when the product speaks for itself.
+### Chrome
 
-## `# Visual Lock` shape
+- Chrome (FAB, drawer, hover guide) is created by `annotate.js` on `document.body` — not authored in `index.html`.
+- Chrome CSS is plain in `src/style.css`, independent of Tailwind.
 
-```markdown
-# Visual Lock
+### `data-aid`
 
-- Vibe: …(one line)
-- Hero register: …
-- References: ./path1, ./path2
-- Forbidden: …(AI-look cluster to avoid)
+- Stable key from board element → comment row. Agent assigns when writing `#board`; user may add more.
+- Meaningful units only. Prefer hosts that can take children; wrap void tags (`img`, …) instead of aiding them.
+- Prefer explicit aids over generated selector fallback.
+
+### Comments queue
+
+- `comments.json` is fs truth for the queue (gitignored).
+- Browser POST `/comments` (debounced) → Vite plugin writes the file. Watcher ignores it.
+- Agent applies selected notes → removes **those** entries only. Reload cmux when the browser must catch up.
+
+### Dev-only
+
+- Alignment tool. `foundation:dev` only. No `vite build` — comments endpoint is dev-only.
+
+## File layout
+
+```
+foundation/
+├── SKILL.md
+├── scripts/start.mjs
+└── board/
+    ├── package.json
+    ├── vite.config.js
+    ├── vite-plugin-comments.mjs
+    ├── index.html            # #board content (co-edited)
+    ├── src/main.js
+    ├── src/annotate.js       # chrome + click → comments
+    ├── src/style.css
+    └── .gitignore            # node_modules, dist, .vite, comments.json, *.log
 ```
 
 ## Anti-patterns
 
-- Persisting to an issue from here — hand `# Visual Lock` to the caller.
-- Running bare `pnpm dev` — collides with the project root; use the wrapper.
-- Touching the project root's `package.json` — `board/` is a separate project.
-- Running `vite build` — the board is dev-only; the comments endpoint is dev-only.
-- Imposing taste via a starter skin — the board is a canvas, not a template.
-- Skipping `data-aid` then relying on fragile generated selectors across rewrites.
-- Treating the board as maintained product — it is disposable, like `prototype/`.
+- Treating `comments.json` as durable design docs — it is a queue; remove entries after apply
+- Clearing the whole queue while unapplied notes remain (unless the user dropped them)
+- Shipping a vibe-memo instead of the agreed HTML/CSS
+- Imposing taste via a starter skin — canvas, not a template
+- Skipping `data-aid` then relying on generated selectors across rewrites
+- Invoking phase skills, `issue`, `rules`, or other soft skills from here
+- Running `vite build` or root `pnpm dev` for this board

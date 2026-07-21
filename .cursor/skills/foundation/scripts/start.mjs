@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url)); // .../foundation/scripts
 const skillRoot = dirname(here); // .../foundation
 const boardDir = join(skillRoot, 'board'); // .../foundation/board
-const port = 5173;
+const port = Number(process.env.FOUNDATION_PORT) || 5173;
 const url = 'http://127.0.0.1:' + port + '/';
 
 // 1. 依存チェック → 必要なら pnpm install（board 内・--ignore-workspace でルートから隔離）
@@ -27,9 +27,10 @@ if (!existsSync(nodeModules)) {
   }
 }
 
-// 2. Vite 起動（board 内・このラッパの子プロセス）
+// 2. Vite 起動（board 内・このラッパの子プロセス）。FOUNDATION_PORT を子にも渡す。
 const vite = spawn('pnpm', ['--ignore-workspace', '--dir', boardDir, 'run', 'foundation:dev'], {
   stdio: 'inherit',
+  env: { ...process.env, FOUNDATION_PORT: String(port) },
 });
 
 // 3. ポート準備待ち → cmux で開く
