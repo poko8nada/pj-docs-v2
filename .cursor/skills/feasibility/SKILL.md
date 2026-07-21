@@ -1,16 +1,22 @@
 ---
 name: feasibility
 description: >-
-  Investigate technical topics with 3 sources (Official / Practice / Failure)
-  for current best practice. Use before locking technical choices in Spec / Forge / Refine
-  (and Design when new stack/UI libraries are introduced). Soft — not a hard gate.
+  Soft skill: investigate technical topics with 3 sources (Official / Practice / Failure) for current best practice.
+  Use from /work before locking Discover Stack or Build technical choices (and whenever a concrete tech question must not rely on agent memory). Soft — not a hard gate.
+  Writes findings/feasibility/ and returns Topic / Path / Why / Summary / Axes touched to the caller.
 ---
 
 # feasibility
 
-Produce **current, cited** answers to technical questions so phase skills can lock Stack / approach without trusting agent memory.
+Produce **current, cited** answers to technical questions so Stack / approach decisions do not trust agent memory.
 
-Soft skill: phases should run this by default before locking technical choices; nothing hard-denies if skipped. Do **not** persist to issues here — return Research MD to the caller (caller may use `issue` if needed).
+Soft skill — nothing hard-denies if skipped. Write concrete Research under `findings/feasibility/` (create that directory on first write if missing). Return a short handoff block to the caller. Do **not** create or edit GitHub issues from here.
+
+## How the caller slices this skill
+
+Each **Step** below is one verifiable unit. Agree and finish a Step before the next. Do not merge later Steps into one silent pass unless the user explicitly allows a short path.
+
+If Step 3 has many topics, the caller may slice **one topic at a time** (still all three roles per topic).
 
 ## Core principle
 
@@ -20,26 +26,27 @@ Anchor every non-trivial claim in **current external sources**. When current bes
 
 ## What you own
 
-- Topic list (if caller did not already fix it)
+- Topic list (if the caller did not already fix it)
 - 3-role investigation per topic (Official / Practice / Failure)
-- Research MD in chat + user confirmation
+- Research MD under `findings/feasibility/` (append-only) after user confirmation
+- Handoff fields for the caller
 
 ## What you do not own
 
-- Phase entry, mode choice, or whether to Spec/Design/Forge
-- Writing the Forge/Refine plan or Spec body — caller does that after confirmation
-- Reconciling claims against _this_ repo’s app code — that is `forge`/`refine` plan Step 1
-- Product code / `rules`
+- Whether this session should run — the caller decides
+- GitHub issue bodies or comments
+- Reconciling claims against this repo’s application code — the caller does that when implementing
+- Product or harness file edits outside `findings/feasibility/`
 
 ## When called
 
-**From a phase skill with topics already scoped** (e.g. “lock Stack: X vs Y”): skip Step 1 debate. Confirm the topic list in one short line if useful, then investigate.
+**Topics already scoped** (e.g. “lock Stack: X vs Y”): after Step 1, skip Step 2 debate — confirm the list in one short line if useful, then Step 3.
 
-**Standalone / topics unclear:** run Step 1 until the list is agreed.
+**Topics unclear:** run Step 2 until the list is agreed.
 
-**Design:** only when Design introduces technical choices beyond the Spec (new stack / UI library). Otherwise skip.
+## Steps
 
-## Phase 0 — Stack awareness (always first)
+### Step 1 — Stack awareness
 
 Before investigating, scope the stack from this repo’s manifests (whichever exist):
 
@@ -48,44 +55,50 @@ Before investigating, scope the stack from this repo’s manifests (whichever ex
 
 Use the stack to decide **what to investigate and what to skip**. Prefer version-aware queries.
 
-## Step 1 — Propose topics (if needed)
+**Done when:** Stack context is noted (chat is enough). Stop if slicing.
 
-Propose 2–5 candidate topics in chat.
+### Step 2 — Propose topics
+
+Propose 2–5 candidate topics in chat (skip debate only when the caller already fixed the list — then one-line confirm).
 
 A topic is:
 
 - A specific question, not a vague area (“How to drag-and-drop with @dnd-kit on a grid” not “DnD”)
-- Actionable — the answer can become a decision or a plan step
+- Actionable — the answer can become a decision
 
-Discuss until agreed. The 3-source rule is enforced in Step 2. If investigation cannot find 3 roles, the topic was too vague — revise and re-investigate.
+Discuss until agreed. If later investigation cannot find three roles, the topic was too vague — return here.
 
-## Step 2 — Investigate
+**Done when:** Topic list agreed. Stop if slicing.
 
-For each topic, run **three roles**. Optional: track with TodoWrite (`Topic A: Official` / Practice / Failure, …).
+### Step 3 — Investigate
 
-### Role 1 — Official: what the spec says
+For each agreed topic (or one topic per sitting if the caller slices), run **three roles**. Optional: track with TodoWrite (`Topic A: Official` / Practice / Failure, …).
+
+#### Role 1 — Official: what the spec says
 
 - **Source:** official docs, language spec, RFC, library reference, maintainer guides
 - **Tools:** Context7 MCP (`resolve-library-id` → `query-docs`) first; if missing, MCP `web_search_exa` then `WebFetch` for the official URL (on Exa 429, fall back to built-in `WebSearch`)
 - **Question:** “What does the canonical authority say?”
 
-### Role 2 — Practice: how it’s used in the wild
+#### Role 2 — Practice: how it’s used in the wild
 
 - **Source:** engineering blogs of major projects, recognized maintainers, conference talks, open-source codebases
 - **Tools:** MCP `web_search_exa` to discover, built-in `WebFetch` to read (on Exa 429, fall back to `WebSearch`)
 - **Question:** “How do production projects actually do this?”
 
-### Role 3 — Failure: what goes wrong
+#### Role 3 — Failure: what goes wrong
 
 - **Source:** issue trackers, postmortems, gotcha / pitfall writeups
 - **Tools:** MCP `web_search_exa` with “issue”, “bug”, “gotcha”, “pitfall”; built-in `WebFetch` to read (on Exa 429, fall back to `WebSearch`)
 - **Question:** “What are the known failure modes?”
 
-One source is not evidence. Three sources with **different roles** is the minimum.
+One source is not evidence. Three sources with **different roles** is the minimum. Follow **Source tiering** below.
 
-## Step 3 — Output & confirm
+**Done when:** Evidence for the topic(s) in this sitting is gathered. Stop if slicing (more topics remain).
 
-Compile findings into Markdown and post to chat. Labels below are English; render in the user’s language (typically Japanese). Topic names must match Step 1.
+### Step 4 — Output, confirm, persist
+
+Compile findings into Markdown and post to chat. Labels below are English; render in the user’s language (typically Japanese). Topic names must match Step 2.
 
 ```markdown
 ## Research
@@ -106,11 +119,24 @@ Compile findings into Markdown and post to chat. Labels below are English; rende
 ...
 ```
 
-Confirm in chat (no special tool): short summary + “この結果で次に進んでよいですか？”
+Confirm: short summary + “この結果で次に進んでよいですか？”
 
-- **yes** → return to caller with the Research MD
-- **edit** → revise topics or dig deeper; re-confirm
-- **no** → back to Step 1 with reasons
+- **yes** → ensure `findings/feasibility/` exists, write `findings/feasibility/<dated-slug>.md` (append-only; do not overwrite prior runs unless the user asks to tidy), return handoff
+- **edit** → revise topics or dig deeper; re-confirm (may return to Step 2 or 3)
+- **no** → back to Step 2 with reasons
+
+**Done when:** Findings file written and handoff returned.
+
+## Handoff (return to caller)
+
+```markdown
+- Topic: …
+- Path: findings/feasibility/<dated-slug>.md
+- Why:
+  - …
+- Summary: …   # optional; at most 3 lines
+- Axes touched: …   # optional; e.g. Stack
+```
 
 ## Source tiering
 
@@ -121,11 +147,14 @@ Confirm in chat (no special tool): short summary + “この結果で次に進�
 
 ## Anti-patterns
 
-- Skipping Phase 0
-- Using this repo’s app/`src` as a _research_ source for ecosystem truth (caller reconciles with code later)
+- Skipping Step 1
+- Using this repo’s app/`src` as a _research_ source for ecosystem truth
 - Memory-only APIs/versions — cite or omit
 - Single-source topics, or three sources of the same role
 - Vague topics (“improve performance”)
 - Evidence without URL/digest or access date
 - Vague confidence (“high”) with no basis
-- Writing Spec/Forge/Refine issue bodies from here — hand persistence to `issue` via the caller
+- Editing GitHub issues from this skill
+- Overwriting prior `findings/feasibility/` files without user request
+- Skipping `findings/feasibility/` create on first write
+- Running later Steps without prior Step agreement when the caller expects sliced Steps

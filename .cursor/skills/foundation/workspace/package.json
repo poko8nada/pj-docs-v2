@@ -1,0 +1,15 @@
+{
+  "name": "foundation-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "foundation:dev": "vite",
+    "foundation:build": "vite build"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.2",
+    "tailwindcss": "^4.3.2",
+    "vite": "^8.1.5",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}

@@ -9,7 +9,7 @@ Axes describe _character_. Tokens (color, font, spacing) implement character —
 | **Grain-stable** | Define, before tokens                                   | Axes, layout shell, depth strategy, hierarchy method, radius band  |
 | **Rules**        | Always — see [craft.md](craft.md), [audit.md](audit.md) | Icon discipline, motion floors, accessibility                      |
 | **Token**        | Define, last step                                       | Color values, font families, spacing/radius px                     |
-| **Deferred**     | Content work in later phases                            | Photo assets, copy, illustration style, widget layout inside cards |
+| **Deferred**     | Content work later                                      | Photo assets, copy, illustration style, widget layout inside cards |
 
 **Grain-stable** = survives a palette or font swap. **Token** = implementation values derived from stable choices (e.g. airy density → 4px grid with ~1.5× multiplier → `--space-4: 16px`).
 
@@ -98,7 +98,7 @@ Grain-stable axes and behavioral temperament must be agreed first. Then map to t
    - **Typography** — display vs body roles (typographic role axis), then font families
    - **Spacing** — density axis → base grid (e.g. 4px) and multiplier (airy vs compact)
    - **Radius** — form language axis → band (e.g. sharp 4–6px vs soft 8–12px), then exact steps
-3. Return `# Grain` and `# Tokens` markdown to the caller for persistence; otherwise apply directly in code (CSS variables, theme tokens).
+3. Return `# Grain` and `# Tokens` markdown to the caller (and into `findings/grain/` when the skill confirms); otherwise the caller applies tokens in code (CSS variables, theme tokens).
 
 Do not lock token values before grain-stable choices are set. Band (grain) before number (token).
 

@@ -23,10 +23,10 @@ const projectRootFallback = resolve(hooksDir, '../..');
 /** 既定フェーズ（議論・調査のみ。コード不可） */
 export const PHASE_DISCUSSION = 'discussion';
 
-export const WORK_PHASES = new Set(['spec', 'design', 'forge', 'refine', 'chore']);
+export const WORK_PHASES = new Set(['work', 'chore']);
 
-/** chore 以外の Spec-flow 作業フェーズ（入場時 issue ハンドシェイク対象） */
-export const SPEC_FLOW_PHASES = new Set(['spec', 'design', 'forge', 'refine']);
+/** work のみ（issue 書き込み時ハンドシェイク対象）。chore は対象外 */
+export const SPEC_FLOW_PHASES = new Set(['work']);
 
 /** 最終更新からこの日数を超えた state を削除 */
 export const STATE_TTL_DAYS = 7;

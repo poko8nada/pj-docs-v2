@@ -1,0 +1,186 @@
+/* foundation — コメント用クローム（FAB / backdrop / ドロワー / 補助線）。Tailwind 非依存。dev のみ読込。 */
+
+/* モーダル背景。開いているときだけ見える。クリックでドロワーを閉じる。 */
+.vl-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 17, 17, 0.35);
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease-out;
+}
+.vl-backdrop.vl-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 浮遊ボタン（チャットボット風メタ）。製品の右下に固定で浮く。 */
+.vl-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  z-index: 10000;
+  font: 600 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease-out;
+}
+.vl-fab:hover { transform: translateY(-2px); }
+.vl-fab[data-open="true"] { display: none; }
+.vl-fab .vl-fab-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 10px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* コメントパネル（右ドロワー）。既定は閉じて右に隠す。 */
+#meta {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  max-width: 90vw;
+  background: #fff;
+  border-left: 1px solid #e5e5e5;
+  box-shadow: -8px 0 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  z-index: 10001;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #111;
+  transform: translateX(100%);
+  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+}
+#meta.vl-open { transform: translateX(0); }
+#meta .vl-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eee;
+  text-transform: uppercase;
+  color: #555;
+}
+#meta .vl-h .vl-close {
+  border: 0;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+}
+#meta .vl-h .vl-close:hover { color: #111; }
+#meta .vl-list { overflow: auto; flex: 1; padding: 8px; }
+#meta .vl-empty { padding: 14px; color: #999; font-size: 12px; line-height: 1.5; }
+#meta .vl-row {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #fafafa;
+}
+#meta .vl-row-draft {
+  border-color: #111;
+  background: #fff;
+}
+#meta .vl-aid {
+  font: 500 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #666;
+  word-break: break-all;
+  margin-bottom: 6px;
+}
+#meta .vl-text {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: 400 13px/1.5 inherit;
+  color: #111;
+  resize: vertical;
+  min-height: 48px;
+}
+#meta .vl-text:focus {
+  outline: 2px solid #111;
+  outline-offset: -1px;
+  border-color: #111;
+}
+#meta .vl-del {
+  float: right;
+  border: 0;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+#meta .vl-del:hover { color: #111; }
+
+/* コメント付き要素のマーカ。 */
+.vl-marker {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  font-size: 0;
+  pointer-events: none;
+  z-index: 9998;
+}
+.vl-anchored { position: relative; }
+.vl-anchored-void {
+  outline: 1px solid #111;
+  outline-offset: 2px;
+}
+
+/* ホバー補助線（dev tool風）。 */
+.vl-hover {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+  z-index: 9997;
+  background: rgba(17, 17, 17, 0.06);
+  border: 1px solid #111;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+}
+.vl-hover .vl-hover-label {
+  position: absolute;
+  top: -18px;
+  left: -1px;
+  background: #111;
+  color: #fff;
+  font: 500 10px/16px ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0 5px;
+  white-space: nowrap;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

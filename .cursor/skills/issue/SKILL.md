@@ -1,85 +1,97 @@
 ---
 name: issue
 description: >-
-  Create, update, transition, or close Spec / Design / Forge / Refine issues.
-  Use when a phase skill (or the user) needs issue persistence — templates and lifecycle live here.
+  Persist this project's product-state GitHub issues — Goal (covenant), Discover (provisional axes), and Build (MVP/Next delivery axes).
+  Bodies hold judgment only (overview, why, agreed); concrete soft results live under findings/.
+  Create, update, or close those issues, and keep one soft comment per soft skill updated in place.
+  Use when working with [Goal]/[Discover]/[Build] issues, locking axis decisions, or pointing soft: comments at findings/.
 ---
 
 # issue
 
-Persist Spec-flow issues. Phase skills decide _when_ and _what content_; this skill owns **templates, titles, comments, create / update / close**.
+Persist product-state issues. Callers decide _when_ and _what content_; this skill owns **templates, titles, soft comments, create / update / close**.
 
-Do **not** invent phase work or re-argue the plan here. If the caller already has user agreement and body content, apply the template and write.
+Do **not** invent product work or re-argue decisions here. If the caller already has user agreement and body content, apply the template and write.
 
 ## When called
 
-**From a phase skill (usual):** agreement and content are already settled. Skip Context / Understanding / Proposal. Read the matching template → create or update → post the required lifecycle comment.
+**From a phase skill (usual):** agreement and content are already settled. Skip Context / Understanding / Proposal. Read the matching template → create or update → soft comments as needed.
 
 **Standalone / unclear:** present **Context / Understanding / Proposal** in one message (what issue, why now, title). Revise until agreed, then proceed.
 
-**Chore:** no Spec-flow issue is required. Only create/update when the user asks or a small lifecycle note is clearly needed — do not open Design / Forge / Refine for typo or harness tweaks.
+**Chore:** only create/update when the user asks.
 
 ## What you own
 
 - Title convention
 - Body shape via templates under `references/`
-- Lifecycle comments (table below)
-- `gh` create / edit / comment / close / list / view (use `gh-cli` skill for command shape when unsure)
+- Soft comments (`## soft: <name>` — one per soft per issue, **update in place**)
+- `gh` create / edit / comment / close / list / view (use `gh-cli` skill when unsure)
 
 ## What you do not own
 
-- Phase entry, mode choice (①/②), or “should we Spec?” — that is the phase skill
-- How to write a Forge/Refine plan — `.cursor/skills/forge|refine/references/plan.md`
-- How to build the Design thinking surface — `design/references/app.md` / `web.md`
-- Product edits — never; hand that to `rules` via the phase skill
+- Phase entry or “what should we do this session?” — `discussion` / `work`
+- Soft investigation itself — soft skills write `findings/` and return; this skill only persists the comment pointer
+- Product / harness file edits — `rules` via the caller
 
 ## Principles
 
-- **Spec** — thick product design (Goal / Scope / Architecture / decisions). One per project or version. Update body only when those shift; record why in a Spec comment.
-- **Phase issues** — Design / Forge / Refine are just-in-time; close when the phase work for that issue is done. Reference prior phase issue(s) and the codebase in the body.
-- **Create thin, fill as you go** — on create, body is the template with empty sections. Content is filled as the phase agrees (`# Grain` / `# Tokens` / `# Screen` for Design, Forge/Refine Plan, slice checkboxes).
-- **Body is source of truth** for the phase’s durable output. Drift between body and agreed work is a failure mode.
-- **Comments** — living work log for lifecycle and material updates (see table). Issues are session-to-session memory; cite issue numbers in commits / PRs.
+- **Body** = judgment axes: overview + why + `- [ ] agreed`. Follow each template’s How to write. Not full Research, HTML, matrices, or token dumps.
+- **`findings/`** = concrete soft results (append-only; committed with the project).
+- **Goal** — one per product. Covenant (What is this / Goal / Non-goal). After agreed, change only for redefinition.
+- **Discover** — one per product. Provisional axes (Name / Look / Stack / Features). No version rows; MVP / Next live on Build Roadmap. Ready for Build = all Discover sections agreed.
+- **Build** — one open at a time. Roadmap defines MVP / Next; Test strategy and Deploy follow those rows. No Plan section in the body.
+- **Create thin, fill as you go** — create with empty sections; fill when axes are agreed.
 
-## Comment rules (required)
+## Soft comments
 
-| Event           | Target       | Comment format                            |
-| --------------- | ------------ | ----------------------------------------- |
-| Spec created    | —            | (no comment — creation body is enough)    |
-| Spec updated    | Spec         | `## 更新: <what changed>\n<why>`          |
-| Design created  | Spec         | `## Design作成: <title>\n<what>`          |
-| Design updated  | Design issue | `## 更新: <what changed>\n<why>`          |
-| Design complete | Spec         | `## Design完了: <title>\n<what was done>` |
-| Forge created   | Spec         | `## Forge作成: <title>\n<what>`           |
-| Forge updated   | Forge issue  | `## 更新: <what changed>\n<why>`          |
-| Forge complete  | Spec         | `## Forge完了: <title>\n<what was done>`  |
-| Refine created  | Spec         | `## Refine作成: <title>\n<what>`          |
-| Refine updated  | Refine issue | `## 更新: <what changed>\n<why>`          |
-| Refine complete | Spec         | `## Refine完了: <title>\n<what was done>` |
+On the issue that the soft informs (usually Discover or Build):
 
-When creating a phase issue, the body must reference:
+1. List comments; find one whose body starts with `## soft: <name>` (same name).
+2. If found → **edit** that comment. If not → create one.
+3. Do **not** stack a new soft comment every run.
 
-- Prior phase issue body (and material comments when relevant)
-- Current codebase state (paths / patterns that matter)
+### Shape
+
+```markdown
+## soft: <name>
+
+- Topic: …
+- Path: findings/<name>/…
+- Why: …
+- Summary: …
+- Axes touched: …
+```
+
+### How to write
+
+| Field        | How                                                          |
+| ------------ | ------------------------------------------------------------ |
+| Topic        | One line                                                     |
+| Path         | One line (`findings/<name>/…`)                               |
+| Why          | 1–3 bullets (required)                                       |
+| Summary      | At most 3 lines; omit if nothing useful                      |
+| Axes touched | One line, comma-separated (e.g. `Look, Stack`); omit if none |
+
+Full dumps stay in `Path`. Do not paste Research, HTML, or long audits into the comment.
 
 ## Title convention
 
-- Spec: `[Spec] <product / feature area name>`
-- Design: `[Design] <what this design achieves>`
-- Forge: `[Forge] <what this forge achieves>`
-- Refine: `[Refine] <what this refine achieves>`
+- Goal: `[Goal] <product>`
+- Discover: `[Discover] <product>`
+- Build: `[Build] <what this build achieves>`
 
 ## Flow
 
-1. Know the operation: create / update body / lifecycle comment / close.
-2. Pick the template (Design: app vs web from project type — caller usually already chose).
-3. Apply agreed content into the template shape. Do not rewrite a locked Forge/Refine plan into a different structure.
-4. Run `gh`. On create of Design / Forge / Refine, also comment on Spec per the table. On phase complete, close the phase issue and comment on Spec.
+1. Know the operation: create / update body / soft comment / close.
+2. Read the matching template (`goal` / `discover` / `build`).
+3. Apply agreed content into the template shape (and its How to write).
+4. Run `gh`. Soft runs → update soft comment.
 5. Return issue number + what changed to the caller.
 
 ## Body write (gh)
 
-Prefer heredoc — stay inside the workspace root (no `/tmp`, no paths outside the project):
+Prefer heredoc — stay inside the workspace root:
 
 ```bash
 gh issue edit <number> --body "$(cat <<'EOF'
@@ -88,18 +100,10 @@ EOF
 )"
 ```
 
-If that fails (body too large, shell quoting), use a scratch file under `.cursor/tmp/` (gitignored):
-
-1. Write `.cursor/tmp/issue-<number>-body.md`
-2. `gh issue edit <number> --body-file .cursor/tmp/issue-<number>-body.md` (or `gh issue create --body-file …`)
-3. Delete the scratch file after `gh` succeeds
-
-Do not leave drafts in the repo root or other tracked paths.
+If that fails, use a scratch file under `.cursor/tmp/` (gitignored), then delete it after success.
 
 ## References
 
-- `references/spec-template.md`
-- `references/design-app-template.md`
-- `references/design-web-template.md`
-- `references/forge-template.md`
-- `references/refine-template.md`
+- `references/goal-template.md`
+- `references/discover-template.md`
+- `references/build-template.md`

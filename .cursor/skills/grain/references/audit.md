@@ -2,7 +2,7 @@
 
 Run all sections. Score findings separately per level — do not let visceral praise override behavioral or cognitive failures.
 
-On static thinking surfaces (Design phase: CSS-only states, no JS interactivity), section 5 (Interaction and motion) is limited to hover/focus/active and scroll affordance. Re-run full behavioral checks when the caller implements interactivity (typically Forge / Refine).
+On static or CSS-only surfaces (limited or no JS interactivity), section 5 (Interaction and motion) is limited to hover/focus/active and scroll affordance. Re-run full behavioral checks when interactivity exists on the target.
 
 ## 1. Five-second clarity (visceral)
 

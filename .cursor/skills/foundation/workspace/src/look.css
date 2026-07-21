@@ -1,0 +1,14 @@
+/* foundation — 見た目の正はここ。色・地・字はトークンで持ち、HTML に生 hex を散らさない。
+   クロームは chrome.css（dev のみ）。 */
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #f3efe6;
+  --color-ink: #1a1a1a;
+  --color-ink-muted: color-mix(in srgb, #1a1a1a 75%, transparent);
+  --color-ink-faint: color-mix(in srgb, #1a1a1a 50%, transparent);
+  --color-ink-line: color-mix(in srgb, #1a1a1a 20%, transparent);
+  --color-inverse: #f3efe6;
+  /* CTA / brand accent（コメント反映） */
+  --color-accent: #c41e3a;
+}

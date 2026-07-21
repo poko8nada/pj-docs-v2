@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * sessionStart でプロジェクト context を additional_context として注入する。
- * 対象: AGENTS.md / Spec / Issues / Cursor 特有（shell・web）/ Gate rules + Current values
+ * 対象: AGENTS.md / Product / Issues / Cursor 特有（shell・web）/ Gate rules + Current values /
+ *        discussion/SKILL.md（初期相の行動指針・末尾・動的読み込み）
  * 詳細手順は各 skill へ。state ファイルはここでは作らない（TTL 掃除のみ）。作成は初回ユーザー発話（beforeSubmitPrompt）。
  */
 import { execFileSync } from 'node:child_process';
@@ -64,7 +65,7 @@ function readAgents(worktree) {
   return readIfExists(join(worktree, 'AGENTS.md'), 4000);
 }
 
-function readSpec(worktree) {
+function readProductState(worktree) {
   const issues = ghJson(worktree, [
     'issue',
     'list',
@@ -73,16 +74,25 @@ function readSpec(worktree) {
     '--json',
     'number,title,body',
     '--limit',
-    '10',
+    '20',
   ]);
   if (!Array.isArray(issues)) {
-    return 'No spec issue exists yet. Check if there are planning documents in the project (e.g., README.md, docs/). If so, review them and consider creating a spec issue to track the product design.';
+    return 'No open Goal / Discover / Build issues yet. Orient from discussion; create them in `/work` via `issue` when ready.';
   }
-  const spec = issues.find((i) => typeof i.title === 'string' && i.title.startsWith('[Spec]'));
-  if (!spec) {
-    return 'No spec issue exists yet. Check if there are planning documents in the project (e.g., README.md, docs/). If so, review them and consider creating a spec issue to track the product design.';
+  const pick = (prefix) =>
+    issues.find((i) => typeof i.title === 'string' && i.title.startsWith(prefix));
+  const goal = pick('[Goal]');
+  const discover = pick('[Discover]');
+  const build = pick('[Build]');
+  if (!goal && !discover && !build) {
+    return 'No open Goal / Discover / Build issues yet. Orient from discussion; create them in `/work` via `issue` when ready.';
   }
-  return `### ${spec.title}\n\n${sanitize(spec.body || '')}`;
+  const blocks = [];
+  for (const issue of [goal, discover, build]) {
+    if (!issue) continue;
+    blocks.push(`### ${issue.title}\n\n${sanitize(issue.body || '')}`);
+  }
+  return blocks.join('\n\n');
 }
 
 function readIssues(worktree) {
@@ -129,7 +139,7 @@ function readWeb() {
 /** ゲート要点を1か所に（詳細は各 skill / deny メッセージ） */
 function readGateRules() {
   return [
-    'Phase: default `discussion`. Work only after user `/spec|/design|/forge|/refine|/chore`. Edit → Read `rules/SKILL.md` (`unlock.rules`). Spec-flow entry → Read `issue/SKILL.md` + phase template (`unlock.issue`; template in `read.refs` as `issue/<template>.md`). Phase re-entry clears `read.skills` / `read.refs`. Broken → user `/bootstrap` only.',
+    'Phase: default `discussion`. Hands-on after user `/work` or `/chore`. Edit → Read `rules/SKILL.md` (`unlock.rules`). Issue writes only in `/work` (not code/findings alone): Read `issue/SKILL.md` + matching Goal/Discover/Build template (`unlock.issue`; template in `read.refs` as `issue/<template>.md`). Phase re-entry clears `read.skills` / `read.refs`. Broken → user `/bootstrap` only.',
     'References: before gated edits, Read at least one `rules/references/*.md` (tracked in `read.refs` as `rules/<name>.md`). Any `.cursor/skills/*/references/*.md` Read is recorded as `skill/name.md`. Do not edit state files.',
     'Review: `review.files` non-empty → commit blocked; `/pre-commit-reviewer` clears. Persists across phase changes. `md` / `json` / `yaml` are not tracked.',
   ].join('\n');
@@ -143,7 +153,7 @@ function readGateState(root, id, stateFileRel) {
   const read = state.read ?? { skills: [], refs: [] };
   return [
     `Gate state (hooks-only; do not edit): \`${stateFileRel}\``,
-    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `unlock.rules`: `null` in discussion; `false` = handshake pending; `true` = unlocked. Spec-flow: `unlock.issue` (template via `read.refs`). `read.skills` = Read of `.cursor/skills/*/SKILL.md`; `read.refs` = `skill/name.md` (both cleared on phase re-entry).',
+    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `unlock.rules`: `null` in discussion; `false` = handshake pending; `true` = unlocked. `/work` `unlock.issue`: `false` until issue-skill Read when writing issues; then template via `read.refs`. `read.skills` = Read of `.cursor/skills/*/SKILL.md`; `read.refs` = `skill/name.md` (both cleared on phase re-entry).',
     'Set `label` via `node .cursor/skills/label/scripts/set-label.mjs <label>`.',
     '',
     'Current values:',
@@ -158,11 +168,16 @@ function readGateState(root, id, stateFileRel) {
   ].join('\n');
 }
 
+/** 初期相の行動指針。sessionStart のみ（途中の /discussion は skill トリガーで足りる） */
+function readDiscussionSkill(worktree) {
+  return readIfExists(join(worktree, '.cursor/skills/discussion/SKILL.md'));
+}
+
 /** SECTION_DEFS が injected context の唯一の source of truth */
 function buildSectionDefs(root, id, stateFileRel) {
   return [
     { id: 'agents', title: 'AGENTS.md', level: 1, codeblock: true, source: readAgents },
-    { id: 'spec', title: 'Product Design', level: 1, source: readSpec },
+    { id: 'product', title: 'Product state', level: 1, source: readProductState },
     { id: 'issues', title: 'Open GitHub Issues', level: 2, codeblock: true, source: readIssues },
     // Cursor 特有ルール（他 IDE / 汎用エージェント向けではない）
     { id: 'shell', title: 'Shell cwd', level: 2, source: readShell },
@@ -173,6 +188,13 @@ function buildSectionDefs(root, id, stateFileRel) {
       title: 'Gate state',
       level: 2,
       source: () => readGateState(root, id, stateFileRel),
+    },
+    {
+      id: 'discussion',
+      title: 'discussion (default phase)',
+      level: 1,
+      codeblock: true,
+      source: readDiscussionSkill,
     },
   ];
 }
