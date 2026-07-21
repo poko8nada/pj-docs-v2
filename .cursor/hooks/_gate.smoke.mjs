@@ -67,8 +67,8 @@ function trackReadIssueSkill(convBase) {
   trackRead(convBase, '.cursor/skills/issue/SKILL.md');
 }
 
-function trackReadForgeTemplate(convBase) {
-  trackRead(convBase, '.cursor/skills/issue/references/forge-template.md');
+function trackReadBuildTemplate(convBase) {
+  trackRead(convBase, '.cursor/skills/issue/references/build-template.md');
 }
 const stateTmp = mkdtempSync(join(smokeTmpRoot, 'state-'));
 const id = 'test-conversation';
@@ -156,6 +156,13 @@ try {
       'inject includes pre-commit review',
       ctx0.includes('Gate rules') && ctx0.includes('/pre-commit-reviewer'),
       'gate rules / review hint missing',
+    );
+    assert(
+      'inject includes discussion skill body last',
+      ctx0.includes('discussion (default phase)') &&
+        ctx0.includes('Agree **this session') &&
+        ctx0.lastIndexOf('discussion (default phase)') > ctx0.lastIndexOf('Gate state'),
+      'discussion section missing or not after gate',
     );
     assert('inject still no file', findStateFileName(root, id) === null);
 
@@ -324,13 +331,13 @@ try {
     );
   }
 
-  // 6. track phase — 既存 discussion を forge に更新（新規ファイルは増やさない）
+  // 6. track phase — 既存 discussion を work に更新（新規ファイルは増やさない）
   {
     const nameBefore = findStateFileName(root, id);
     const out = run('track.mjs', {
       ...base,
       hook_event_name: 'beforeSubmitPrompt',
-      prompt: '/forge lock plan',
+      prompt: '/work lock plan',
     });
     assert('track-phase continue', out.continue === true, JSON.stringify(out));
     assert(
@@ -340,8 +347,8 @@ try {
     );
     const st = readState();
     assert(
-      'phase is forge',
-      st.phase === 'forge' &&
+      'phase is work',
+      st.phase === 'work' &&
         st.unlock.rules === false &&
         st.unlock.issue === false &&
         st.unlock.issueTemplate === undefined,
@@ -365,7 +372,7 @@ try {
       command: 'gh issue list',
     });
     assert(
-      'spec-flow gh issue list allow before handshake',
+      'work gh issue list allow before handshake',
       outGhList.permission === 'allow',
       JSON.stringify(outGhList),
     );
@@ -376,7 +383,7 @@ try {
       command: 'gh issue create --title t --body b',
     });
     assert(
-      'spec-flow gh issue create deny before handshake',
+      'work gh issue create deny before handshake',
       outGh.permission === 'deny' && String(outGh.agent_message).includes('[gate-issue]'),
       JSON.stringify(outGh),
     );
@@ -421,13 +428,13 @@ try {
       JSON.stringify(outGhPartial),
     );
 
-    trackReadForgeTemplate(base);
+    trackReadBuildTemplate(base);
     const stReady = loadState(root, id);
     assert(
       'issue handshake complete',
       stReady.unlock.issue === true &&
         Array.isArray(stReady.read.refs) &&
-        stReady.read.refs.includes('issue/forge-template.md'),
+        stReady.read.refs.includes('issue/build-template.md'),
       JSON.stringify(stReady),
     );
 
@@ -496,15 +503,15 @@ try {
     );
   }
 
-  // 8b. forge のあと rules Read で解禁
+  // 8b. work のあと rules Read で解禁
   {
-    run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/forge go' });
+    run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/work go' });
     const out = run('track.mjs', {
       ...base,
       hook_event_name: 'beforeReadFile',
       file_path: join(root, '.cursor/skills/rules/SKILL.md'),
     });
-    assert('forge track-rules allow', out.permission === 'allow', JSON.stringify(out));
+    assert('work track-rules allow', out.permission === 'allow', JSON.stringify(out));
     const denyNoRef = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
@@ -641,12 +648,12 @@ try {
     run('track.mjs', {
       ...persistBase,
       hook_event_name: 'beforeSubmitPrompt',
-      prompt: '/forge after review dirty',
+      prompt: '/work after review dirty',
     });
     const stPersist = loadState(root, persistId);
     assert(
       'review files persist across phase switch',
-      stPersist.phase === 'forge' &&
+      stPersist.phase === 'work' &&
         stPersist.review.files.includes('utils/_review-persist-probe.ts') &&
         stPersist.read.refs.length === 0,
       JSON.stringify(stPersist),
@@ -673,13 +680,13 @@ try {
     const nameBefore = findStateFileName(root, id);
     writeFileSync(
       stateAbs(),
-      JSON.stringify({ phase: 'forge', implement: true, updatedAt: formatJstIso() }, null, 2),
+      JSON.stringify({ phase: 'work', implement: true, updatedAt: formatJstIso() }, null, 2),
     );
     onSessionStart(root);
     const st = loadState(root, id);
     assert(
-      'resume keeps forge+rules',
-      st.phase === 'forge' && st.unlock.rules === true,
+      'resume keeps work+rules',
+      st.phase === 'work' && st.unlock.rules === true,
       JSON.stringify(st),
     );
     assert(
@@ -785,7 +792,7 @@ try {
   {
     const readId = 'pretooluse-read-id';
     const readBase = { conversation_id: readId, workspace_roots: [root], cwd: root };
-    run('track.mjs', { ...readBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/forge go' });
+    run('track.mjs', { ...readBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/work go' });
     const out = run('track.mjs', {
       ...readBase,
       hook_event_name: 'preToolUse',
@@ -796,7 +803,7 @@ try {
     const st = loadState(root, readId);
     assert(
       'preToolUse Read sets rules true',
-      st.phase === 'forge' && st.unlock.rules === true,
+      st.phase === 'work' && st.unlock.rules === true,
       JSON.stringify(st),
     );
   }
@@ -1641,7 +1648,7 @@ try {
     );
   }
 
-  // 21. design + issue ready: gh issue edit with process-sub heredoc allows
+  // 21. work + issue ready: gh issue edit with process-sub heredoc allows
   //     （旧バグ: heredoc 除去後の改行で `)` が単独セグメント → DENY_SHELL）
   {
     const heredocId = 'heredoc00-0000-4000-8000-000000000001';
@@ -1653,17 +1660,17 @@ try {
     run('track.mjs', {
       ...heredocBase,
       hook_event_name: 'beforeSubmitPrompt',
-      prompt: '/design heredoc allow',
+      prompt: '/work heredoc allow',
     });
     trackReadIssueSkill(heredocBase);
-    trackRead(heredocBase, '.cursor/skills/issue/references/design-app-template.md');
+    trackRead(heredocBase, '.cursor/skills/issue/references/build-template.md');
     const st = loadState(root, heredocId);
     assert(
       'heredoc case issue ready',
-      st.phase === 'design' &&
+      st.phase === 'work' &&
         st.unlock.issue === true &&
         Array.isArray(st.read.refs) &&
-        st.read.refs.includes('issue/design-app-template.md'),
+        st.read.refs.includes('issue/build-template.md'),
       JSON.stringify(st),
     );
 
@@ -1685,7 +1692,7 @@ try {
       hook_event_name: 'beforeShellExecution',
       command: cmd,
     });
-    assert('design gh process-sub heredoc allow', out.permission === 'allow', JSON.stringify(out));
+    assert('work gh process-sub heredoc allow', out.permission === 'allow', JSON.stringify(out));
 
     // 改行を潰すと `git status\npnpm` が git 1セグメント扱いになり bypass する
     const outBypass = run('gate.mjs', {
@@ -1717,11 +1724,11 @@ try {
     });
     const msg = String(outPnpm.agent_message ?? '');
     assert(
-      'design pnpm deny names phase',
-      outPnpm.permission === 'deny' && msg.includes('phase=design'),
+      'work pnpm deny names phase',
+      outPnpm.permission === 'deny' && msg.includes('phase=work'),
       JSON.stringify(outPnpm),
     );
-    assert('design pnpm deny does not claim discussion', !msg.includes('In discussion:'), msg);
+    assert('work pnpm deny does not claim discussion', !msg.includes('In discussion:'), msg);
 
     const outWrite = run('gate.mjs', {
       ...heredocBase,
@@ -1731,14 +1738,14 @@ try {
     });
     const writeMsg = String(outWrite.agent_message ?? '');
     assert(
-      'design Write deny names phase+rules',
+      'work Write deny names phase+rules',
       outWrite.permission === 'deny' &&
-        writeMsg.includes('phase=design') &&
+        writeMsg.includes('phase=work') &&
         writeMsg.includes('rules'),
       JSON.stringify(outWrite),
     );
     assert(
-      'design Write deny does not say Default phase is discussion',
+      'work Write deny does not say Default phase is discussion',
       !writeMsg.includes('Default phase is discussion'),
       writeMsg,
     );

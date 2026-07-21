@@ -48,7 +48,7 @@ function denyCodeMessage(phase) {
   if (WORK_PHASES.has(p)) {
     return `[gate] Edits blocked (phase=${p}, rules≠true). Read .cursor/skills/rules/SKILL.md to unlock.`;
   }
-  return `[gate] Edits blocked (phase=${p}). Enter a work phase (/work|/chore|/spec|/design|/forge|/refine), then Read .cursor/skills/rules/SKILL.md.`;
+  return `[gate] Edits blocked (phase=${p}). Enter a work phase (/work|/chore), then Read .cursor/skills/rules/SKILL.md.`;
 }
 
 /** @param {string} phase */

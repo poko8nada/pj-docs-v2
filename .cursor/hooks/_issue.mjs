@@ -1,7 +1,8 @@
 /**
- * work / spec / design / forge / refine 入場時の issue ハンドシェイク。
+ * work の issue 書き込み時ハンドシェイク。
+ * 入場だけでは不要。gh issue 変更の直前に解錠する。
  * issue/SKILL.md Read → unlock.issue: true。
- * フェーズテンプレ Read → read.refs に `issue/<template>.md`（isIssueReady が参照）。
+ * Goal/Discover/Build テンプレ Read → read.refs に `issue/<template>.md`（isIssueReady が参照）。
  */
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
 import { normalizeReadRefs } from './_refs.mjs';
@@ -14,20 +15,11 @@ const ISSUE_TEMPLATE_NAMES = new Set([
   'goal-template.md',
   'discover-template.md',
   'build-template.md',
-  'spec-template.md',
-  'design-app-template.md',
-  'design-web-template.md',
-  'forge-template.md',
-  'refine-template.md',
 ]);
 
 /** @type {Record<string, string[]>} basename（`issue/` なし） */
 const PHASE_ISSUE_TEMPLATES = {
   work: ['goal-template.md', 'discover-template.md', 'build-template.md'],
-  spec: ['spec-template.md'],
-  design: ['design-app-template.md', 'design-web-template.md'],
-  forge: ['forge-template.md'],
-  refine: ['refine-template.md'],
 };
 
 const GH_ISSUE_READ_SUBS = new Set(['list', 'view', 'status']);
@@ -81,29 +73,19 @@ export function isIssueReady(state) {
 }
 
 export function templateHintForPhase(phase) {
-  switch (phase) {
-    case 'work':
-      return `\`${ISSUE_REFS_DIR}/goal-template.md\`, \`${ISSUE_REFS_DIR}/discover-template.md\`, or \`${ISSUE_REFS_DIR}/build-template.md\``;
-    case 'spec':
-      return `\`${ISSUE_REFS_DIR}/spec-template.md\``;
-    case 'design':
-      return `\`${ISSUE_REFS_DIR}/design-app-template.md\` or \`${ISSUE_REFS_DIR}/design-web-template.md\``;
-    case 'forge':
-      return `\`${ISSUE_REFS_DIR}/forge-template.md\``;
-    case 'refine':
-      return `\`${ISSUE_REFS_DIR}/refine-template.md\``;
-    default:
-      return 'the phase issue template';
+  if (phase === 'work') {
+    return `\`${ISSUE_REFS_DIR}/goal-template.md\`, \`${ISSUE_REFS_DIR}/discover-template.md\`, or \`${ISSUE_REFS_DIR}/build-template.md\``;
   }
+  return 'the phase issue template';
 }
 
 /** @param {{ phase?: string, unlock?: { issue?: boolean | null }, read?: { refs?: string[] } }} state */
 export function denyIssueMessage(state) {
   if (!isSpecFlowPhase(state?.phase)) return '[gate-issue] unexpected phase';
   if (state.unlock?.issue !== true) {
-    return `[gate-issue] Phase entry requires Read of \`${ISSUE_SKILL_REL}\` first.`;
+    return `[gate-issue] Before issue writes, Read \`${ISSUE_SKILL_REL}\` first.`;
   }
-  return `[gate-issue] Read the phase issue template: ${templateHintForPhase(state.phase)}.`;
+  return `[gate-issue] Before issue writes, Read the matching template: ${templateHintForPhase(state.phase)}.`;
 }
 
 function stripQuotesAndHeredoc(command) {
