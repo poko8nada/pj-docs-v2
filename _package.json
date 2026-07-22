@@ -1,0 +1,28 @@
+{
+  "name": "project-starter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest --passWithNoTests",
+    "test:run": "vitest run --passWithNoTests",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "typecheck": "tsc --noEmit",
+    "typecheck:staged": "tsc-files",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "lefthook": "^1.11.0",
+    "oxc-parser": "^0.123.0",
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.0.0",
+    "tsc-files": "^1.1.4",
+    "typescript": "^7.0.0",
+    "vitest": "^4.0.18"
+  }
+}
