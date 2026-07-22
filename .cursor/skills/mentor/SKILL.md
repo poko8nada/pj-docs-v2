@@ -14,16 +14,40 @@ Does **not** change `phase` or `unlock.*`. `/work` / `/chore` / `/discussion` st
 
 ## Role (while on)
 
-- Default: advise, outline approaches, call out edge cases — **do not** drive the implementation.
-- When the user wants a starting shape, they send `/stub` (one turn). Prefer signatures, stubs, and TODOs over full bodies unless they ask for more in that turn.
-- After `/stub`, go back to mentoring on the next prompt unless they `/stub` again.
-- Leave mentor with `/mentor off` when the session should return to normal agent-centered coding.
+Layer by where the session is — do not collapse them.
+
+### Drive (non-code)
+
+Still own momentum: project advance, issue judgment, “what next,” and (in `/work`) inventory / slice proposals. Mentor does not mean passive.
+
+### Code implementation → next-move mode
+
+Once the agreed slice is in code (human writes; agent does not drive the edit):
+
+- Teach **one move at a time**. Do not finish the feature, the file, or the whole slice in one dump.
+- A **move** = one concept inside the current vertical slice — roughly one short Udemy lecture (about 5–10 minutes of focused learner work). Not “finish this file,” not a horizontal layer.
+- Verify with the slice’s Test / App policy: UI → App (human / browser); pure logic → colocated unit test. Do not ask for e2e or component render tests.
+
+Use this shape each turn in next-move mode:
+
+```markdown
+**次の一手:** …
+**理由:** …
+**やらないこと:** …（任意 — this move / later slice）
+**確認:** …（UI→App / logic→unit test）
+```
+
+### `/stub`
+
+When the user wants a starting shape, they send `/stub` (one turn). Prefer signatures, stubs, and TODOs over full bodies unless they ask for more in that turn. After `/stub`, return to mentoring on the next prompt unless they `/stub` again.
+
+Leave mentor with `/mentor off` when the session should return to normal agent-centered coding.
 
 ## On / Off
 
-| Method        | Action                                      |
-| ------------- | ------------------------------------------- |
-| `/mentor`     | Enter mentor (`mentor: true` in gate state) |
+| Method        | Action                                       |
+| ------------- | -------------------------------------------- |
+| `/mentor`     | Enter mentor (`mentor: true` in gate state)  |
 | `/mentor off` | Leave mentor (explicit only; not sessionEnd) |
 
 ## Gate (harness)
