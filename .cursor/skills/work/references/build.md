@@ -11,14 +11,14 @@ Goal/Discover-only sessions → `goal-discover.md`.
 - **Product tree / relevant code** — axes alone are not enough
 - Session scope agreed in discussion
 
-List in-scope capabilities or improvements in chat, then slice. Do not slice from an empty list. No durable Plan section on the Build issue — session slices stay in chat.
+List in-scope capabilities or improvements in chat (Inventory), then Slice plan table — `SKILL.md`. Do not slice from an empty list. No durable Plan section on the Build issue — session slices stay in chat.
 
 ## What this situation often does
 
 - Implement / fix / refactor product code for one vertical concern
 - Run softs when Build needs concrete input → `findings/` → soft comment on Build (edit in place)
 - Update Build axes when judgment changes (overview + why + agreed)
-- Verify per slice (Test + App below)
+- Verify per slice (Test + Surface — see Slice plan below)
 
 Prefer cheap media only when the slice is explicitly exploratory; do not “try in the product tree and throw away.” Harness / meta → `/chore`.
 
@@ -36,19 +36,28 @@ Prefer cheap media only when the slice is explicitly exploratory; do not “try 
 
 **Do** put **New logic + its New unit tests in the same vertical slice.**
 
-For each slice, in chat:
+Slice plan table → `SKILL.md` (Inventory → Slice plan). For Build rows:
 
-- **What** — one line (which capability / fix this adds)
-- **Test** — command, or `N/A` per Test policy; when Required, name error/edge angles (short)
-- **App** — run app → user action → expected result (human / browser — stands in for e2e)
+| Column   | Fill                                                               |
+| -------- | ------------------------------------------------------------------ |
+| Includes | pure logic + wiring + route/UI/handler for **this** concern only |
+| Test     | `pnpm test:run` target or `N/A` per Test policy below; angles    |
+| Surface  | human observation on the product — examples below                  |
 
-Dependencies: `prerequisite:` notes — not a reason to merge slices.
+**Surface** (pick what matches the product):
+
+- Web UI — dev server → user action → expected UI (browser / cmux)
+- HTTP API — method + path → status + body (curl, client, playground)
+- CLI — command + args → stdout / exit code
+- Library — minimal consumer example runs as documented
+
+Dependencies: `prerequisite:` in **Notes** — not a reason to merge slices.
 
 ## Test policy (decide per slice when slicing)
 
 Align with Build **Test strategy** (what MVP/Next guarantees). If a slice’s tests would contradict the axis, update the axis first (or name `/discussion`).
 
-**Stance:** Prefer solid TypeScript / schema at boundaries plus **unit tests on pure logic error paths**. Skip browser automation and component render tests by default — App / cmux covers the main path for small–medium products.
+**Stance:** Prefer solid TypeScript / schema at boundaries plus **unit tests on pure logic error paths**. Skip browser automation and component render tests by default — **Surface** (human / browser / HTTP / CLI) covers the main path for small–medium products.
 
 **Required**
 
@@ -80,7 +89,7 @@ Align with Build **Test strategy** (what MVP/Next guarantees). If a slice’s te
 
 - CSS / visual-only
 - Playwright / e2e / browser automation
-- Component render / click-heavy UI tests (use **App** instead)
+- Component render / click-heavy UI tests (use **Surface** instead)
 - Config-only (manual env check)
 - Trivial getters / thin pass-through mappings
 - External plugin internals (stub at the boundary; test your mapping if any)
@@ -89,4 +98,4 @@ Follow this repository’s test layout and naming (`rules` → `shared` colocati
 
 ## After a slice
 
-Commit when agreed (per slice or batched). Update Build (or soft comments) at milestones — not after every slice by default. Browser check via `cmux-browser` when App verification needs it. If direction stalls, name `/discussion`.
+Commit when agreed (per slice or batched). Update Build (or soft comments) at milestones — not after every slice by default. Browser check via `cmux-browser` when Surface verification needs it. If direction stalls, name `/discussion`.

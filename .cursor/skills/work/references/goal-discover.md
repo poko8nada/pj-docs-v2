@@ -10,7 +10,7 @@ Build-stage product implementation + Test policy → `build.md` (softs are still
 - Soft comments (`## soft: …`) and cited `findings/` paths
 - Session scope agreed in discussion
 
-List in-scope concerns in chat, then slice. Do not slice from an empty list.
+List in-scope concerns in chat (Inventory), then Slice plan table — `SKILL.md`. Do not slice from an empty list.
 
 ## What this situation often does
 
@@ -31,6 +31,16 @@ Harness / meta → `/chore`.
 - Ready for Build: create `[Build]` with Links + thin Roadmap/Test/Deploy — not implementation yet
 
 One sitting, one verifiable concern, chat agreement before execute. Fidelity still applies (realistic look content, honest research — not filler).
+
+## Slice plan columns (Goal / Discover)
+
+Same table as `SKILL.md`. Typical fills:
+
+| Column   | Fill                                                                 |
+| -------- | -------------------------------------------------------------------- |
+| Includes | soft run + `findings/` artifact + issue / axis touch in this slice |
+| Test     | `N/A` unless the slice touches product logic (then `build.md`)       |
+| Surface  | observable done — e.g. `findings/<path>`; axis / soft comment updated |
 
 ## Test policy
 

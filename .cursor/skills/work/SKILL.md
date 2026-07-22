@@ -21,7 +21,31 @@ A **slice** is one sitting of work that adds **one verifiable concern**, cut fro
 Do not invent slices from nothing:
 
 1. **Inventory** — list what is in scope this session (short bullets in chat).
-2. **Slice order** — only then sequence into thin vertical slices.
+2. **Slice plan** — only then sequence into thin vertical slices as a table (chat only — not on issues).
+
+### Inventory (chat)
+
+Short bullets — what is in scope this session. No sequence yet.
+
+### Slice plan (chat — agree before execute)
+
+One row = one slice. **Includes** + **Test** + **Surface** on the same row enforce a vertical cut — logic and product surface ship together, not “all logic, then all UI, then all tests.”
+
+```markdown
+| #   | What                   | Includes                               | Test         | Surface                          | Notes                    |
+| --- | ---------------------- | -------------------------------------- | ------------ | -------------------------------- | ------------------------ |
+| 1   | one verifiable concern | logic + wiring + surface in this slice | cmd or `N/A` | human observation on the product | `prerequisite:` optional |
+```
+
+| Column   | Write                                    | Do not write                        |
+| -------- | ---------------------------------------- | ----------------------------------- |
+| What     | one concern name                         | a file list as the title            |
+| Includes | logic + integration + surface this slice | “later: tests” / “later: UI”        |
+| Test     | command + angles, or `N/A` + reason      | vague “add tests”                   |
+| Surface  | action → expected on the product         | duplicate Test only                 |
+| Notes    | `prerequisite:`, skip reason             | merge rationale for bundling slices |
+
+Situation references (`goal-discover.md`, `build.md`) say how to fill **Test** / **Surface** — do not copy those rules here.
 
 **Two rules — do not collapse them:**
 
@@ -37,8 +61,8 @@ Do not invent slices from nothing:
 At each step: discuss and agree when judgment is needed.
 
 ```text
-Inventory → Slice → Execute → Commit (per slice or batched — as agreed)
-                → Issue update when needed
+Inventory → Slice plan → Execute → Commit (per slice or batched — as agreed)
+                      → Issue update when needed
 ```
 
 Execute may include soft runs, `findings/`, cheap media, product edits, and even issue _create_ when that is part of the slice. Soft comment / axis updates often land at the end of the soft’s slice (or a follow-up slice), after any discussion.
@@ -61,7 +85,7 @@ Scope unclear or changed → name `/discussion`. Do not redefine the session goa
 - Do not self-invoke `/discussion` or `/chore` — name them for the user.
 - Do not invoke soft skills from each other — only this phase (or the user) calls softs.
 - Do not dump Research / HTML / matrices into issue bodies — those stay in `findings/`.
-- Do not skip inventory → slice → agree before execute.
-- Do not treat Build issue as a durable Plan of slices — session slices live in chat.
+- Do not skip inventory → slice plan → agree before execute.
+- Do not treat Build issue as a durable Plan of slices — session slices stay in chat.
 
 Hand off to `issue` / `rules` / soft skills by name — do not copy their contents here.
