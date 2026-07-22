@@ -402,7 +402,18 @@ try {
       hook_event_name: 'beforeShellExecution',
       command: 'pnpm test:run',
     });
-    assert('phase-only pnpm still deny', outPnpm.permission === 'deny', JSON.stringify(outPnpm));
+    assert('phase-only pnpm test allow', outPnpm.permission === 'allow', JSON.stringify(outPnpm));
+
+    const outPnpmInstall = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm install',
+    });
+    assert(
+      'phase-only pnpm install deny',
+      outPnpmInstall.permission === 'deny',
+      JSON.stringify(outPnpmInstall),
+    );
   }
 
   // 7b. issue handshake — skill Read, template Read, then gh issue write
@@ -1718,19 +1729,34 @@ try {
       JSON.stringify(outBypassGh),
     );
 
-    // rules 前の pnpm は従来どおり deny。文言に実 phase が出ること
+    // rules 前でも pnpm test は work で allow。install は deny
     const outPnpm = run('gate.mjs', {
       ...heredocBase,
       hook_event_name: 'beforeShellExecution',
       command: 'pnpm test',
     });
-    const msg = String(outPnpm.agent_message ?? '');
     assert(
-      'work pnpm deny names phase',
-      outPnpm.permission === 'deny' && msg.includes('phase=work'),
+      'work pnpm test allow without rules',
+      outPnpm.permission === 'allow',
       JSON.stringify(outPnpm),
     );
-    assert('work pnpm deny does not claim discussion', !msg.includes('In discussion:'), msg);
+
+    const outPnpmInstall = run('gate.mjs', {
+      ...heredocBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm install',
+    });
+    const msg = String(outPnpmInstall.agent_message ?? '');
+    assert(
+      'work pnpm install deny names phase',
+      outPnpmInstall.permission === 'deny' && msg.includes('phase=work'),
+      JSON.stringify(outPnpmInstall),
+    );
+    assert(
+      'work pnpm install deny does not claim discussion',
+      !msg.includes('In discussion:'),
+      msg,
+    );
 
     const outWrite = run('gate.mjs', {
       ...heredocBase,
@@ -2000,6 +2026,114 @@ try {
       denyShellEcho.permission === 'deny' &&
         String(denyShellEcho.agent_message).includes('[gate-mentor]'),
       JSON.stringify(denyShellEcho),
+    );
+
+    clearSticky();
+  }
+
+  // 19. pnpm test early allow (work|chore, no rules unlock)
+  {
+    const testId = 'test-pnpm-early';
+    const testBase = {
+      conversation_id: testId,
+      session_id: testId,
+      workspace_roots: [root],
+      cwd: root,
+    };
+    clearSticky();
+    run('track.mjs', {
+      ...testBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/work',
+    });
+    const stWork = loadState(root, testId);
+    assert(
+      'pnpm early work phase without rules',
+      stWork.phase === 'work' && stWork.unlock.rules !== true,
+      JSON.stringify(stWork),
+    );
+
+    const allowBare = run('gate.mjs', {
+      ...testBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm test:run',
+    });
+    assert(
+      'pnpm test:run without rules unlock',
+      allowBare.permission === 'allow',
+      JSON.stringify(allowBare),
+    );
+
+    const allowPath = run('gate.mjs', {
+      ...testBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm test:run src/foo.test.ts',
+    });
+    assert(
+      'pnpm test:run with path without rules',
+      allowPath.permission === 'allow',
+      JSON.stringify(allowPath),
+    );
+
+    run('track.mjs', {
+      ...testBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/mentor',
+    });
+    const allowMentor = run('gate.mjs', {
+      ...testBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm test:run src/foo.test.ts',
+    });
+    assert(
+      'mentor pnpm test without rules unlock',
+      allowMentor.permission === 'allow',
+      JSON.stringify(allowMentor),
+    );
+
+    const denyInstall = run('gate.mjs', {
+      ...testBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm install',
+    });
+    assert(
+      'pnpm install still deny without rules',
+      denyInstall.permission === 'deny',
+      JSON.stringify(denyInstall),
+    );
+
+    const denyChain = run('gate.mjs', {
+      ...testBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm test:run && tee src/foo.ts',
+    });
+    assert(
+      'pnpm test chain with write deny',
+      denyChain.permission === 'deny',
+      JSON.stringify(denyChain),
+    );
+
+    const discId = 'test-pnpm-discussion';
+    const discBase = {
+      conversation_id: discId,
+      session_id: discId,
+      workspace_roots: [root],
+      cwd: root,
+    };
+    run('track.mjs', {
+      ...discBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/discussion',
+    });
+    const denyDisc = run('gate.mjs', {
+      ...discBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm test:run',
+    });
+    assert(
+      'discussion pnpm test still deny',
+      denyDisc.permission === 'deny',
+      JSON.stringify(denyDisc),
     );
 
     clearSticky();

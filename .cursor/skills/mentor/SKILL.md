@@ -20,11 +20,21 @@ Layer by where the session is — do not collapse them.
 
 Same momentum as without mentor: read issues / findings / code, advance the project, issue judgment, “what next,” and (in `/work`) inventory / slice proposals. Mentor does not mean passive. Planning and progress proposal are not mentor-only — this layer is the normal rail; mentor only changes how **code** is taught below.
 
-### Code implementation → Digest / Deep Dive
+### Code implementation → Digest / Hint / Explain
 
 Once the agreed slice is in code (human writes; agent does not drive the edit). Scope is the **current agreed slice** only — not the whole session roadmap. Session-local map only; do not treat it as a durable project plan (slices stay in chat per `/work`).
 
+**Read learner code from the repo** (Read / Grep) — do not ask them to paste it in chat. When the slice has a **Test** check, **run it yourself** (`pnpm test:run` or the Digest command) and report pass/fail. **Surface** stays human.
+
 Align checks with the slice’s Test / Surface policy: product observation → Surface (browser, HTTP, CLI, etc.); pure logic → colocated unit test. Do not ask for e2e or component render tests.
+
+Three layers — do not collapse them:
+
+| Layer   | When                         | Density                                               |
+| ------- | ---------------------------- | ----------------------------------------------------- |
+| Digest  | slice enters implementation  | structural map — what, where, flow; no code fences    |
+| Hint    | step number or stuck on beat | one nudge — first move, one pitfall, signature-level  |
+| Explain | after Hint or explicit ask   | teach that beat — partial code + `これは…`, why/terms |
 
 #### How to split (before formatting)
 
@@ -33,14 +43,14 @@ Numbered steps are **concern beats** — each beat advances the vertical concern
 - Do **not** split one-file-at-a-time (no “finish this file, then the next”).
 - Do **not** park all tests at the end (horizontal). When unit tests belong in the slice, they interleave with the logic they cover — same files may recur across steps.
 - Do **not** invent test steps for UI-only work (Surface is enough).
-- Same path may appear in multiple steps. UI, logic, wiring, and data can mix in one digest — the **fields** stay the same. Per step: ファイル / シンボル / フロー are required; チェック is optional (omit the whole line if none).
-- Target **3–7** steps. Fewer than 3 → keep short. More than 7 → slice is too thick; cut the slice (Drive / `/work`), do not inflate the digest.
+- Same path may appear in multiple steps. UI, logic, wiring, and data can mix in one Digest — the **fields** stay the same. Per step: ファイル / シンボル / フロー are required; チェック is optional (omit the whole field if none).
+- Target **3–7** steps. Fewer than 3 → keep short. More than 7 → slice is too thick; cut the slice (Drive / `/work`), do not inflate the Digest.
 
-Density: **barely implementable** — not a vague outline, not full source dumps. Fill rules below remove overlap; do not invent extra headings.
+Digest density: **barely implementable** — not a vague outline, not full source dumps. Structure and symbols, not teaching prose.
 
-#### 1 — Digest (first)
+#### 1 — Digest
 
-Output this shape once when the slice enters implementation. No code fences (signatures go under シンボル as plain text).
+Output once when the slice enters implementation. No code fences (signatures go under **シンボル** as plain text).
 
 ```markdown
 **ゴール:** （1文。完成後の状態だけ。ステップ列挙禁止）
@@ -49,33 +59,60 @@ Output this shape once when the slice enters implementation. No code fences (sig
 **ステップ:**（3–7）
 
 1. （動詞で始まる到達点・1行。ファイル名禁止）
-   - **ファイル:** `path`（`new`|`edit`）を列挙するだけ。説明禁止
-   - **シンボル:** コード表記のみ・1行に1つ。説明禁止
-   - **フロー:** `→` でつないだ短い節だけ（3–6個）。実装詳細・コード禁止
-   - **チェック:** このステップの観測1文。無ければ行ごと省略（空の「チェック:」禁止）
+
+   **ファイル**
+   - `path`（`new`|`edit`）
+   - …
+
+   **シンボル**
+   - `fnName(args): ReturnType`
+   - `ComponentName` — props: …
+   - `describe('…', …)` — angles: …
+   - …
+
+   **フロー**
+   - short beat — input, transform, branch, or handoff
+   - …
+
+   **チェック**（optional）
+   - observe **this** beat only
 
 2. …
 ```
 
-| Field             | Write                                             | Do not write                |
-| ----------------- | ------------------------------------------------- | --------------------------- |
-| ゴール            | slice end state, one sentence                     | a preview of the step list  |
-| チェック（slice） | how to observe done                               | vague “it works”            |
-| ステップ名        | verb + outcome                                    | file name as the title      |
-| ファイル          | path + `new`/`edit` only                          | why that file               |
-| シンボル          | types / components / fns / args as code-like text | Japanese prose              |
-| フロー            | data or UI path as `→` chain                      | full algorithm, code fences |
-| チェック（step）  | observe **this** beat only                        | copy of the slice チェック  |
+| Field             | Write                                              | Do not write                |
+| ----------------- | -------------------------------------------------- | --------------------------- |
+| ゴール            | slice end state, one sentence                      | a preview of the step list  |
+| チェック（slice） | how to observe done                                | vague “it works”            |
+| ステップ名        | verb + outcome                                     | file name as the title      |
+| ファイル          | path + `new`/`edit`, one bullet per path           | why that file               |
+| シンボル          | types / components / fns / tests as code-like text | Japanese prose, code fences |
+| フロー            | bullets — path, branches, boundaries               | algorithms, teaching prose  |
+| チェック（step）  | 1–2 observable bullets for this beat only          | copy of the slice チェック  |
 
-Close with a cue that the learner can ask by number for a Deep Dive.
+Close with a cue: step number → Hint; still stuck → Explain.
 
-#### 2 — Deep Dive
+#### 2 — Hint
 
-When the learner asks about a Digest step (by number or stuck on one), teach **that** — short and concrete. About one short Udemy lecture of focus when they are implementing; shorter when the ask is smaller. Do not re-dump the whole Digest unless they ask to reorient.
+Default when the learner names a Digest step (by number) or is stuck on one beat.
 
-No fixed heading template (no mandatory ゴール / ポイント / ガイド). Do not invent mode switches for “実装 vs 用語” — answer what they asked.
+- Restate the beat’s outcome in one line.
+- **First move** — where to start (file, symbol, or test).
+- **One pitfall** — common mistake or edge for this beat.
+- Signature or one-line shape at most — no code fences, no multi-block walkthrough.
+- Stay inside the current slice’s Test / Surface policy.
 
-When code helps, show **partial / focused** snippets in write order (not full files), each followed by a short `これは…` paragraph. When code does not help, a short explanation is enough. Stay inside the current slice’s Test / Surface policy.
+Do not re-dump the whole Digest unless they ask to reorient.
+
+#### 3 — Explain
+
+When Hint was not enough, or the learner explicitly asks to explain a step.
+
+- Teach **that beat only** — enough to implement and understand why.
+- Partial / focused snippets in write order (not full files), each followed by a `これは…` paragraph.
+- Cover terms, tradeoffs, and alternatives when they unblock the learner.
+- No fixed heading template — answer what they asked.
+- Stay inside the current slice’s Test / Surface policy.
 
 ### `/stub`
 
@@ -92,7 +129,12 @@ Leave mentor with `/mentor off` when the session should return to normal agent-c
 
 ## Gate (harness)
 
-While on and **not** in a `/stub` turn, the gate denies **reviewable code** paths (`ts`/`tsx`/`js`/`jsx`/`mjs`/`cjs`/`css`/`html`) and Shell that touches them. Other paths still follow normal phase / `unlock.rules`. That deny is the backstop — the role above is what you optimize for.
+While on and **not** in a `/stub` turn:
+
+- **Read** is always allowed.
+- **Edits** to reviewable code paths (`ts`/`tsx`/`js`/`jsx`/`mjs`/`cjs`/`css`/`html`) are denied.
+- **`pnpm test` / `pnpm test:run`** in `/work` or `/chore` are allowed without `rules` unlock — use them for Test checks.
+- Other Shell follows normal phase / `unlock.rules`. That deny is the backstop — the role above is what you optimize for.
 
 ## Hard limits
 

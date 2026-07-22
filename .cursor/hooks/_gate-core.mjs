@@ -498,6 +498,42 @@ function isSetLabelShellCommand(command) {
   return isSetLabelShellSegment(cleaned);
 }
 
+function shellSegments(command) {
+  const cleaned = normalizeShellForAllowlist(command);
+  return cleaned
+    .split(/&&|\|\||;|\n|\|/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** 1 セグメントが pnpm test / test:run 単体なら true */
+function isPnpmTestShellSegment(segment) {
+  const cleaned = String(segment ?? '').trim();
+  if (!cleaned) return false;
+  if (/&&|\|\||;|\n|\||&/.test(cleaned)) return false;
+  if (shellHasWriteRedirect(cleaned)) return false;
+  if (firstCommandToken(cleaned) !== 'pnpm') return false;
+
+  const parts = tokenize(cleaned);
+  let i = 0;
+  while (i < parts.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(parts[i])) i += 1;
+  while (
+    i < parts.length &&
+    (parts[i] === 'sudo' || parts[i] === 'command' || parts[i] === 'time')
+  ) {
+    i += 1;
+  }
+  const sub = parts[i + 1] ?? '';
+  return sub === 'test' || sub === 'test:run';
+}
+
+/** work|chore で rules 不要の pnpm test 実行 */
+function isPnpmTestShellCommand(command) {
+  const segments = shellSegments(command);
+  if (segments.length === 0) return false;
+  return segments.every((seg) => isSetLabelShellSegment(seg) || isPnpmTestShellSegment(seg));
+}
+
 function isAllowedWithoutCodeUnlock(command, inWorkPhase) {
   const cleaned = normalizeShellForAllowlist(command);
   const segments = cleaned
@@ -590,6 +626,9 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
 
   // label script はどのフェーズでも許可（state は script が書く）
   if (isSetLabelShellCommand(command)) return allow();
+
+  // pnpm test — work|chore のみ、rules 不要（mentor 下の検証用）
+  if (WORK_PHASES.has(state.phase) && isPnpmTestShellCommand(command)) return allow();
 
   // mentor: コード path に触る書き込みうる Shell は stub 無しでは deny
   // （ls/cat・git/gh の read-only のみ例外。work の git 書き込みは例外にしない）
