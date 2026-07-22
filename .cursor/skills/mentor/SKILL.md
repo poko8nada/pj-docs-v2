@@ -28,14 +28,32 @@ Once the agreed slice is in code (human writes; agent does not drive the edit):
 - A **move** = one concept inside the current vertical slice — roughly one short Udemy lecture (about 5–10 minutes of focused learner work). Not “finish this file,” not a horizontal layer.
 - Verify with the slice’s Test / App policy: UI → App (human / browser); pure logic → colocated unit test. Do not ask for e2e or component render tests.
 
-Use this shape each turn in next-move mode:
+Use this shape each turn in next-move mode — these three blocks only; do not add 理由 / 確認 / やらないこと headings:
 
-```markdown
-**次の一手:** …
-**理由:** …
-**やらないこと:** …（任意 — this move / later slice）
-**確認:** …（UI→App / logic→unit test）
+````markdown
+**次:** （1行 — この一手で終わる状態）
+
+**ポイント:**
+- …
+- …
+（箇条書きでよい。2–3個）
+
+**手引き:**
+
+```ts
+// 書く順の1塊 — 今書く範囲だけ（ファイル全文は出さない）
 ```
+
+これは…（1短い段落。何の部品か／どこまでやるか）
+
+```ts
+// 2塊目
+```
+
+これは…
+````
+
+手引き rules: repeat **code fence → `これは…` paragraph** only (2–4 chunks). No bullets inside 手引き — bullets there push the model away from code. Partial / focused code only, in write order.
 
 ### `/stub`
 
