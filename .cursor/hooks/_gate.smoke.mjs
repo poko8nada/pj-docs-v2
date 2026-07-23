@@ -37,6 +37,7 @@ import {
   STATE_TTL_DAYS,
 } from './_state.mjs';
 import { buildReviewTaskInjection, collectReviewDiff, isReviewablePath } from './_review.mjs';
+import { isCheckToolingReady, runFormatLint } from './_check.mjs';
 
 function clearSticky() {
   try {
@@ -1522,6 +1523,19 @@ try {
       stLoop.check?.pending?.length === 0,
       JSON.stringify(stLoop),
     );
+
+    // deps 未 install なら format/lint を失敗にせずスキップする
+    {
+      const noDepsRoot = mkdtempSync(join(smokeTmpRoot, 'no-deps-'));
+      writeFileSync(join(noDepsRoot, 'probe.mjs'), 'export const x = 1;\n');
+      assert(
+        'tooling not ready without node_modules packages',
+        !isCheckToolingReady(noDepsRoot),
+        noDepsRoot,
+      );
+      const skipped = runFormatLint(noDepsRoot, ['probe.mjs']);
+      assert('runFormatLint skips when deps missing', skipped.ok, JSON.stringify(skipped));
+    }
 
     run('track.mjs', {
       ...checkBase,

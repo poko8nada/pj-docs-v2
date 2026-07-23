@@ -9,6 +9,9 @@ import { isExcludedFromReviewTrack } from './_review.mjs';
 const FORMAT_LINT_EXT = /\.(ts|tsx|js|jsx|mjs|cjs)$/i;
 const TYPECHECK_EXT = /\.(ts|tsx)$/i;
 
+/** format / lint / typecheck に必要なルート依存パッケージ */
+const CHECK_TOOL_PACKAGES = ['oxfmt', 'oxlint', 'typescript'];
+
 function relPosix(root, filePath) {
   if (!filePath) return null;
   const abs = resolve(isAbsolute(filePath) ? filePath : resolve(root, String(filePath)));
@@ -33,6 +36,11 @@ export function isTypecheckPath(root, filePath) {
   return TYPECHECK_EXT.test(posix);
 }
 
+/** oxfmt / oxlint / typescript が node_modules にあるか。 */
+export function isCheckToolingReady(root) {
+  return CHECK_TOOL_PACKAGES.every((name) => existsSync(join(root, 'node_modules', name)));
+}
+
 function existingRelPaths(root, relPaths) {
   return relPaths.filter((rel) => rel && existsSync(join(root, rel)));
 }
@@ -55,6 +63,12 @@ export function runFormatLint(root, relPaths) {
   const typecheckFiles = filterByExt(existing, TYPECHECK_EXT);
 
   if (formatLintFiles.length === 0 && typecheckFiles.length === 0) return { ok: true };
+
+  // 未 install は失敗にせずスキップ（フォローアップループを起こさない）
+  if (!isCheckToolingReady(root)) {
+    process.stderr.write('[check] deps missing — skipped format/lint/typecheck\n');
+    return { ok: true };
+  }
 
   const parts = [];
 
