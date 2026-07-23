@@ -127,6 +127,9 @@ export function resolveConversationIdFromPayload(payload) {
  * - それ以外 → sticky `last-prompt-id` 優先、無ければ payload フォールバック
  *   （ツール hooks の conversation_id / transcript_path 汚染対策）
  *
+ * sticky の書き込みは track の beforeSubmitPrompt（ユーザー発話）のみ。
+ * sessionStart / Task は sticky を更新しない（盗用 → 無 state → discussion 誤認を防ぐ）。
+ *
  * @returns {{ id: string, via: string }}
  */
 export function resolveConversationId(payload) {

@@ -1793,7 +1793,7 @@ try {
     );
   }
 
-  // 22. sessionStart inject: 前会話 sticky があっても payload の state を出し、sticky を更新
+  // 22. sessionStart inject: 前会話 sticky があっても payload の state を出す（sticky は触らない）
   {
     clearSticky();
     const prevId = 'stickyprv-0000-4000-8000-000000000001';
@@ -1858,7 +1858,22 @@ try {
       ctx.slice(0, 600),
     );
     assert(
-      'inject refreshes sticky to new id',
+      'inject does not steal sticky from previous conversation',
+      readLastPromptId(root) === prevId,
+      String(readLastPromptId(root)),
+    );
+
+    // sticky 更新はユーザー発話のみ
+    run('track.mjs', {
+      conversation_id: newId,
+      session_id: newId,
+      workspace_roots: [root],
+      cwd: root,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: 'hello new conversation',
+    });
+    assert(
+      'user utterance updates sticky to new id',
       readLastPromptId(root) === newId,
       String(readLastPromptId(root)),
     );

@@ -158,7 +158,7 @@ function maybeMarkReadRef(root, payload) {
 
 function handleBeforeSubmitPrompt(root, payload) {
   const id = conversationId(payload);
-  // ツール hooks は汚染されうるので、発話で確定した id を sticky にする
+  // ツール hooks は汚染されうるので、ユーザー発話で確定した id だけ sticky にする
   writeLastPromptId(root, id);
   // stub は1ターン限り — 新発話の冒頭で必ず消す（state には載せない）
   clearStubTurn(root);

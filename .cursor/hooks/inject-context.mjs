@@ -4,19 +4,18 @@
  * 対象: AGENTS.md / Product / Issues / Cursor 特有（shell・web）/ Gate rules + Current values /
  *        discussion/SKILL.md（初期相の行動指針・末尾・動的読み込み）
  * 詳細手順は各 skill へ。state ファイルはここでは作らない（TTL 掃除のみ）。作成は初回ユーザー発話（beforeSubmitPrompt）。
+ * sticky（last-prompt-id）は更新しない — 書き込みは track の beforeSubmitPrompt のみ。
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { logHookIds } from './_id-log.mjs';
 import {
-  isUnknownConversationId,
   loadState,
   onSessionStart,
   resolveConversationIdFromPayload,
   statePathRelative,
   workspaceRoot,
-  writeLastPromptId,
 } from './_state.mjs';
 
 // null = 無制限 / 数値 = 文字数で機械カット
@@ -228,10 +227,9 @@ async function main() {
   }
 
   const root = workspaceRoot(payload);
-  // inject は sessionStart 専用。sticky は前会話の残りがありうるので常に payload。
+  // inject は sessionStart 専用。context 用 id は常に payload（前会話 sticky を見ない）。
+  // sticky の更新はユーザー発話（track beforeSubmitPrompt）のみ — Task/subagent の sessionStart で盗ませない。
   const id = resolveConversationIdFromPayload(payload).id;
-  // 初回発話前のツール hooks もこの会話を見るよう sticky を即更新
-  if (!isUnknownConversationId(id)) writeLastPromptId(root, id);
   onSessionStart(root);
   const stateFileRel = statePathRelative(root, id);
 
