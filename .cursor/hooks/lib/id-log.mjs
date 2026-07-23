@@ -19,7 +19,7 @@ import {
   resolveConversationId,
   resolveConversationIdFromPayload,
   workspaceRoot,
-} from './_state.mjs';
+} from './state.mjs';
 
 /** id.jsonl の最大行数（超過分は先頭＝古い方を破棄） */
 const MAX_LOG_LINES = 200;

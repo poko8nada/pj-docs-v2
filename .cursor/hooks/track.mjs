@@ -12,18 +12,18 @@
  */
 import { realpathSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
-import { disableBootstrap, enableBootstrap } from './_bootstrap.mjs';
-import { clearStubTurn, enableStubTurn, isMentorActive } from './_mentor.mjs';
+import { disableBootstrap, enableBootstrap } from './lib/bootstrap.mjs';
+import { clearStubTurn, enableStubTurn, isMentorActive } from './lib/mentor.mjs';
 import {
   commandIncludesGitCommit,
   injectReviewFilesIntoTaskInput,
   isPreCommitReviewerContext,
   isReviewablePath,
-} from './_review.mjs';
-import { skillRefIdFromPath } from './_refs.mjs';
-import { ISSUE_SKILL_REL } from './_issue.mjs';
-import { isCheckablePath } from './_check.mjs';
-import { logHookIds } from './_id-log.mjs';
+} from './lib/review.mjs';
+import { skillRefIdFromPath } from './lib/refs.mjs';
+import { ISSUE_SKILL_REL } from './lib/issue.mjs';
+import { isCheckablePath } from './lib/check.mjs';
+import { logHookIds } from './lib/id-log.mjs';
 import {
   conversationId,
   defaultRead,
@@ -46,7 +46,7 @@ import {
   WORK_PHASES,
   workspaceRoot,
   writeLastPromptId,
-} from './_state.mjs';
+} from './lib/state.mjs';
 
 const PHASE_RE = /(?:^|[\s`])\/(discussion|work|chore)(?=[\s`/]|$)/i;
 const BOOTSTRAP_OFF_RE = /(?:^|[\s`])\/bootstrap\s+off(?=[\s`/]|$)/i;

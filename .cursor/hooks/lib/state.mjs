@@ -15,10 +15,11 @@ import {
 } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normalizeReadRefs, discoverSkillNames } from './_refs.mjs';
+import { normalizeReadRefs, discoverSkillNames } from './refs.mjs';
 
-const hooksDir = fileURLToPath(new URL('.', import.meta.url));
-const projectRootFallback = resolve(hooksDir, '../..');
+const libDir = fileURLToPath(new URL('.', import.meta.url));
+/** lib/ → hooks/ → .cursor/ → repo root */
+const projectRootFallback = resolve(libDir, '../../..');
 
 /** 既定フェーズ（議論・調査のみ。コード不可） */
 export const PHASE_DISCUSSION = 'discussion';

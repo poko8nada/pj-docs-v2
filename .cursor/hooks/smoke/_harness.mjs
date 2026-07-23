@@ -20,8 +20,8 @@ import {
   disableBootstrap,
   enableBootstrap,
   isBootstrapActive,
-} from '../_bootstrap.mjs';
-import { clearStubTurn, isStubTurnActive, lastStubPath } from '../_mentor.mjs';
+} from '../lib/bootstrap.mjs';
+import { clearStubTurn, isStubTurnActive, lastStubPath } from '../lib/mentor.mjs';
 import {
   findStateFileName,
   formatJstIso,
@@ -33,9 +33,10 @@ import {
   purgeStaleStates,
   readLastPromptId,
   STATE_TTL_DAYS,
-} from '../_state.mjs';
-import { buildReviewTaskInjection, collectReviewDiff, isReviewablePath } from '../_review.mjs';
-import { isCheckToolingReady, runFormatLint } from '../_check.mjs';
+  workspaceRoot,
+} from '../lib/state.mjs';
+import { buildReviewTaskInjection, collectReviewDiff, isReviewablePath } from '../lib/review.mjs';
+import { isCheckToolingReady, runFormatLint } from '../lib/check.mjs';
 
 const smokeDir = fileURLToPath(new URL('.', import.meta.url));
 /** hooks ディレクトリ（本番スクリプトの場所） */
@@ -164,6 +165,7 @@ export function createSmokeCtx() {
     purgeStaleStates,
     readLastPromptId,
     STATE_TTL_DAYS,
+    workspaceRoot,
     bootstrapMarkerPath,
     disableBootstrap,
     enableBootstrap,

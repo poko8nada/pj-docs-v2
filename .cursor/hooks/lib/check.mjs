@@ -4,7 +4,7 @@
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { isExcludedFromReviewTrack } from './_review.mjs';
+import { isExcludedFromReviewTrack } from './review.mjs';
 
 const FORMAT_LINT_EXT = /\.(ts|tsx|js|jsx|mjs|cjs)$/i;
 const TYPECHECK_EXT = /\.(ts|tsx)$/i;

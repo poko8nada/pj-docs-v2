@@ -166,7 +166,7 @@ export function runMentorStub(smoke) {
     const allowShellRo = run('gate.mjs', {
       ...mentorBase,
       hook_event_name: 'beforeShellExecution',
-      command: 'ls .cursor/hooks/_mentor.mjs',
+      command: 'ls .cursor/hooks/lib/mentor.mjs',
     });
     assert(
       'mentor allows readonly shell',

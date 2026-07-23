@@ -1,5 +1,5 @@
 /**
- * _gate-core.mjs — gate 本体（許可/拒否のみ。state は書かない）
+ * gate-core.mjs — gate 本体（許可/拒否のみ。state は書かない）
  * 入口は `gate.mjs`（bootstrap 救命胴衣）。ここを壊しても entry が bootstrap 中は allow できる。
  *
  * | Event              | Checks                                              |
@@ -14,17 +14,17 @@ import {
   isBootstrapActive,
   isBootstrapMarkerPath,
   isShellWriteToBootstrapMarker,
-} from './_bootstrap.mjs';
-import { DENY_MENTOR, isMentorCodeBlocked, isMentorDeniedPath } from './_mentor.mjs';
-import { logHookIds } from './_id-log.mjs';
-import { commandIncludesGitCommit, denyReviewMessage, isReviewablePath } from './_review.mjs';
-import { denyRefsMessage, missingRefs, requiredRefsForPath } from './_refs.mjs';
+} from './bootstrap.mjs';
+import { DENY_MENTOR, isMentorCodeBlocked, isMentorDeniedPath } from './mentor.mjs';
+import { logHookIds } from './id-log.mjs';
+import { commandIncludesGitCommit, denyReviewMessage, isReviewablePath } from './review.mjs';
+import { denyRefsMessage, missingRefs, requiredRefsForPath } from './refs.mjs';
 import {
   commandIncludesGhIssueMutation,
   denyIssueMessage,
   isIssueReady,
   isSpecFlowPhase,
-} from './_issue.mjs';
+} from './issue.mjs';
 import {
   conversationId,
   isReviewBlocking,
@@ -35,8 +35,8 @@ import {
   stateDir,
   WORK_PHASES,
   workspaceRoot,
-} from './_state.mjs';
-import { playDenySound } from './_notify-deny.mjs';
+} from './state.mjs';
+import { playDenySound } from './notify-deny.mjs';
 
 const WRITE_TOOLS = new Set(['Write', 'StrReplace', 'Delete', 'EditNotebook']);
 

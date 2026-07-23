@@ -21,7 +21,14 @@ export function runPhaseCore(smoke) {
     unlinkSync,
     writeFileSync,
     join,
+    workspaceRoot,
   } = smoke;
+  // lib/ 移動後も payload 無しの root fallback がリポジトリ根を指すこと
+  assert(
+    'workspaceRoot fallback is repo root',
+    workspaceRoot({}) === root,
+    String(workspaceRoot({})),
+  );
   // 0. sessionStart はファイルを作らない。初回発話で discussion を実体化。
   {
     onSessionStart(root);

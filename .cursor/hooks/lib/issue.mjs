@@ -5,8 +5,8 @@
  * Goal/Discover/Build テンプレ Read → read.refs に `issue/<template>.md`（isIssueReady が参照）。
  */
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
-import { normalizeReadRefs } from './_refs.mjs';
-import { SPEC_FLOW_PHASES } from './_state.mjs';
+import { normalizeReadRefs } from './refs.mjs';
+import { SPEC_FLOW_PHASES } from './state.mjs';
 
 export const ISSUE_SKILL_REL = '.cursor/skills/issue/SKILL.md';
 const ISSUE_REFS_DIR = '.cursor/skills/issue/references';

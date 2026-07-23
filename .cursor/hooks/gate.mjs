@@ -2,16 +2,16 @@
 /**
  * gate.mjs — 薄い入口（bootstrap 救命胴衣）。
  *
- * hooks.json はここを指す。本体は `_gate-core.mjs`。
+ * hooks.json はここを指す。本体は `lib/gate-core.mjs`。
  * 本体の import / 実行が壊れても、bootstrap 中なら allow して修復可能にする。
- * （entry 自体と `_bootstrap.mjs` は壊さないこと。）
+ * （entry 自体と `lib/bootstrap.mjs` は壊さないこと。）
  */
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isBootstrapActive } from './_bootstrap.mjs';
-import { playDenySound } from './_notify-deny.mjs';
+import { isBootstrapActive } from './lib/bootstrap.mjs';
+import { playDenySound } from './lib/notify-deny.mjs';
 
-/** entry は _state に依存しない（state 壊れでも bootstrap 救済できるように） */
+/** entry は lib/state に依存しない（state 壊れでも bootstrap 救済できるように） */
 const PROJECT_ROOT_FALLBACK = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
 function workspaceRoot(payload) {
@@ -49,7 +49,7 @@ function coreModuleUrl() {
   if (process.env.CURSOR_GATE_CORE_PATH) {
     return pathToFileURL(resolve(process.env.CURSOR_GATE_CORE_PATH)).href;
   }
-  return new URL('./_gate-core.mjs', import.meta.url).href;
+  return new URL('./lib/gate-core.mjs', import.meta.url).href;
 }
 
 async function main() {

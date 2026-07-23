@@ -9,14 +9,14 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { logHookIds } from './_id-log.mjs';
+import { logHookIds } from './lib/id-log.mjs';
 import {
   loadState,
   onSessionStart,
   resolveConversationIdFromPayload,
   statePathRelative,
   workspaceRoot,
-} from './_state.mjs';
+} from './lib/state.mjs';
 
 // null = 無制限 / 数値 = 文字数で機械カット
 const MAX_CONTEXT_CHARS = 16000;

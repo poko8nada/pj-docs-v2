@@ -8,9 +8,9 @@ disable-model-invocation: true
 
 # bootstrap
 
-**User-only rescue.** When the gate is broken (e.g. phase/unlock out of sync, or `_gate-core.mjs` throws), normal work phases cannot unlock code edits. `/bootstrap` turns on a temporary bypass so harness files can be fixed.
+**User-only rescue.** When the gate is broken (e.g. phase/unlock out of sync, or `lib/gate-core.mjs` throws), normal work phases cannot unlock code edits. `/bootstrap` turns on a temporary bypass so harness files can be fixed.
 
-`gate.mjs` is a thin entry: if the core fails to load or run while bootstrap is on, the entry still returns allow. Keep the entry and `_bootstrap.mjs` healthy — those are the life raft.
+`gate.mjs` is a thin entry: if the core fails to load or run while bootstrap is on, the entry still returns allow. Keep the entry and `lib/bootstrap.mjs` healthy — those are the life raft.
 
 Does **not** change phase or unlock progress. Creates `.cursor/hooks/.bootstrap` only.
 

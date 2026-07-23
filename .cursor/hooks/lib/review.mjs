@@ -4,8 +4,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
-import { isBootstrapMarkerPath } from './_bootstrap.mjs';
-import { isUnderStateDir } from './_state.mjs';
+import { isBootstrapMarkerPath } from './bootstrap.mjs';
+import { isUnderStateDir } from './state.mjs';
 
 /** コード＋CSS＋HTMLのみ（md/json/yaml は Issue 下書き等で gate を汚さない） */
 const REVIEWABLE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|css|html)$/i;

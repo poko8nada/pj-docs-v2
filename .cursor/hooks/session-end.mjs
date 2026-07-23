@@ -2,8 +2,8 @@
 /**
  * sessionEnd — bootstrap マーカーを消す（付けっぱなし防止）。fire-and-forget。
  */
-import { disableBootstrap } from './_bootstrap.mjs';
-import { workspaceRoot } from './_state.mjs';
+import { disableBootstrap } from './lib/bootstrap.mjs';
+import { workspaceRoot } from './lib/state.mjs';
 
 async function readStdinJson() {
   const chunks = [];

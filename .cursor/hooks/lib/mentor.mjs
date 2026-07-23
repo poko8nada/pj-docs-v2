@@ -4,8 +4,8 @@
  */
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isReviewablePath } from './_review.mjs';
-import { formatJstIso, isUnknownConversationId, stateDir } from './_state.mjs';
+import { isReviewablePath } from './review.mjs';
+import { formatJstIso, isUnknownConversationId, stateDir } from './state.mjs';
 
 export const LAST_STUB_FILENAME = 'last-stub';
 

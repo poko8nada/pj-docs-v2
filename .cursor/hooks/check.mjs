@@ -7,8 +7,8 @@
  * | stop | pending があれば format/lint/typecheck → 失敗時 followup（loop_count 制限） |
  * | beforeSubmitPrompt | leftover pending をフラッシュ（stop 漏れの保険） |
  */
-import { buildCheckFollowup, runFormatLint } from './_check.mjs';
-import { logHookIds } from './_id-log.mjs';
+import { buildCheckFollowup, runFormatLint } from './lib/check.mjs';
+import { logHookIds } from './lib/id-log.mjs';
 import {
   conversationId,
   isUnlocked,
@@ -16,7 +16,7 @@ import {
   normalizeCheck,
   resetCheck,
   workspaceRoot,
-} from './_state.mjs';
+} from './lib/state.mjs';
 
 async function readStdinJson() {
   const chunks = [];
