@@ -12,13 +12,12 @@ Small, bounded changes only: typos, harness tweaks, meta fixes, and other light 
 
 ## On entry
 
-Inspect the repo (and issues only if relevant). Then present **Context / Understanding / Proposal** in one message — exact scope you intend to touch, not a question dump.
+Inspect the repo (and issues only if relevant).
 
-Typical anchors:
-
-- Request is clearly tiny (typo, harness, meta, light fix) → propose **that exact scope**, then edit after agreement
-- Request is actually Goal / Discover / Build product work → say so; user invokes `/work` (or `/discussion` first)
-- Scope starts creeping mid-work → **stop**, restate Understanding / Proposal, or ask the user to switch phase
+- **Scope clear** from the user (files named, `/chore` with a concrete ask) → state the exact touch list briefly, then edit after `rules` handshake.
+- **Scope unclear** → agree exact files and one concern in chat before editing. Not a question dump.
+- **Actually product work** → say so; user invokes `/work` (or `/discussion` first).
+- **Scope creeps mid-work** → stop, restate the agreed touch list, or ask the user to switch phase.
 
 Revise until the user agrees the scope. Do not start editing on a vague “fix stuff”.
 

@@ -11,8 +11,8 @@ Put a short slug on the current conversation state (`label` field). Helps when r
 
 ## When
 
-- Discussion Flow step **Label** — before handing off to another phase (required once the topic is clear)
-- Topic of the session becomes clear earlier (optional, same script)
+- Discussion Flow step **Label** — once **Theme** is stable (required before handing off to another phase)
+- Theme becomes clear earlier (optional, same script)
 - Topic changes enough that the old label is misleading
 
 ## How (agent runs this)

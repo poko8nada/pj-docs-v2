@@ -26,7 +26,7 @@ Internal planning (Concept & Goals, Stack rationale, Architecture, Roadmap) belo
 
 ## On entry
 
-Inspect the existing `README.md` (and `package.json` / manifests for inference). Present **Context / Understanding / Proposal** in one message — Mode A or B, which sections change, what (if anything) should move to Goal / Discover / Build issues.
+Inspect the existing `README.md` (and `package.json` / manifests for inference). Recommend **Mode A or B**, which sections change, and what (if anything) should move to Goal / Discover / Build issues. Agree before Write.
 
 Revise until the user agrees. Do not Write `README.md` on a vague “improve the readme”.
 
@@ -99,7 +99,7 @@ Ask only when missing and material.
 
 ## Flow
 
-1. Agree Mode + Proposal with the user.
+1. Agree Mode + scope with the user.
 2. Before editing `README.md`, ensure a work phase (`/chore` is enough for README-only) and Read `.cursor/skills/rules/SKILL.md`, then follow `rules`.
 3. If relocating internal sections to Goal / Discover / Build issues, use `issue` skill after the user agrees — do not invent an issue rewrite without approval.
 4. Confirm: list what changed and what was moved or deferred.

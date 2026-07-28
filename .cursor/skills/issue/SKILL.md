@@ -15,9 +15,9 @@ Do **not** invent product work or re-argue decisions here. If the caller already
 
 ## When called
 
-**From a phase skill (usual):** agreement and content are already settled. Skip Context / Understanding / Proposal. Read the matching template → create or update → soft comments as needed.
+**From a phase skill (usual):** agreement and content are already settled. Skip scope chat. Read the matching template → create or update → soft comments as needed.
 
-**Standalone / unclear:** present **Context / Understanding / Proposal** in one message (what issue, why now, title). Revise until agreed, then proceed.
+**Standalone / unclear:** agree in chat what issue, why now, and title (brief — not `discussion` Scope agreement unless session direction is unsettled). Revise until agreed, then proceed.
 
 **Chore:** only create/update when the user asks.
 

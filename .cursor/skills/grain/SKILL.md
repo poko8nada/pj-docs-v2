@@ -49,7 +49,7 @@ Always evaluate Visceral and Behavioral separately. Good looks must not mask con
 
 ## On entry — pick Mode
 
-Inspect the repo and open `[Goal]` / `[Discover]` / `[Build]` when useful (read-only). Prefer the **target UI or look**. Present **Context / Understanding / Proposal** for the Mode.
+Inspect the repo and open `[Goal]` / `[Discover]` / `[Build]` when useful (read-only). Prefer the **target UI or look**. Recommend a **Mode** and why; agree before Steps.
 
 - No agreed style language → **Define**
 - UI / look exists, needs review → **Audit**

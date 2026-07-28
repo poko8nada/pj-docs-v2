@@ -71,14 +71,17 @@ Execute may include soft runs, `findings/`, cheap media, product edits, and even
 
 **Handshake:** File edits → Read `.cursor/skills/rules/SKILL.md`, then a matching `rules/references/*`. Issue create/update → Read `.cursor/skills/issue/SKILL.md`, then `goal` / `discover` / `build` template.
 
-Inspect open `[Goal]` / `[Discover]` / `[Build]` and `findings/` as needed. Present **Context / Understanding / Proposal** — session scope + which situation below + first inventory/slice move. Not a question dump.
+Inspect open `[Goal]` / `[Discover]` / `[Build]` and `findings/` as needed.
+
+- **Scope already agreed** (discussion, or user named the slice) → start **inventory** or the agreed slice; no ceremony.
+- **Scope unclear** → name `/discussion` or confirm session scope in chat (situation + first inventory move). Not a question dump.
 
 Then Read the matching reference and stay on the rail:
 
 - **Goal / Discover** (axes, softs, cheap media, open Build when ready) → `references/goal-discover.md`
 - **Build** (Roadmap / Test / Deploy + product code; softs still OK) → `references/build.md`
 
-Scope unclear or changed → name `/discussion`. Do not redefine the session goal here.
+Scope changed mid-session → name `/discussion`. Do not redefine session direction here.
 
 ## Hard limits
 
