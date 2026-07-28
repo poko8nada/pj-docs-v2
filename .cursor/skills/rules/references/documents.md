@@ -10,7 +10,7 @@ Apply when writing or modifying `.md` / `.mdc` body shape. Issue / README substa
 ## Placement
 
 - Keep document source next to what it describes when it is local notes; product docs follow repo layout (`README` at root, templates under skills).
-- Do not put Spec / issue substance into ad-hoc markdown — those skills own the content.
+- Do not put Goal / Discover / Build / README substance into ad-hoc markdown — `issue` / `readme` skills own the content.
 
 ## Writing
 

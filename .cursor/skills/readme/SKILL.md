@@ -3,30 +3,30 @@ name: readme
 description: >-
   Generate or improve root README.md for external audiences (Overview, Getting Started,
   Usage, Contributing, License). Use when the user asks to create, rewrite, or clean up
-  README.md. Internal planning belongs in the Spec issue — not in the README.
+  README.md. Internal planning belongs in Goal / Discover / Build issues — not in the README.
 ---
 
 # readme
 
 Write or improve root `README.md` for people who install or use the project.
 
-Internal planning (Concept & Goals, Stack rationale, Architecture, Roadmap) belongs in the GitHub `[Spec]` issue — not in the README. If the current README has that material, propose moving it to Spec via `issue` skill (work phase).
+Internal planning (Concept & Goals, Stack rationale, Architecture, Roadmap) belongs in GitHub `[Goal]` / `[Discover]` / `[Build]` issues — not in the README. If the current README has that material, propose moving it to the right issue via `issue` skill (work phase).
 
 ## What you own
 
 - README structure and external-facing copy
 - Badges, section order, optional sections when applicable
-- Propose moving internal planning out of README into Spec
+- Propose moving internal planning out of README into Goal / Discover / Build issues
 
 ## What you do not own
 
-- Spec / Design / Forge / Refine body writing — `issue` + phase skills
+- Goal / Discover / Build body writing — `issue` + phase skills
 - Product or harness code — `rules` (after work-phase handshake)
-- Creating Spec just to park README leftovers — only when the user agrees
+- Creating Goal / Discover / Build issues just to park README leftovers — only when the user agrees
 
 ## On entry
 
-Inspect the existing `README.md` (and `package.json` / manifests for inference). Present **Context / Understanding / Proposal** in one message — Mode A or B, which sections change, what (if anything) should move to Spec.
+Inspect the existing `README.md` (and `package.json` / manifests for inference). Present **Context / Understanding / Proposal** in one message — Mode A or B, which sections change, what (if anything) should move to Goal / Discover / Build issues.
 
 Revise until the user agrees. Do not Write `README.md` on a vague “improve the readme”.
 
@@ -85,7 +85,7 @@ Preserve good content. Fill gaps, fix order, drop or relocate internal planning.
 ### Do not put in README
 
 - Concept & Goals, Stack & Key Decisions, Architecture, Roadmap, agent/harness internals
-- Point readers to Spec / issues / `AGENTS.md` only when truly needed for contributors — prefer Contributing stay thin
+- Point readers to Goal / Discover / Build issues / `AGENTS.md` only when truly needed for contributors — prefer Contributing stay thin
 
 ## Inference
 
@@ -101,7 +101,7 @@ Ask only when missing and material.
 
 1. Agree Mode + Proposal with the user.
 2. Before editing `README.md`, ensure a work phase (`/chore` is enough for README-only) and Read `.cursor/skills/rules/SKILL.md`, then follow `rules`.
-3. If relocating internal sections to Spec, use `issue` skill after the user agrees — do not invent a Spec rewrite without approval.
+3. If relocating internal sections to Goal / Discover / Build issues, use `issue` skill after the user agrees — do not invent an issue rewrite without approval.
 4. Confirm: list what changed and what was moved or deferred.
 
 ## Hard limits

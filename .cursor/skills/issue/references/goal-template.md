@@ -19,9 +19,25 @@ Use for the Goal issue body. One Goal per product. Covenant: What is this / Goal
 
 ### How to write
 
-- **What is this** — one line (form: app/web/API/… + what it does). Then why: 1–3 bullets.
-- **Goal** — one line covenant. Then why: 1–3 bullets.
-- **Non-goal** — bullets only (short). Optional `(why: …)` on a bullet.
+Covenant = **outcome** (who changes how, and why it matters) — not features, stack, or screens. Discover may inform Goal; distill upward from concrete material, do not copy Discover axes into Goal.
+
+- **What is this** — one line: who + situation + problem or need (form: app/web/API/… is optional, last). Then why: 1–3 bullets.
+- **Goal** — one line covenant (measurable or observable outcome when possible). Then why: 1–3 bullets.
+- **Non-goal** — bullets only (short). Things a reasonable reader might expect but this project deliberately excludes. Optional `(why: …)` — deferred / rejected / out-of-domain.
+
+**Abstraction test (Goal):** Ask why up to three times. If the answer is a feature, screen, technology, or MVP list → that belongs on Discover or Build, not Goal.
+
+**Good Goal (outcome):** Help small teams agree what they are building before they over-specify.
+
+**Bad Goal (feature in disguise):** Build a Next.js app with drag-and-drop and real-time sync.
+
+**Do not put in Goal** — feature names, UI flows, stack choices, MVP/Later lists, roadmap rows. Those live on Discover (Name / Look / Stack / Features) or Build (Roadmap).
+
+**Non-goal shapes (pick one per bullet when useful):**
+
+- Deferred — out of scope now; tracked elsewhere `(why: …)`
+- Rejected — decided not to pursue `(why: …)`
+- Out-of-domain — owned elsewhere or not this product's job `(why: …)`
 
 <!-- FOR AGENT — do not edit. Operating instructions. -->
 
@@ -30,25 +46,18 @@ Use for the Goal issue body. One Goal per product. Covenant: What is this / Goal
 ## What is this
 
 - [ ] agreed
-<!-- 1 line: form + what. Then why: 1–3 bullets. -->
-
-
-
+<!-- 1 line: who + situation + need. Form optional. Then why: 1–3 bullets. -->
 
 ## Goal
 
 - [ ] agreed
-<!-- 1 line covenant. Then why: 1–3 bullets. -->
-
-
-
+<!-- 1 line outcome covenant. Then why: 1–3 bullets. Not features/stack/screens. -->
 
 ## Non-goal
 
 - [ ] agreed
-<!-- Bullets only. Optional (why: …) per bullet. -->
+<!-- Bullets: expected-but-excluded. Optional (why: …). Deferred / rejected / out-of-domain. -->
 
-- 
-- 
-
+-
+-
 ```
