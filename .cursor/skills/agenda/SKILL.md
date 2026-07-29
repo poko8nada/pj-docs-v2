@@ -1,20 +1,20 @@
 ---
-name: plan
+name: agenda
 description: >-
-  Build the session work plan for /work: inventory, then thin vertical slices as a table.
-  A slice is one row — one verifiable concern. Agent or user may start this; unlock.plan opens on Read (work only).
-  Always get explicit user agreement before execute — do not implement in the same turn as first presenting the plan.
+  Build the session work agenda for /work: inventory, then thin vertical slices as a table.
+  A slice is one row — one verifiable concern. Agent or user may start this; unlock.agenda opens on Read (work only).
+  Always get explicit user agreement before execute — do not implement in the same turn as first presenting the agenda.
 ---
 
-# plan
+# agenda
 
-Own **how product `/work` is cut into slices**. Session direction stays in `discussion` / `scope`. Harness meta stays in `/chore` (no `unlock.plan` there).
+Own **how product `/work` is cut into slices**. Session direction stays in `discussion` / `scope`. Harness meta stays in `/chore` (no `unlock.agenda` there).
 
-**Harness:** Reading this file in **work** sets `unlock.plan: true`. discussion / chore keep `unlock.plan: null` (not gated). File edits in work still need `unlock.scope` and `unlock.rules`.
+**Harness:** Reading this file in **work** sets `unlock.agenda: true`. discussion / chore keep `unlock.agenda: null` (not gated). File edits in work still need `unlock.scope` and `unlock.rules`.
 
-**Agreement (required):** After presenting inventory and/or the slice table, **stop and wait for the user to agree** (which slice, or the whole plan) before Execute. Do not invent agreement. Do not start implementation in the same turn as the first plan dump.
+**Agreement (required):** After presenting inventory and/or the slice table, **stop and wait for the user to agree** (which slice, or the whole agenda) before Execute. Do not invent agreement. Do not start implementation in the same turn as the first agenda dump.
 
-Agent may draft the plan first; user may ask to plan — either is fine. Unlock by Read ≠ permission to code yet.
+Agent may draft the agenda first; user may ask for an agenda — either is fine. Unlock by Read ≠ permission to code yet.
 
 ## Slice
 
@@ -29,10 +29,11 @@ Do not invent slices from nothing:
 
 One row = one slice. **Includes** + **Test** + **Surface** on the same row enforce a vertical cut.
 
-```markdown
-| #   | What                   | Includes                               | Test         | Surface                          | Notes                    |
-| --- | ---------------------- | -------------------------------------- | ------------ | -------------------------------- | ------------------------ |
-| 1   | one verifiable concern | logic + wiring + surface in this slice | cmd or `N/A` | human observation on the product | `prerequisite:` optional |
+Chat shape (not a wide markdown table — columns stay short):
+
+```text
+# / What / Includes / Test / Surface / Notes
+1 / one concern / logic+wiring+surface / cmd or N/A / observe product / prerequisite: …
 ```
 
 | Column   | Write                                    | Do not write                        |
@@ -52,7 +53,7 @@ Situation references on `work` (`goal-discover.md`, `build.md`) say how to fill 
 
 **Avoid bundling:** full feature in one slice; horizontal cuts; merging slices because of a dependency (`prerequisite:` is a note, not a merge reason).
 
-**Agree in chat per slice** (or the plan as a whole) before execute. Issue body updates at milestones when needed — not after every slice by default.
+**Agree in chat per slice** (or the agenda as a whole) before execute. Issue body updates at milestones when needed — not after every slice by default.
 
 ## Rail
 
@@ -63,8 +64,8 @@ Inventory → Slice table → User agrees → Execute → Commit
 
 ## Hard limits
 
-- Do not execute before user agreement on the plan or the next slice.
+- Do not execute before user agreement on the agenda or the next slice.
 - Do not treat the Build issue as a durable list of slices — session slices stay in chat.
-- Do not run this gate for `/chore` — harness leaves `unlock.plan` null there.
+- Do not run this gate for `/chore` — harness leaves `unlock.agenda` null there.
 
 Hand off to `work` / `scope` / `issue` / `rules` by name — do not copy their contents here.

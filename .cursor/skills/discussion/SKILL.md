@@ -10,7 +10,7 @@ disable-model-invocation: true
 
 # discussion
 
-Agree **this session’s scope** via the `scope` skill. There is **no plan issue and no progress tracker** — the agent must **analyze** Goal / Discover / Build (bodies + soft comments), related `findings/`, and when Build is in play the **product code**, then **think** and respond. Do not ship here. Do not inventory→slice here — that is `/work` via the **`plan` skill**.
+Agree **this session’s scope** via the `scope` skill. There is **no plan issue and no progress tracker** — the agent must **analyze** Goal / Discover / Build (bodies + soft comments), related `findings/`, and when Build is in play the **product code**, then **think** and respond. Do not ship here. Do not inventory→slice here — that is `/work` via the **`agenda` skill**.
 
 **Default:** converse naturally. `AGENTS.md` **理解:** handles reception; do **not** open with a formatted scope block on every entry — but **do** Read `scope` and agree Theme (even when obvious) before handing off to hands-on.
 
@@ -67,7 +67,7 @@ Revise until the user agrees the **scope**. Do not drift into implementation or 
 - Do **not** create or update GitHub issues here — that belongs in `/work` (or `/chore`) via `issue`.
 - Do **not** run mutating `gh`/`git`, `pnpm`, or other shell that changes the repo.
 - Do **not** skip code reading when the session is Build-stage — scope judgment without code is incomplete.
-- Do **not** inventory→slice or lock a slice list here — `/work` + `plan` own that after scope is agreed.
-- Do **not** copy `scope` / `plan` / `work` / `chore` / soft skill contents here — hand off by name.
+- Do **not** inventory→slice or lock a slice list here — `/work` + `agenda` own that after scope is agreed.
+- Do **not** copy `scope` / `agenda` / `work` / `chore` / soft skill contents here — hand off by name.
 
-Hand off to `scope` / `plan` by name — do not copy their contents here.
+Hand off to `scope` / `agenda` by name — do not copy their contents here.

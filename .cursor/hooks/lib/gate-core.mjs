@@ -25,7 +25,7 @@ import {
   isIssueReady,
   isSpecFlowPhase,
 } from './issue.mjs';
-import { denyPlanMessage, isPlanReady } from './plan.mjs';
+import { denyAgendaMessage, isAgendaReady } from './agenda.mjs';
 import {
   conversationId,
   isReviewBlocking,
@@ -643,9 +643,9 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
     return deny(DENY_SCOPE);
   }
 
-  // plan: work のみ（chore は unlock.plan=null で対象外）。scope の次
-  if (inWorkPhase && !isPlanReady(state) && !isAllowedWithoutCodeUnlock(command, inWorkPhase)) {
-    return deny(denyPlanMessage(state));
+  // agenda: work のみ（chore は unlock.agenda=null で対象外）。scope の次
+  if (inWorkPhase && !isAgendaReady(state) && !isAllowedWithoutCodeUnlock(command, inWorkPhase)) {
+    return deny(denyAgendaMessage(state));
   }
 
   // mentor: コード path に触る書き込みうる Shell は stub 無しでは deny
@@ -715,9 +715,9 @@ export async function handleGate(payload) {
     return deny(DENY_SCOPE);
   }
 
-  // plan: work のみ（chore は対象外）。scope の次
-  if (WRITE_TOOLS.has(toolName) && inWorkPhase && !isPlanReady(state)) {
-    return deny(denyPlanMessage(state));
+  // agenda: work のみ（chore は対象外）。scope の次
+  if (WRITE_TOOLS.has(toolName) && inWorkPhase && !isAgendaReady(state)) {
+    return deny(denyAgendaMessage(state));
   }
 
   // mentor: コード系 path の編集は stub 無しでは deny（通常 unlock より上）

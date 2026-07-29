@@ -12,7 +12,7 @@ export function runPhaseCore(smoke) {
     trackReadTsRef,
     trackReadIssueSkill,
     trackReadScope,
-    trackReadPlan,
+    trackReadAgenda,
     trackReadBuildTemplate,
     stateAbs,
     readState,
@@ -243,7 +243,7 @@ export function runPhaseCore(smoke) {
     const out = run('track.mjs', {
       ...base,
       hook_event_name: 'beforeSubmitPrompt',
-      prompt: '/work lock plan',
+      prompt: '/work go',
     });
     assert('track-phase continue', out.continue === true, JSON.stringify(out));
     assert(
@@ -257,7 +257,7 @@ export function runPhaseCore(smoke) {
       st.phase === 'work' &&
         st.unlock.rules === false &&
         st.unlock.issue === false &&
-        st.unlock.plan === false &&
+        st.unlock.agenda === false &&
         st.unlock.issueTemplate === undefined,
       JSON.stringify(st),
     );
@@ -303,44 +303,44 @@ export function runPhaseCore(smoke) {
       tool_input: { path: join(root, 'utils/foo.ts') },
     });
     assert(
-      'scope open Write deny is gate-plan',
+      'scope open Write deny is gate-agenda',
       outAfterScope.permission === 'deny' &&
-        String(outAfterScope.agent_message).includes('[gate-plan]') &&
+        String(outAfterScope.agent_message).includes('[gate-agenda]') &&
         !String(outAfterScope.agent_message).includes('[gate-scope]'),
       JSON.stringify(outAfterScope),
     );
 
-    const outPnpmInstallPlan = run('gate.mjs', {
+    const outPnpmInstallAgenda = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'pnpm install',
     });
     assert(
-      'scope open pnpm install deny is gate-plan',
-      outPnpmInstallPlan.permission === 'deny' &&
-        String(outPnpmInstallPlan.agent_message).includes('[gate-plan]'),
-      JSON.stringify(outPnpmInstallPlan),
+      'scope open pnpm install deny is gate-agenda',
+      outPnpmInstallAgenda.permission === 'deny' &&
+        String(outPnpmInstallAgenda.agent_message).includes('[gate-agenda]'),
+      JSON.stringify(outPnpmInstallAgenda),
     );
 
-    trackReadPlan(base);
+    trackReadAgenda(base);
     assert(
-      'plan Read opens unlock.plan',
-      loadState(root, id).unlock.plan === true,
+      'agenda Read opens unlock.agenda',
+      loadState(root, id).unlock.agenda === true,
       JSON.stringify(loadState(root, id)),
     );
 
-    const outAfterPlan = run('gate.mjs', {
+    const outAfterAgenda = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
       tool_input: { path: join(root, 'utils/foo.ts') },
     });
     assert(
-      'plan open still denies Write without rules',
-      outAfterPlan.permission === 'deny' &&
-        String(outAfterPlan.agent_message).includes('rules≠true') &&
-        !String(outAfterPlan.agent_message).includes('[gate-plan]'),
-      JSON.stringify(outAfterPlan),
+      'agenda open still denies Write without rules',
+      outAfterAgenda.permission === 'deny' &&
+        String(outAfterAgenda.agent_message).includes('rules≠true') &&
+        !String(outAfterAgenda.agent_message).includes('[gate-agenda]'),
+      JSON.stringify(outAfterAgenda),
     );
 
     const outGhList = run('gate.mjs', {
@@ -385,7 +385,7 @@ export function runPhaseCore(smoke) {
       command: 'pnpm install',
     });
     assert(
-      'plan open pnpm install deny is rules',
+      'agenda open pnpm install deny is rules',
       outPnpmInstallRules.permission === 'deny' &&
         String(outPnpmInstallRules.agent_message).includes('rules≠true'),
       JSON.stringify(outPnpmInstallRules),
@@ -493,11 +493,11 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 8b. work のあと scope + plan + rules Read で解禁
+  // 8b. work のあと scope + agenda + rules Read で解禁
   {
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/work go' });
     trackReadScope(base);
-    trackReadPlan(base);
+    trackReadAgenda(base);
     const out = run('track.mjs', {
       ...base,
       hook_event_name: 'beforeReadFile',

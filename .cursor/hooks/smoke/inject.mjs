@@ -19,7 +19,7 @@ export function runInjectGateListing(smoke) {
       ctx.slice(0, 400),
     );
     assert('inject includes live scope', ctx.includes('unlock.scope:'), ctx.slice(0, 400));
-    assert('inject includes live plan', ctx.includes('unlock.plan:'), ctx.slice(0, 400));
+    assert('inject includes live agenda', ctx.includes('unlock.agenda:'), ctx.slice(0, 400));
     assert(
       'inject mentions refs gate',
       ctx.includes('Gate rules') && ctx.includes('read.refs') && ctx.includes('skill/name.md'),

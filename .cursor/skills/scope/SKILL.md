@@ -15,7 +15,7 @@ Lock **what this session is about**, set a short `label`, and open the harness s
 **Open:** Reading this file sets `unlock.scope` true (any phase).
 **Close:** User sends `/discussion` — harness clears `unlock.scope`. No separate close command.
 
-Callers (`discussion` / `work` / `chore` / `issue`, etc.) decide *when* direction is unsettled; this skill owns the agreement shape, label, and gate open.
+Callers (`discussion` / `work` / `chore` / `issue`, etc.) decide _when_ direction is unsettled; this skill owns the agreement shape, label, and gate open.
 
 ## When to use
 
@@ -45,11 +45,11 @@ Light case: **Theme** alone in prose is enough. Use the full block when in/out b
 - …
 ```
 
-| Field        | Write                                          | Do not write                         |
-| ------------ | ---------------------------------------------- | ------------------------------------ |
-| Theme        | One-line umbrella for this conversation beat   | Issue body regurgitation, file lists |
-| In scope     | 1–3 bullets — what we treat now                | Slice table, implementation steps    |
-| Out of scope | 1–3 bullets — what we deliberately exclude now | Straw men nobody would ask for       |
+| Field        | Write                           | Do not write                 |
+| ------------ | ------------------------------- | ---------------------------- |
+| Theme        | One-line umbrella for this beat | Issue dump, file lists       |
+| In scope     | 1–3 bullets — treat now         | Slice table, implement steps |
+| Out of scope | 1–3 bullets — exclude now       | Straw men nobody asks for    |
 
 **Good (Goal discussion):**
 

@@ -19,7 +19,7 @@ Inspect the repo (and issues only if relevant).
 - **Actually product work** → say so; user invokes `/work` (or `/discussion` first).
 - **Scope creeps mid-work** → stop, restate the agreed touch list, or ask the user to switch phase (`/discussion` closes harness scope).
 
-Harness: edits need `unlock.scope` (Read `.cursor/skills/scope/SKILL.md`) **before** `unlock.rules`. `/discussion` closes scope. **`unlock.plan` is null here** — product planning is `/work` only.
+Harness: edits need `unlock.scope` (Read `.cursor/skills/scope/SKILL.md`) **before** `unlock.rules`. `/discussion` closes scope. **`unlock.agenda` is null here** — product planning is `/work` only.
 
 Revise until the user agrees the scope. Do not start editing on a vague “fix stuff”.
 
