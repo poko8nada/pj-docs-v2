@@ -280,6 +280,7 @@ export function defaultUnlock(phase = PHASE_DISCUSSION) {
   return {
     rules: normalizeRules(p, null),
     issue: normalizeIssue(p, null),
+    plan: normalizePlan(p, null),
     scope: false,
   };
 }
@@ -291,7 +292,7 @@ export function defaultRead() {
 /**
  * @returns {{
  *   phase: string,
- *   unlock: { rules: boolean | null, issue: boolean | null, scope: boolean },
+ *   unlock: { rules: boolean | null, issue: boolean | null, plan: boolean | null, scope: boolean },
  *   read: { skills: string[], refs: string[] },
  *   review: ReturnType<typeof defaultReview>,
  *   check: ReturnType<typeof defaultCheck>,
@@ -350,11 +351,18 @@ export function normalizeImplement(phase, implement) {
   return normalizeRules(phase, implement);
 }
 
-/** discussion / chore → null。Spec-flow → true/false のみ */
+/** discussion / chore → null。Spec-flow（work）→ true/false のみ */
 export function normalizeIssue(phase, issue) {
   const p = normalizePhase(phase);
   if (!SPEC_FLOW_PHASES.has(p)) return null;
   return issue === true;
+}
+
+/** discussion / chore → null。work → true/false のみ（plan スキル Read で true） */
+export function normalizePlan(phase, plan) {
+  const p = normalizePhase(phase);
+  if (!SPEC_FLOW_PHASES.has(p)) return null;
+  return plan === true;
 }
 
 /** 旧 `unlock.implement` を `rules` に読み替える */
@@ -368,6 +376,7 @@ export function normalizeUnlock(phase, unlock) {
   return {
     rules: normalizeRules(phase, rulesFromUnlockSrc(src)),
     issue: normalizeIssue(phase, src.issue),
+    plan: normalizePlan(phase, src.plan),
     scope: normalizeScope(src.scope),
   };
 }
@@ -451,7 +460,7 @@ export function loadState(root, id) {
  * @param {string} id
  * @param {{
  *   phase?: string,
- *   unlock?: Partial<{ rules: boolean | null, implement: boolean | null, issue: boolean | null, scope: boolean }>,
+ *   unlock?: Partial<{ rules: boolean | null, implement: boolean | null, issue: boolean | null, plan: boolean | null, scope: boolean }>,
  *   read?: Partial<{ skills: string[], refs: string[] }>,
  *   review?: unknown,
  *   check?: unknown,
@@ -483,6 +492,7 @@ export function saveState(root, id, state) {
     unlock: normalizeUnlock(phase, {
       rules: nextRules,
       issue: unlockPatch.issue !== undefined ? unlockPatch.issue : prev.unlock.issue,
+      plan: unlockPatch.plan !== undefined ? unlockPatch.plan : prev.unlock.plan,
       scope: unlockPatch.scope !== undefined ? unlockPatch.scope : prev.unlock.scope,
     }),
     read: normalizeRead(

@@ -22,6 +22,7 @@ import {
 } from './lib/review.mjs';
 import { skillRefIdFromPath } from './lib/refs.mjs';
 import { ISSUE_SKILL_REL } from './lib/issue.mjs';
+import { PLAN_SKILL_REL } from './lib/plan.mjs';
 import { isCheckablePath } from './lib/check.mjs';
 import { logHookIds } from './lib/id-log.mjs';
 import {
@@ -123,6 +124,17 @@ function isIssueSkill(root, filePath) {
   }
 }
 
+function isPlanSkill(root, filePath) {
+  if (!filePath) return false;
+  try {
+    const abs = realpathSync(isAbsolute(filePath) ? filePath : resolve(root, filePath));
+    const target = realpathSync(join(root, PLAN_SKILL_REL));
+    return abs === target;
+  } catch {
+    return false;
+  }
+}
+
 /** 任意の `.cursor/skills/<name>/SKILL.md` Read → read.skills */
 function maybeMarkReadSkill(root, payload) {
   const filePath = filePathFromPayload(payload);
@@ -141,6 +153,19 @@ function maybeUnlockIssue(root, payload) {
   saveState(root, id, {
     phase: prev.phase,
     unlock: { ...prev.unlock, issue: true },
+  });
+}
+
+/** plan スキル Read → work のみ unlock.plan を開く */
+function maybeUnlockPlan(root, payload) {
+  const filePath = filePathFromPayload(payload);
+  if (!isPlanSkill(root, String(filePath))) return;
+  const id = conversationId(payload);
+  const prev = loadState(root, id);
+  if (!SPEC_FLOW_PHASES.has(prev.phase)) return;
+  saveState(root, id, {
+    phase: prev.phase,
+    unlock: { ...prev.unlock, plan: true },
   });
 }
 
@@ -223,12 +248,17 @@ function handleBeforeSubmitPrompt(root, payload) {
   const read = defaultRead();
 
   if (phase === PHASE_DISCUSSION) {
-    unlock = { rules: null, issue: null, scope: false };
+    unlock = { rules: null, issue: null, plan: null, scope: false };
   } else if (phase === 'chore') {
-    unlock = { rules: false, issue: null, scope: prev.unlock.scope === true };
+    unlock = { rules: false, issue: null, plan: null, scope: prev.unlock.scope === true };
   } else {
-    // work — rules on entry; issue stays false until issue writes; scope は維持
-    unlock = { rules: false, issue: false, scope: prev.unlock.scope === true };
+    // work — rules/issue/plan on entry; scope は維持
+    unlock = {
+      rules: false,
+      issue: false,
+      plan: false,
+      scope: prev.unlock.scope === true,
+    };
   }
 
   // mentor はフェーズ変更でも維持。scope は /discussion でのみ閉じる（上で false）
@@ -341,6 +371,7 @@ async function main() {
   if (isReadEvent) {
     maybeMarkReadSkill(root, payload);
     maybeUnlockIssue(root, payload);
+    maybeUnlockPlan(root, payload);
     maybeUnlockRules(root, payload);
     maybeOpenScope(root, payload);
     maybeMarkReadRef(root, payload);

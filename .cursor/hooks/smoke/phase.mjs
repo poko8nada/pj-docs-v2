@@ -12,6 +12,7 @@ export function runPhaseCore(smoke) {
     trackReadTsRef,
     trackReadIssueSkill,
     trackReadScope,
+    trackReadPlan,
     trackReadBuildTemplate,
     stateAbs,
     readState,
@@ -256,6 +257,7 @@ export function runPhaseCore(smoke) {
       st.phase === 'work' &&
         st.unlock.rules === false &&
         st.unlock.issue === false &&
+        st.unlock.plan === false &&
         st.unlock.issueTemplate === undefined,
       JSON.stringify(st),
     );
@@ -301,11 +303,44 @@ export function runPhaseCore(smoke) {
       tool_input: { path: join(root, 'utils/foo.ts') },
     });
     assert(
-      'scope open still denies Write without rules',
+      'scope open Write deny is gate-plan',
       outAfterScope.permission === 'deny' &&
-        String(outAfterScope.agent_message).includes('rules≠true') &&
+        String(outAfterScope.agent_message).includes('[gate-plan]') &&
         !String(outAfterScope.agent_message).includes('[gate-scope]'),
       JSON.stringify(outAfterScope),
+    );
+
+    const outPnpmInstallPlan = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm install',
+    });
+    assert(
+      'scope open pnpm install deny is gate-plan',
+      outPnpmInstallPlan.permission === 'deny' &&
+        String(outPnpmInstallPlan.agent_message).includes('[gate-plan]'),
+      JSON.stringify(outPnpmInstallPlan),
+    );
+
+    trackReadPlan(base);
+    assert(
+      'plan Read opens unlock.plan',
+      loadState(root, id).unlock.plan === true,
+      JSON.stringify(loadState(root, id)),
+    );
+
+    const outAfterPlan = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/foo.ts') },
+    });
+    assert(
+      'plan open still denies Write without rules',
+      outAfterPlan.permission === 'deny' &&
+        String(outAfterPlan.agent_message).includes('rules≠true') &&
+        !String(outAfterPlan.agent_message).includes('[gate-plan]'),
+      JSON.stringify(outAfterPlan),
     );
 
     const outGhList = run('gate.mjs', {
@@ -350,7 +385,7 @@ export function runPhaseCore(smoke) {
       command: 'pnpm install',
     });
     assert(
-      'scope open pnpm install deny is rules',
+      'plan open pnpm install deny is rules',
       outPnpmInstallRules.permission === 'deny' &&
         String(outPnpmInstallRules.agent_message).includes('rules≠true'),
       JSON.stringify(outPnpmInstallRules),
@@ -458,10 +493,11 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 8b. work のあと scope + rules Read で解禁
+  // 8b. work のあと scope + plan + rules Read で解禁
   {
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/work go' });
     trackReadScope(base);
+    trackReadPlan(base);
     const out = run('track.mjs', {
       ...base,
       hook_event_name: 'beforeReadFile',

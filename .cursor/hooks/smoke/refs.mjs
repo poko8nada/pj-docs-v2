@@ -209,6 +209,7 @@ export function runIssueHeredoc(smoke) {
     );
 
     trackRead(heredocBase, '.cursor/skills/scope/SKILL.md');
+    trackRead(heredocBase, '.cursor/skills/plan/SKILL.md');
 
     const outPnpmInstall = run('gate.mjs', {
       ...heredocBase,

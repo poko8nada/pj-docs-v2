@@ -30,7 +30,7 @@ Do **not** invent product work or re-argue decisions here. If the caller already
 
 ## What you do not own
 
-- Phase entry or “what should we do this session?” — `discussion` / `scope` / `work`
+- Phase entry or “what should we do this session?” — `discussion` / `scope` / `plan` / `work`
 - Soft investigation itself — soft skills write `findings/` and return; this skill only persists the comment pointer
 - Product / harness file edits — `rules` via the caller
 
