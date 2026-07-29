@@ -29,6 +29,10 @@ export const WORK_PHASES = new Set(['work', 'chore']);
 /** work のみ（issue 書き込み時ハンドシェイク対象）。chore は対象外 */
 export const SPEC_FLOW_PHASES = new Set(['work']);
 
+export function isSpecFlowPhase(phase) {
+  return SPEC_FLOW_PHASES.has(phase);
+}
+
 /** 最終更新からこの日数を超えた state を削除 */
 export const STATE_TTL_DAYS = 7;
 

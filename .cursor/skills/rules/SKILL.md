@@ -2,19 +2,19 @@
 name: rules
 description: >-
   Edit rules via references/ (logic, components, documents, and more).
-  Read this SKILL.md before gated edits (permission handshake), then Read at least one matching reference.
+  Run this skill before gated edits, then execute at least one matching reference.
 ---
 
 # rules
 
 Edit only the agreed scope. Do not reopen settled questions or expand scope.
 
-**Read this file before gated edits** — that Read is the permission handshake.
-In `discussion`, reading this file does not unlock edits.
+**Run this skill before gated edits** — that opens `unlock.rules` (the harness detects the skill file Read).
+In `discussion`, running this skill does not unlock edits.
 
-## 1 — Read matching references
+## 1 — Execute matching references
 
-Pick **at least one** file under `references/` before editing. The harness only checks that you Read one or more — choose what fits the change. Internalize; do not summarize in chat.
+Pick **at least one** file under `references/` before editing. Apply its guidance. The harness records the file Read — choose what fits the change. Internalize; do not summarize in chat.
 
 | File            | When (examples)                                                              |
 | --------------- | ---------------------------------------------------------------------------- |
@@ -29,7 +29,7 @@ Pick **at least one** file under `references/` before editing. The harness only 
 
 Examples: README typo → `documents`. New `useX` → `state`. Button styles → `components`. Page landmarks / semantic markup → `html`. Unit test file → `shared`. Pure helper → `logic`. Object/JSON/schema shape → `data`. Unsure → `shared`.
 
-Phase re-entry clears Read progress — Read this skill and needed references again.
+Phase re-entry clears progress — run this skill and needed references again.
 
 ## 2 — Edit
 

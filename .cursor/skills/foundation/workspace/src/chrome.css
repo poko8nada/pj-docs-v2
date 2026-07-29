@@ -29,14 +29,23 @@
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
   z-index: 10000;
-  font: 600 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font:
+    600 13px/1 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: transform 0.15s ease-out;
 }
-.vl-fab:hover { transform: translateY(-2px); }
-.vl-fab[data-open="true"] { display: none; }
+.vl-fab:hover {
+  transform: translateY(-2px);
+}
+.vl-fab[data-open='true'] {
+  display: none;
+}
 .vl-fab .vl-fab-count {
   position: absolute;
   top: -4px;
@@ -66,12 +75,19 @@
   display: flex;
   flex-direction: column;
   z-index: 10001;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   color: #111;
   transform: translateX(100%);
   transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
 }
-#meta.vl-open { transform: translateX(0); }
+#meta.vl-open {
+  transform: translateX(0);
+}
 #meta .vl-h {
   display: flex;
   align-items: center;
@@ -93,9 +109,20 @@
   line-height: 1;
   padding: 2px 6px;
 }
-#meta .vl-h .vl-close:hover { color: #111; }
-#meta .vl-list { overflow: auto; flex: 1; padding: 8px; }
-#meta .vl-empty { padding: 14px; color: #999; font-size: 12px; line-height: 1.5; }
+#meta .vl-h .vl-close:hover {
+  color: #111;
+}
+#meta .vl-list {
+  overflow: auto;
+  flex: 1;
+  padding: 8px;
+}
+#meta .vl-empty {
+  padding: 14px;
+  color: #999;
+  font-size: 12px;
+  line-height: 1.5;
+}
 #meta .vl-row {
   border: 1px solid #eee;
   border-radius: 8px;
@@ -108,7 +135,11 @@
   background: #fff;
 }
 #meta .vl-aid {
-  font: 500 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font:
+    500 11px/1.4 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
   color: #666;
   word-break: break-all;
   margin-bottom: 6px;
@@ -139,7 +170,9 @@
   line-height: 1;
   padding: 2px 4px;
 }
-#meta .vl-del:hover { color: #111; }
+#meta .vl-del:hover {
+  color: #111;
+}
 
 /* コメント付き要素のマーカ。 */
 .vl-marker {
@@ -155,7 +188,9 @@
   pointer-events: none;
   z-index: 9998;
 }
-.vl-anchored { position: relative; }
+.vl-anchored {
+  position: relative;
+}
 .vl-anchored-void {
   outline: 1px solid #111;
   outline-offset: 2px;
@@ -177,7 +212,11 @@
   left: -1px;
   background: #111;
   color: #fff;
-  font: 500 10px/16px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font:
+    500 10px/16px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
   padding: 0 5px;
   white-space: nowrap;
   max-width: 240px;

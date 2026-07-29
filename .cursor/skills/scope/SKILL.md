@@ -12,7 +12,7 @@ Lock **what this session is about**, set a short `label`, and open the harness s
 
 **Always use** — even when the topic feels obvious. Do not skip because intent seems clear.
 
-**Open:** Reading this file sets `unlock.scope` true (any phase).
+**Open:** Running this skill opens `unlock.scope` (any phase; the harness detects the skill file Read).
 **Close:** User sends `/discussion` — harness clears `unlock.scope`. No separate close command.
 
 Callers (`discussion` / `work` / `chore` / `issue`, etc.) decide _when_ direction is unsettled; this skill owns the agreement shape, label, and gate open.
@@ -47,9 +47,9 @@ Light case: **Theme** alone in prose is enough. Use the full block when in/out b
 
 | Field        | Write                           | Do not write                 |
 | ------------ | ------------------------------- | ---------------------------- |
-| Theme        | One-line umbrella for this beat | Issue dump, file lists       |
+| Theme        | One-line umbrella for this beat | Issue body dump, file lists  |
 | In scope     | 1–3 bullets — treat now         | Slice table, implement steps |
-| Out of scope | 1–3 bullets — exclude now       | Straw men nobody asks for    |
+| Out of scope | 1–3 bullets — exclude now       | Straw men nobody asked for   |
 
 **Good (Goal discussion):**
 
@@ -91,5 +91,5 @@ Smoke: `node .cursor/skills/scope/scripts/set-label.smoke.mjs`
 
 1. Agree Theme (and In / Out when needed).
 2. Set label when Theme is stable.
-3. This Read already opened `unlock.scope` — hands-on phases may then unlock `rules` and edit.
+3. Running this skill already opened `unlock.scope` — hands-on phases may then run `rules` and edit.
 4. When the scoped work is done, user returns via `/discussion` (closes `unlock.scope`).

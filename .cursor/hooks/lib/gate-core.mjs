@@ -19,16 +19,12 @@ import { DENY_MENTOR, isMentorCodeBlocked, isMentorDeniedPath } from './mentor.m
 import { logHookIds } from './id-log.mjs';
 import { commandIncludesGitCommit, denyReviewMessage, isReviewablePath } from './review.mjs';
 import { denyRefsMessage, missingRefs, requiredRefsForPath } from './refs.mjs';
-import {
-  commandIncludesGhIssueMutation,
-  denyIssueMessage,
-  isIssueReady,
-  isSpecFlowPhase,
-} from './issue.mjs';
+import { commandIncludesGhIssueMutation, denyIssueMessage, isIssueReady } from './issue.mjs';
 import { denyAgendaMessage, isAgendaReady } from './agenda.mjs';
 import {
   conversationId,
   isReviewBlocking,
+  isSpecFlowPhase,
   isUnderStateDir,
   isUnlocked,
   loadState,
@@ -48,22 +44,22 @@ const DENY_STATE =
 function denyCodeMessage(phase) {
   const p = phase || 'discussion';
   if (WORK_PHASES.has(p)) {
-    return `[gate] Edits blocked (phase=${p}, rules≠true). Read .cursor/skills/rules/SKILL.md to unlock.`;
+    return `[gate] Edits blocked (phase=${p}, rules≠true). Run .cursor/skills/rules/SKILL.md to unlock.`;
   }
-  return `[gate] Edits blocked (phase=${p}). Enter a work phase (/work|/chore), then Read .cursor/skills/rules/SKILL.md.`;
+  return `[gate] Edits blocked (phase=${p}). Enter a work phase (/work|/chore), then run .cursor/skills/rules/SKILL.md.`;
 }
 
 /** @param {string} phase */
 function denyShellMessage(phase) {
   const p = phase || 'discussion';
   if (WORK_PHASES.has(p)) {
-    return `[gate] Shell blocked (phase=${p}, rules≠true). gh/git are allowed; other commands need rules Read. Prefer --body-file path over <(cat <<EOF) if a gh/git command was denied unexpectedly.`;
+    return `[gate] Shell blocked (phase=${p}, rules≠true). gh/git are allowed; other commands need the rules skill. Prefer --body-file path over <(cat <<EOF) if a gh/git command was denied unexpectedly.`;
   }
-  return `[gate] Shell blocked (phase=${p}). Read-only commands + read-only gh/git only. Enter a work phase for gh/git writes; other commands need rules Read.`;
+  return `[gate] Shell blocked (phase=${p}). Read-only commands + read-only gh/git only. Enter a work phase for gh/git writes; other commands need the rules skill.`;
 }
 
 const DENY_SCOPE =
-  '[gate-scope] Scope is closed. Read `.cursor/skills/scope/SKILL.md` to agree Theme and open `unlock.scope` before edits. Close is `/discussion` only.';
+  '[gate-scope] Scope is closed. Run `.cursor/skills/scope/SKILL.md` to agree Theme and open `unlock.scope` before edits. Close is `/discussion` only.';
 
 const DENY_BOOTSTRAP =
   '[gate] Bootstrap marker is hooks-only. User invokes /bootstrap or /bootstrap off.';

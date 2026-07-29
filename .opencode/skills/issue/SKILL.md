@@ -1,6 +1,6 @@
 ---
 name: issue
-description: "Create, update, transition, or close Spec / Design / Build / Refine issues. Use when the user starts a new phase, switches between phases, or finalizes an existing one. Do not use for ad-hoc tasks outside the Spec flow."
+description: 'Create, update, transition, or close Spec / Design / Build / Refine issues. Use when the user starts a new phase, switches between phases, or finalizes an existing one. Do not use for ad-hoc tasks outside the Spec flow.'
 ---
 
 # issue

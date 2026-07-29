@@ -1,6 +1,6 @@
 ---
 name: feasibility
-description: "Investigate technical topics with 3 sources (Official / Practice / Failure) for current best practice. Use when making technical decisions, validating an unfamiliar approach, or filling a knowledge gap. Do not use for non-technical tasks or when the answer is already known."
+description: 'Investigate technical topics with 3 sources (Official / Practice / Failure) for current best practice. Use when making technical decisions, validating an unfamiliar approach, or filling a knowledge gap. Do not use for non-technical tasks or when the answer is already known.'
 compatibility: opencode
 ---
 

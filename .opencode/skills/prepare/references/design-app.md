@@ -142,40 +142,39 @@ Add `data-component="ComponentName"` directly to the root element of each compon
 ```tsx
 // components/header.tsx
 export function Header({ user }) {
-  return <header data-component="Header">...</header>;
+  return <header data-component='Header'>...</header>;
 }
 ```
 
 ```tsx
 // prototype/default.tsx
-import { Header } from "../components/header";
-import { TaskList } from "../components/task-list";
-import { Footer } from "../components/footer";
+import { Header } from '../components/header';
+import { TaskList } from '../components/task-list';
+import { Footer } from '../components/footer';
 
 export default function DefaultScreen() {
   const tasks = [
     {
       id: 1,
-      title: "Review Q3 report",
-      status: "in-progress",
-      assignee: "Yuki",
+      title: 'Review Q3 report',
+      status: 'in-progress',
+      assignee: 'Yuki',
     },
-    { id: 2, title: "Update roadmap", status: "todo", assignee: null },
+    { id: 2, title: 'Update roadmap', status: 'todo', assignee: null },
     // edge case: very long title
     {
       id: 3,
-      title:
-        "Migrate legacy authentication system to OAuth 2.0 and update all dependent services",
-      status: "todo",
-      assignee: "Park",
+      title: 'Migrate legacy authentication system to OAuth 2.0 and update all dependent services',
+      status: 'todo',
+      assignee: 'Park',
     },
     // edge case: done, no assignee
-    { id: 4, title: "Send digest", status: "done", assignee: null },
+    { id: 4, title: 'Send digest', status: 'done', assignee: null },
   ];
 
   return (
     <>
-      <Header user={{ name: "Yuki", avatar: "/avatar.png" }} />
+      <Header user={{ name: 'Yuki', avatar: '/avatar.png' }} />
       <main>
         <TaskList tasks={tasks} />
       </main>

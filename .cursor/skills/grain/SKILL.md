@@ -134,7 +134,7 @@ Recap axes or cite `findings/grain/` Path.
 
 ### Step 2 — Improve brief
 
-Read [references/craft.md](references/craft.md). Produce **Improve brief** (format below). User **yes** / **edit** / **no**.
+Execute [references/craft.md](references/craft.md). Produce **Improve brief** (format below). User **yes** / **edit** / **no**.
 
 **Done when:** Brief agreed. Stop if slicing.
 
@@ -164,7 +164,7 @@ Recap axes or cite findings Path.
 
 ### Step 2 — Create brief
 
-Read [references/craft.md](references/craft.md). Produce **Create brief** (format below). Do not invent grain mid-brief. User **yes** / **edit** / **no**.
+Execute [references/craft.md](references/craft.md). Produce **Create brief** (format below). Do not invent grain mid-brief. User **yes** / **edit** / **no**.
 
 **Done when:** Brief agreed. Stop if slicing.
 
@@ -188,9 +188,11 @@ Same shapes in chat (before confirm) and in the findings MD.
 
 ```markdown
 # Grain
+
 …
 
 # Tokens
+
 …
 ```
 
@@ -200,13 +202,16 @@ Same shapes in chat (before confirm) and in the findings MD.
 ## Grain — Improve brief
 
 ### Target
+
 - paths / components / surfaces
 
 ### Changes
+
 - Visceral: ...
 - Behavioral: ...
 
 ### Verify
+
 - browser / scroll / click path to confirm
 ```
 
@@ -216,15 +221,19 @@ Same shapes in chat (before confirm) and in the findings MD.
 ## Grain — Create brief
 
 ### Surface
+
 - what to build
 
 ### Structure
+
 - layout, hierarchy, key elements
 
 ### Styling
+
 - per Tokens and craft.md
 
 ### Verify
+
 - browser / scroll / click path to confirm
 ```
 
@@ -239,8 +248,8 @@ Findings per [references/audit.md](references/audit.md). Append after Define / I
 - Path: findings/grain/<dated-slug>.md
 - Why:
   - …
-- Summary: …   # optional; at most 3 lines
-- Axes touched: …   # optional; e.g. Look, Roadmap
+- Summary: … # optional; at most 3 lines
+- Axes touched: … # optional; e.g. Look, Roadmap
 ```
 
 ## Anti-patterns

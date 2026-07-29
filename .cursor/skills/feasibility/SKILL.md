@@ -134,8 +134,8 @@ Confirm: short summary + “この結果で次に進んでよいですか？”
 - Path: findings/feasibility/<dated-slug>.md
 - Why:
   - …
-- Summary: …   # optional; at most 3 lines
-- Axes touched: …   # optional; e.g. Stack
+- Summary: … # optional; at most 3 lines
+- Axes touched: … # optional; e.g. Stack
 ```
 
 ## Source tiering

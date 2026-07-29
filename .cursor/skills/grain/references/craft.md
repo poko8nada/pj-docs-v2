@@ -46,12 +46,12 @@ Do not mix strategies on different card types.
 
 Default to **text**. Icons cost recognition, screen space, and cognitive load — use only when benefit exceeds cost ([NN/G Icon Usability](https://www.nngroup.com/articles/icon-usability/)).
 
-| Tier | When | Examples |
-| --- | --- | --- |
-| **Prefer text** | Primary nav, main CTAs, anything a first-time user must understand | "Sign up", "Pricing", section links |
-| **Standard symbol only** | Widely standardized, same meaning across products; still label when space allows | Search (magnifying glass), close (×), back (←) |
-| **Icon + visible label** | Secondary actions, toolbars, when icon aids scan but meaning is not universal | "Settings" + gear, "Menu" + hamburger |
-| **Icon-only** | Rare; tiny repeated actions for expert users; never for primary path without prior learning | Overflow (⋯) for secondary actions |
+| Tier                     | When                                                                                        | Examples                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| **Prefer text**          | Primary nav, main CTAs, anything a first-time user must understand                          | "Sign up", "Pricing", section links            |
+| **Standard symbol only** | Widely standardized, same meaning across products; still label when space allows            | Search (magnifying glass), close (×), back (←) |
+| **Icon + visible label** | Secondary actions, toolbars, when icon aids scan but meaning is not universal               | "Settings" + gear, "Menu" + hamburger          |
+| **Icon-only**            | Rare; tiny repeated actions for expert users; never for primary path without prior learning | Overflow (⋯) for secondary actions             |
 
 Rules:
 

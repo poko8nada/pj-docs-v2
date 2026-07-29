@@ -10,5 +10,5 @@
   "bracketSpacing": true,
   "arrowParens": "always",
   "insertFinalNewline": true,
-  "ignorePatterns": ["*.md"]
+  "ignorePatterns": ["tsconfig.json", "tsconfig.*.json", "jsconfig.json"]
 }

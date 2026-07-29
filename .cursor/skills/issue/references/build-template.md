@@ -43,7 +43,7 @@ Use for a Build issue body. One open Build at a time; close and open another whe
 - **Next:**
 
 - why:
-  -
+  - ...
 
 ## Test strategy
 

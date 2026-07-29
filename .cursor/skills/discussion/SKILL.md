@@ -12,11 +12,11 @@ disable-model-invocation: true
 
 Agree **this session’s scope** via the `scope` skill. There is **no plan issue and no progress tracker** — the agent must **analyze** Goal / Discover / Build (bodies + soft comments), related `findings/`, and when Build is in play the **product code**, then **think** and respond. Do not ship here. Do not inventory→slice here — that is `/work` via the **`agenda` skill**.
 
-**Default:** converse naturally. `AGENTS.md` **理解:** handles reception; do **not** open with a formatted scope block on every entry — but **do** Read `scope` and agree Theme (even when obvious) before handing off to hands-on.
+**Default:** converse naturally. `AGENTS.md` **理解:** handles reception; do **not** open with a formatted scope block on every entry — but **do** execute `scope` and agree Theme (even when obvious) before handing off to hands-on.
 
 **Exit:** the user agrees the scope (which Goal/Discover axis, soft continuation, or Build concern this session is about). What happens next (stay talking, `/work`, `/chore`) is the user’s call — do not treat naming `/work` as required exit criteria.
 
-**Close:** User invoking `/discussion` clears harness `scope` (edits lock again until `scope` is re-Read).
+**Close:** User invoking `/discussion` clears harness `scope` (edits lock again until `scope` is run again).
 
 **No editing** product/harness code. **No mutating gh/git** (read-only). **No issue create/update** — read issues as source of truth only. **Reading** code and issues is required for judgment.
 
@@ -28,7 +28,7 @@ First user prompt in a conversation starts here automatically. User may invoke `
 2. Follow soft `Path`s into `findings/` when cited or when Summary/Why implies unfinished work.
 3. If Goal + Discover look agreed and Build is open (or the session is clearly Build-stage), **read the product tree / relevant code** — axes alone are not enough.
 4. **Synthesize** — there is no checklist of “what’s next.” Derive judgment from the evidence.
-5. **Respond** — match the user’s mode. When focus must be locked (or before hands-on), Read and follow `scope` (Theme / In / Out + label).
+5. **Respond** — match the user’s mode. When focus must be locked (or before hands-on), execute `scope` (Theme / In / Out + label).
 
 ### Judgment
 
@@ -49,7 +49,7 @@ First user prompt in a conversation starts here automatically. User may invoke `
 - Code and Build axes disagree → say so; scope = Discover rethink or Build-axis update in hands-on
 - Discover must change after hands-on → `/discussion` to rethink scope / Discover
 - Goal change only on strong request → redefinition; otherwise keep Goal fixed
-- Tiny harness / typo / meta only → `/chore` is enough (no product scope required) — still Read `scope` (thin Theme) before edits
+- Tiny harness / typo / meta only → `/chore` is enough (no product scope required) — still execute `scope` (thin Theme) before edits
 
 When the session topic is still fuzzy, do not invent a `label` slug yet (`scope` skill owns label).
 
@@ -58,12 +58,12 @@ Revise until the user agrees the **scope**. Do not drift into implementation or 
 ## Flow
 
 1. **Analyze** — issues, soft comments, findings as needed, and product code when Build-stage. Think; do not wait for a plan or progress field that does not exist.
-2. **Agree scope** — Read and follow `scope` (always before hands-on; use the block when boundaries matter).
+2. **Agree scope** — execute `scope` (always before hands-on; use the block when boundaries matter).
 3. **Exit** — when scope is agreed, stop. Do not self-invoke `/work` or `/chore`. Naming them is optional when it helps; it is not the exit condition.
 
 ## Hard limits
 
-- Do **not** Read `.cursor/skills/rules/SKILL.md` for edits — that handshake does not apply in this phase.
+- Do **not** run `.cursor/skills/rules/SKILL.md` for edits — that unlock does not apply in this phase.
 - Do **not** create or update GitHub issues here — that belongs in `/work` (or `/chore`) via `issue`.
 - Do **not** run mutating `gh`/`git`, `pnpm`, or other shell that changes the repo.
 - Do **not** skip code reading when the session is Build-stage — scope judgment without code is incomplete.

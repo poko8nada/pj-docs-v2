@@ -20,99 +20,113 @@ Layer by where the session is — do not collapse them.
 
 Same momentum as without mentor: read issues / findings / code, advance the project, issue judgment, “what next,” and (in `/work`) inventory / slice proposals. Mentor does not mean passive. Planning and progress proposal are not mentor-only — this layer is the normal rail; mentor only changes how **code** is taught below.
 
-### Code implementation → Digest / Hint / Explain
+### Code implementation → Digest / Hint
 
 Once the agreed slice is in code (human writes; agent does not drive the edit). Scope is the **current agreed slice** only — not the whole session roadmap. Session-local map only; do not treat it as a durable project plan (slices stay in chat per `/work`).
 
-**Read learner code from the repo** (Read / Grep) — do not ask them to paste it in chat. When the slice has a **Test** check, **run it yourself** (`pnpm test:run` or the Digest command) and report pass/fail. **Surface** stays human.
+**Read learner code from the repo** (Read / Grep) — do not ask them to paste it in chat. When the slice has a **Test** check, **run it yourself** (`pnpm test:run` or the agreed command) and report pass/fail. **Surface** stays human.
 
-Align checks with the slice’s Test / Surface policy: product observation → Surface (browser, HTTP, CLI, etc.); pure logic → colocated unit test. Do not ask for e2e or component render tests.
+Align with the slice’s Test / Surface policy: product observation → Surface (browser, HTTP, CLI, etc.); pure logic → colocated unit test. Do not ask for e2e or component render tests.
 
-Three layers — do not collapse them:
+Two layers — do not collapse them:
 
-| Layer   | When                         | Density                                               |
-| ------- | ---------------------------- | ----------------------------------------------------- |
-| Digest  | slice enters implementation  | structural map — what, where, flow; no code fences    |
-| Hint    | step number or stuck on beat | one nudge — first move, one pitfall, signature-level  |
-| Explain | after Hint or explicit ask   | teach that beat — partial code + `これは…`, why/terms |
+| Layer  | When                         | Density                                            |
+| ------ | ---------------------------- | -------------------------------------------------- |
+| Digest | slice enters implementation  | map — 完了, なぜ, steps with files and entries     |
+| Hint   | step number or stuck on beat | per-entry processing — no full implementation code |
 
-#### How to split (before formatting)
+Deeper questions → answer in chat. Starting shape → `/stub` (one turn).
 
-Numbered steps are **concern beats** — each beat advances the vertical concern to something checkable.
+#### How to split steps (before formatting)
+
+Numbered steps are **concern beats** — each beat advances the vertical concern.
 
 - Do **not** split one-file-at-a-time (no “finish this file, then the next”).
 - Do **not** park all tests at the end (horizontal). When unit tests belong in the slice, they interleave with the logic they cover — same files may recur across steps.
 - Do **not** invent test steps for UI-only work (Surface is enough).
-- Same path may appear in multiple steps. UI, logic, wiring, and data can mix in one Digest — the **fields** stay the same. Per step: ファイル / シンボル / フロー are required; チェック is optional (omit the whole field if none).
 - Target **3–7** steps. Fewer than 3 → keep short. More than 7 → slice is too thick; cut the slice (Drive / `/work`), do not inflate the Digest.
-
-Digest density: **barely implementable** — not a vague outline, not full source dumps. Structure and symbols, not teaching prose.
 
 #### 1 — Digest
 
-Output once when the slice enters implementation. No code fences (signatures go under **シンボル** as plain text).
+Output once when the slice enters implementation. No code fences (entries go under each file as plain text).
 
 ```markdown
-**ゴール:** （1文。完成後の状態だけ。ステップ列挙禁止）
-**チェック:** （1文。観測できる完了条件だけ。例: Surfaceで… / pnpm test:run で…が green）
+**完了:** （このスライスが終わったときの状態・1文）
+
+**なぜ:**
+
+- （完了に近い条件）
+- （その前提）
+- …
 
 **ステップ:**（3–7）
 
-1. （動詞で始まる到達点・1行。ファイル名禁止）
+1. （動詞で始まる到達点・1行）
+   - **`package.json`** (`edit`)
+     - dependency: `zod` — runtime validation
+     - script: `test:run` → `vitest run`
 
-   **ファイル**
-   - `path`（`new`|`edit`）
-   - …
+   - **`path/to/file.ts`** (`new`)
+     - `type Session = { userId: string; expiresAt: Date }`
+     - `function parseSession(raw: unknown): Session | null` — `raw`: … / returns: …
 
-   **シンボル**
-   - `fnName(args): ReturnType`
-   - `ComponentName` — props: …
-   - `describe('…', …)` — angles: …
-   - …
-
-   **フロー**
-   - short beat — input, transform, branch, or handoff
-   - …
-
-   **チェック**（optional）
-   - observe **this** beat only
+   - **`path/to/file.test.ts`** (`new`)
+     - `describe('parseSession')` — cases: null input, invalid shape, valid
 
 2. …
 ```
 
-| Field             | Write                                              | Do not write                |
-| ----------------- | -------------------------------------------------- | --------------------------- |
-| ゴール            | slice end state, one sentence                      | a preview of the step list  |
-| チェック（slice） | how to observe done                                | vague “it works”            |
-| ステップ名        | verb + outcome                                     | file name as the title      |
-| ファイル          | path + `new`/`edit`, one bullet per path           | why that file               |
-| シンボル          | types / components / fns / tests as code-like text | Japanese prose, code fences |
-| フロー            | bullets — path, branches, boundaries               | algorithms, teaching prose  |
-| チェック（step）  | 1–2 observable bullets for this beat only          | copy of the slice チェック  |
+**完了** — slice end state in one sentence. Not the whole product goal.
 
-Close with a cue: step number → Hint; still stuck → Explain.
+**なぜ** — bullets only. Read top → bottom: closer to **完了** first, then prerequisites. Explains why this slice exists; do not repeat per step.
+
+**ステップ** — implementation order. Each file is one bullet; nest **that file’s entries** under it. Same path may appear in multiple steps.
+
+Write entries by kind — enough to implement without prose algorithms:
+
+| Kind           | Include                                                 |
+| -------------- | ------------------------------------------------------- |
+| 型             | fields, optional, union members                         |
+| 関数           | params, return type, throws if any                      |
+| コンポーネント | props, children, events                                 |
+| テスト         | `describe` / `it` angles                                |
+| 依存           | package name, dev/prod; `pnpm add` when one-off         |
+| config         | keys, plugins, paths, env var names                     |
+| ルート / API   | path, method, handler name                              |
+| スキーマ       | table, column, migration direction                      |
+| 定数 / env     | name, meaning, example value                            |
+| スクリプト     | `package.json` script name and command                  |
+| その他         | when not a symbol — what to do in that file (1–2 lines) |
+
+Do **not** add フロー, チェック, or per-step なぜ fields.
+
+Close with: step number → Hint; deeper detail → chat or `/stub`.
 
 #### 2 — Hint
 
-Default when the learner names a Digest step (by number) or is stuck on one beat.
+When the learner names a Digest step (by number) or is stuck on one beat.
 
-- Restate the beat’s outcome in one line.
-- **First move** — where to start (file, symbol, or test).
-- **One pitfall** — common mistake or edge for this beat.
-- Signature or one-line shape at most — no code fences, no multi-block walkthrough.
-- Stay inside the current slice’s Test / Surface policy.
+For **each entry in that step**, describe **what it does** — input, branches, return, config effect — in short bullets or lines. Teach processing, not file layout (Digest already has that).
+
+**Write:** responsibility, data flow, edge cases, one pitfall if non-obvious.
+
+**Do not write:** function bodies, import lists, or copy-paste-ready code. That is `/stub` or normal implementation, not Hint.
+
+```markdown
+### Hint: ステップ 2
+
+**`parseSession`**
+
+- takes `unknown`; non-object → `null`
+- requires `userId` string; otherwise `null`
+- returns `{ userId, expiresAt }` when valid
+
+**`Session`**
+
+- return shape for parse; `expiresAt` typed here if used later
+```
 
 Do not re-dump the whole Digest unless they ask to reorient.
-
-#### 3 — Explain
-
-When Hint was not enough, or the learner explicitly asks to explain a step.
-
-- Teach **that beat only** — enough to implement and understand why.
-- Partial / focused snippets in write order (not full files), each followed by a `これは…` paragraph.
-- Cover terms, tradeoffs, and alternatives when they unblock the learner.
-- No fixed heading template — answer what they asked.
-- Stay inside the current slice’s Test / Surface policy.
 
 ### `/stub`
 

@@ -1,5 +1,6 @@
 # prod
 dist/
+dist-server/
 
 # dev
 .yarn/
@@ -13,11 +14,11 @@ dist/
 
 # deps
 node_modules/
-pnpm-lock.yaml
+.wrangler
 
 # env
-.env.*
-.env.production
+.env*
+.dev.vars
 
 # logs
 logs/
@@ -30,8 +31,3 @@ lerna-debug.log*
 
 # misc
 .DS_Store
-
-.playwright-cli
-
-# agent scratch (issue body drafts, etc.)
-.cursor/tmp/

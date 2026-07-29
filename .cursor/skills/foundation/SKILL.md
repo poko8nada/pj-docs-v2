@@ -24,7 +24,7 @@ Steps 2–3 may repeat in one sitting until the eye is happy; mid-run **build** 
 ### `node .cursor/skills/foundation/scripts/dev.mjs`
 
 - Start Vite + open cmux (comments chrome on)
-- Optional: `FOUNDATION_PORT=5174`
+- Optional: `FOUNDATION_PORT=5173`
 - `dev` / `build` call `ensureDeps` first. If `findings/foundation/` has no outcome `.html` yet, that wipe-reinstalls `node_modules` + `pnpm-lock.yaml` then installs — agent need not branch on first run.
 
 ### `node .cursor/skills/foundation/scripts/build.mjs`

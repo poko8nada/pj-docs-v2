@@ -14,11 +14,13 @@ Hands-on phase for what **this session** already agreed in discussion. Judgment 
 
 Harness / meta / unrelated light fixes → `/chore`. Session direction → `/discussion`.
 
+Running a skill unlocks the harness (it detects the skill file Read). That is not the work — **execute** each skill’s procedure.
+
 ## Agenda (required)
 
-Product cuts live in the **`agenda` skill** — inventory, slice table, **user agreement before execute**. Do not copy that content here.
+Planning lives in the **`agenda` skill**. Situation guidance lives in its `references/` — execute the matching Goal/Discover or Build ref when inventoring and slicing.
 
-**Harness:** Read `.cursor/skills/agenda/SKILL.md` sets `unlock.agenda: true` (work only). Edits need `unlock.scope` → `unlock.agenda` → `unlock.rules`. `/chore` does not use `unlock.agenda` (`null`).
+**Harness:** Running the agenda skill opens `unlock.agenda` in work (the harness detects the skill file Read). Edits need `unlock.scope` → `unlock.agenda` → `unlock.rules`. `/chore` keeps `unlock.agenda` null.
 
 **Agreement:** After presenting the agenda (or the next slice), stop and wait for the user. Do not implement in the same turn as the first agenda dump.
 
@@ -35,19 +37,19 @@ Execute may include soft runs, `findings/`, cheap media, product edits, and even
 
 ## On entry
 
-**Handshake:** Session focus → Read `.cursor/skills/scope/SKILL.md` if `scope` is not open. Agenda → Read `.cursor/skills/agenda/SKILL.md` (and get agreement before execute). File edits → Read `.cursor/skills/rules/SKILL.md`, then a matching `rules/references/*`. Issue create/update → Read `.cursor/skills/issue/SKILL.md`, then `goal` / `discover` / `build` template.
+Execute the skills this session needs (running them also unlocks the harness):
+
+- Session focus → execute `.cursor/skills/scope/SKILL.md` if `scope` is not open
+- Agenda → execute `.cursor/skills/agenda/SKILL.md` and the matching `agenda/references/*` (Goal/Discover or Build)
+- File edits → execute `.cursor/skills/rules/SKILL.md` and a matching `rules/references/*`
+- Issue create/update → execute `.cursor/skills/issue/SKILL.md` and the matching `goal` / `discover` / `build` template
 
 Inspect open `[Goal]` / `[Discover]` / `[Build]` and `findings/` as needed.
 
-- **Scope already agreed** (discussion opened scope) → Read `agenda` and start inventory / agreed slice; no ceremony on Theme.
-- **Scope unclear** → Read `scope` or name `/discussion`. Not a question dump.
+- **Scope already agreed** (discussion opened scope) → execute `agenda` and the matching `agenda/references/*`, start inventory / agreed slice; no ceremony on Theme.
+- **Scope unclear** → execute `scope` or name `/discussion`. Not a question dump.
 
-Then Read the matching reference and stay on the rail:
-
-- **Goal / Discover** (axes, softs, cheap media, open Build when ready) → `references/goal-discover.md`
-- **Build** (Roadmap / Test / Deploy + product code; softs still OK) → `references/build.md`
-
-Scope changed mid-session → name `/discussion`. Do not redefine session direction here.
+Scope changed mid-session → name `/discussion`. Session direction is not redefined here.
 
 ## Hard limits
 
@@ -55,6 +57,6 @@ Scope changed mid-session → name `/discussion`. Do not redefine session direct
 - Do not invoke soft skills from each other — only this phase (or the user) calls softs.
 - Do not dump Research / HTML / matrices into issue bodies — those stay in `findings/`.
 - Do not skip agenda → user agreement before execute.
-- Do not treat Build issue as a durable Plan of slices — session slices stay in chat via `agenda`.
+- Do not treat Build issue as a durable list of slices — session slices stay in chat via `agenda`.
 
-Hand off to `scope` / `agenda` / `issue` / `rules` / soft skills by name — do not copy their contents here.
+Hand off to `scope` / `agenda` / `issue` / `rules` / soft skills by name.

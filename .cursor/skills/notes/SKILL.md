@@ -39,7 +39,7 @@ Inline `NOTE:` comments capture work left in the codebase (user or agent). **Per
    ```
 
 2. **Analyze & propose** — one block per note (context, understanding, proposal). No file edits until the user agrees.
-3. **Edit** — work phase + Read `rules/SKILL.md`, then apply agreed changes.
+3. **Edit** — work phase + execute `rules/SKILL.md`, then apply agreed changes.
 4. **Delete** resolved `NOTE:` lines after the user confirms the changes (not before).
 5. Run **Commit check** (below) before `git commit`.
 

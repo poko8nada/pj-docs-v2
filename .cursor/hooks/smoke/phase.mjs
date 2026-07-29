@@ -439,7 +439,7 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 8. discussion 中の rules Read はフラグを立てない／Write 不可
+  // 8. discussion 中の rules スキル実行はフラグを立てない／Write 不可
   {
     run('track.mjs', {
       ...base,
@@ -493,7 +493,7 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 8b. work のあと scope + agenda + rules Read で解禁
+  // 8b. work のあと scope + agenda + rules スキル実行で解禁
   {
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/work go' });
     trackReadScope(base);

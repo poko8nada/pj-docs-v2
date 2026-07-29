@@ -1,6 +1,6 @@
 ---
 name: readme
-description: "Generate or improve a README.md with external-facing content only — Overview, Getting Started, Usage, Contributing, License. Internal planning (Concept & Goals, Stack, Architecture) belongs in the Spec. Trigger when README.md is created, edited, or restructured."
+description: 'Generate or improve a README.md with external-facing content only — Overview, Getting Started, Usage, Contributing, License. Internal planning (Concept & Goals, Stack, Architecture) belongs in the Spec. Trigger when README.md is created, edited, or restructured.'
 ---
 
 # readme

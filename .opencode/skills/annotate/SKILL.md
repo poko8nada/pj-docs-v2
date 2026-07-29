@@ -1,6 +1,6 @@
 ---
 name: annotate
-description: "Manage agent context notes (AN comments) left in code. Collect existing notes, assess relevance, mark resolved ones as [done], and add new notes for future sessions. Trigger at phase transitions or when the agent identifies context worth preserving."
+description: 'Manage agent context notes (AN comments) left in code. Collect existing notes, assess relevance, mark resolved ones as [done], and add new notes for future sessions. Trigger at phase transitions or when the agent identifies context worth preserving.'
 ---
 
 # Annotate

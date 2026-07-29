@@ -1,15 +1,11 @@
 /**
  * work の実装前ハンドシェイク。
- * agenda/SKILL.md Read → unlock.agenda: true。
+ * agenda スキル実行（SKILL.md Read 検知）→ unlock.agenda: true。
  * discussion / chore では unlock.agenda は null（ゲート対象外）。
  */
-import { SPEC_FLOW_PHASES } from './state.mjs';
+import { isSpecFlowPhase } from './state.mjs';
 
 export const AGENDA_SKILL_REL = '.cursor/skills/agenda/SKILL.md';
-
-export function isSpecFlowPhase(phase) {
-  return SPEC_FLOW_PHASES.has(phase);
-}
 
 /** work 以外はゲート対象外（true = チェックしない） */
 export function isAgendaReady(state) {
@@ -21,7 +17,7 @@ export function isAgendaReady(state) {
 export function denyAgendaMessage(state) {
   if (!isSpecFlowPhase(state?.phase)) return '[gate-agenda] unexpected phase';
   return (
-    `[gate-agenda] Before product edits in work, Read \`${AGENDA_SKILL_REL}\` ` +
+    `[gate-agenda] Before product edits in work, run \`${AGENDA_SKILL_REL}\` ` +
     `(build the agenda and get user agreement before execute).`
   );
 }

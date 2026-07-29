@@ -34,16 +34,10 @@ Use for the Discover issue body. One Discover per product. Provisional axes: Nam
 - [ ] agreed
 <!-- 1 line: name. Then why: 1–3 bullets. -->
 
-
-
-
 ## Look
 
 - [ ] agreed
 <!-- 1 line: direction. Then why. Path: findings/foundation/… when set. -->
-
-
-
 
 ## Stack
 
@@ -59,7 +53,6 @@ Use for the Discover issue body. One Discover per product. Provisional axes: Nam
 - [ ] agreed
 <!-- Bullets. Optional MVP: / Later: prefix. Optional why bullets at end. -->
 
-- 
-- 
-
+-
+-
 ```

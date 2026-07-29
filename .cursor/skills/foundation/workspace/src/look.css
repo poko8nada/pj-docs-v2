@@ -1,6 +1,6 @@
 /* foundation — 見た目の正はここ。色・地・字はトークンで持ち、HTML に生 hex を散らさない。
    クロームは chrome.css（dev のみ）。 */
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   --color-paper: #f3efe6;

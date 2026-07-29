@@ -138,9 +138,9 @@ function readWeb() {
 /** ゲート要点を1か所に（詳細は各 skill / deny メッセージ） */
 function readGateRules() {
   return [
-    'Phase: default `discussion`. Hands-on after user `/work` or `/chore`. Session focus → Read `scope/SKILL.md` (`unlock.scope`; `/discussion` closes). `/work` product edits → Read `agenda/SKILL.md` (`unlock.agenda`; chore keeps null). Edit → Read `rules/SKILL.md` (`unlock.rules`). Issue writes only in `/work`: Read `issue/SKILL.md` + matching Goal/Discover/Build template (`unlock.issue`; template in `read.refs` as `issue/<template>.md`). Phase re-entry clears `read.skills` / `read.refs` (`unlock.scope` stays open until `/discussion`). Broken → user `/bootstrap` only.',
+    'Phase: default `discussion`. Hands-on after user `/work` or `/chore`. Session focus → run `scope` skill (`unlock.scope`; `/discussion` closes). `/work` product edits → run `agenda` skill (`unlock.agenda`; chore keeps null). Edit → run `rules` skill (`unlock.rules`). Issue writes only in `/work`: run `issue` skill + matching Goal/Discover/Build template (`unlock.issue`; template in `read.refs` as `issue/<template>.md`). Phase re-entry clears `read.skills` / `read.refs` (`unlock.scope` stays open until `/discussion`). Broken → user `/bootstrap` only.',
     'Mentor: `/mentor` (human-centered; code edits denied). `/stub` unlocks code for that one turn only while mentor is on — no-op if mentor is off. `/mentor off` leaves mentor. Does not change phase.',
-    'References: before gated edits, Read at least one `rules/references/*.md` (tracked in `read.refs` as `rules/<name>.md`). Any `.cursor/skills/*/references/*.md` Read is recorded as `skill/name.md`. Do not edit state files.',
+    'References: before gated edits, execute at least one `rules/references/*.md` (tracked in `read.refs` as `rules/<name>.md`). Any `.cursor/skills/*/references/*.md` Read is recorded as `skill/name.md`. Do not edit state files.',
     'Review: `review.files` non-empty → commit blocked; `/pre-commit-reviewer` clears. Persists across phase changes. `md` / `json` / `yaml` are not tracked.',
   ].join('\n');
 }
@@ -153,7 +153,7 @@ function readGateState(root, id, stateFileRel) {
   const read = state.read ?? { skills: [], refs: [] };
   return [
     `Gate state (hooks-only; do not edit): \`${stateFileRel}\``,
-    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `unlock.scope`: Read `scope/SKILL.md` → true; `/discussion` → false (survives `/work`|/chore`). `unlock.agenda`: work only — Read `agenda/SKILL.md` → true; discussion/chore → `null`. `unlock.rules`: `null` in discussion; `false` = handshake pending; `true` = unlocked. `/work` `unlock.issue`: `false` until issue-skill Read when writing issues; then template via `read.refs`. `read.skills` = Read of `.cursor/skills/*/SKILL.md`; `read.refs` = `skill/name.md` (both cleared on phase re-entry). `mentor`: explicit `/mentor` / `/mentor off` only.',
+    'Name: `YYYYMMDD-HHmmss+0900__<conversation_id>.json`. `unlock.scope`: run `scope` skill → true; `/discussion` → false (survives `/work`|/chore`). `unlock.agenda`: work only — run `agenda` skill → true; discussion/chore → `null`. `unlock.rules`: `null` in discussion; `false` = pending; `true` = unlocked. `/work` `unlock.issue`: `false` until issue skill runs when writing issues; then template via `read.refs`. `read.skills` = Read of `.cursor/skills/*/SKILL.md` (harness detection); `read.refs` = `skill/name.md` (both cleared on phase re-entry). `mentor`: explicit `/mentor` / `/mentor off` only.',
     'Set `label` via `node .cursor/skills/scope/scripts/set-label.mjs <label>` (see `scope` skill).',
     '',
     'Current values:',

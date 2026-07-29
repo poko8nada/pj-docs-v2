@@ -156,8 +156,8 @@ export function refIdToRelPath(refId) {
 export function denyRefsMessage(missing) {
   if (missing.includes(ANY_RULES_REF)) {
     return (
-      `[gate-refs] Missing rules reference Read. ` +
-      `Read at least one file under \`${SKILLS_ROOT}/${RULES_SKILL}/references/\` before editing this path.`
+      `[gate-refs] Missing rules reference. ` +
+      `Execute at least one file under \`${SKILLS_ROOT}/${RULES_SKILL}/references/\` before editing this path.`
     );
   }
   const list = missing
@@ -167,7 +167,7 @@ export function denyRefsMessage(missing) {
     })
     .join(', ');
   return (
-    `[gate-refs] Missing rules reference Read(s): ${list}. ` +
-    'Read the listed file(s) before editing this path.'
+    `[gate-refs] Missing rules reference(s): ${list}. ` +
+    'Execute the listed file(s) before editing this path.'
   );
 }

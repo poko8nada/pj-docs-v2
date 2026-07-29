@@ -62,4 +62,4 @@ pnpm test:run
 
 ## License
 
-MIT。
+MIT

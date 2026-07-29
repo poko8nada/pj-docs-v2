@@ -3,3 +3,4 @@ hooks/probe/
 hooks/state/
 hooks/.smoke-tmp/
 hooks/.bootstrap
+tmp/

@@ -15,7 +15,7 @@ Do **not** invent product work or re-argue decisions here. If the caller already
 
 ## When called
 
-**From a phase skill (usual):** agreement and content are already settled. Skip scope chat. Read the matching template → create or update → soft comments as needed.
+**From a phase skill (usual):** agreement and content are already settled. Skip scope chat. Execute the matching template → create or update → soft comments as needed.
 
 **Standalone / unclear:** agree in chat what issue, why now, and title (brief — call `scope` when session direction is unsettled). Revise until agreed, then proceed.
 
@@ -84,7 +84,7 @@ Full dumps stay in `Path`. Do not paste Research, HTML, or long audits into the 
 ## Flow
 
 1. Know the operation: create / update body / soft comment / close.
-2. Read the matching template (`goal` / `discover` / `build`).
+2. Execute the matching template (`goal` / `discover` / `build`).
 3. Apply agreed content into the template shape (and its How to write).
 4. Run `gh`. Soft runs → update soft comment.
 5. Return issue number + what changed to the caller.

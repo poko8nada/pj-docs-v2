@@ -247,7 +247,7 @@ The default screen is the top page of the site. The goal is to agree on the visu
 ```tsx
 // components/header.tsx
 export function Header({ siteName, nav }) {
-  return <header data-component="Header">...</header>;
+  return <header data-component='Header'>...</header>;
 }
 ```
 
@@ -255,13 +255,13 @@ export function Header({ siteName, nav }) {
 
 ```tsx
 // prototype/index.tsx
-import { Header } from "../components/header";
-import { Footer } from "../components/footer";
+import { Header } from '../components/header';
+import { Footer } from '../components/footer';
 
 export default function DefaultScreen() {
   return (
     <>
-      <Header siteName="Acme" nav={[{ label: "Home", href: "/" }]} />
+      <Header siteName='Acme' nav={[{ label: 'Home', href: '/' }]} />
       <main>{/* Feature slices will fill this */}</main>
       <Footer />
     </>

@@ -6,7 +6,8 @@
     "outDir": "dist",
     "strict": true,
     "skipLibCheck": true,
-    "lib": ["ESNext"]
+    "lib": ["ESNext", "DOM", "DOM.Iterable"]
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

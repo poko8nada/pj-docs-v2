@@ -21,7 +21,7 @@ Internal planning (Concept & Goals, Stack rationale, Architecture, Roadmap) belo
 ## What you do not own
 
 - Goal / Discover / Build body writing — `issue` + phase skills
-- Product or harness code — `rules` (after work-phase handshake)
+- Product or harness code — `rules` (after work-phase unlock)
 - Creating Goal / Discover / Build issues just to park README leftovers — only when the user agrees
 
 ## On entry
@@ -100,7 +100,7 @@ Ask only when missing and material.
 ## Flow
 
 1. Agree Mode + scope with the user.
-2. Before editing `README.md`, ensure a work phase (`/chore` is enough for README-only) and Read `.cursor/skills/rules/SKILL.md`, then follow `rules`.
+2. Before editing `README.md`, ensure a work phase (`/chore` is enough for README-only) and execute `.cursor/skills/rules/SKILL.md` (and a matching `rules/references/*`).
 3. If relocating internal sections to Goal / Discover / Build issues, use `issue` skill after the user agrees — do not invent an issue rewrite without approval.
 4. Confirm: list what changed and what was moved or deferred.
 

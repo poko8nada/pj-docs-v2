@@ -7,9 +7,9 @@ readonly: true
 
 You review implementation AND tests together. You do not edit files.
 
-## Rules (read before reviewing)
+## Rules (execute before reviewing)
 
-Read `.cursor/skills/rules/references/` files that apply to the changed files — same catalog as `rules` skill:
+Execute `.cursor/skills/rules/references/` files that apply to the changed files — same catalog as `rules` skill:
 
 | File            | When                             |
 | --------------- | -------------------------------- |

@@ -62,15 +62,15 @@ Interface-type hints (pick what applies):
 
 Icons trade clarity for decoration when misused. Check against [craft.md](craft.md) icon rules.
 
-| # | Check | Fail signal |
-| --- | --- | --- |
-| 1 | Primary CTA and main nav use text (or icon + visible label) | Icon-only "Sign up", nav without labels |
-| 2 | Non-standard actions are not icon-only | Custom icons with no label anywhere |
-| 3 | 5-second rule | Meaning unclear without prior use or hover |
-| 4 | No decorative icon sets | Every nav row has a different cryptic icon |
-| 5 | Desktop global nav | Hamburger-only on wide viewports when space allows visible links |
-| 6 | Recognition over recall | User must memorize what each icon does |
-| 7 | Accessibility | Icon-only control missing accessible name |
+| #   | Check                                                       | Fail signal                                                      |
+| --- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1   | Primary CTA and main nav use text (or icon + visible label) | Icon-only "Sign up", nav without labels                          |
+| 2   | Non-standard actions are not icon-only                      | Custom icons with no label anywhere                              |
+| 3   | 5-second rule                                               | Meaning unclear without prior use or hover                       |
+| 4   | No decorative icon sets                                     | Every nav row has a different cryptic icon                       |
+| 5   | Desktop global nav                                          | Hamburger-only on wide viewports when space allows visible links |
+| 6   | Recognition over recall                                     | User must memorize what each icon does                           |
+| 7   | Accessibility                                               | Icon-only control missing accessible name                        |
 
 Hamburger-specific: acceptable on mobile with many destinations; flag if it is the only path to global nav on desktop.
 

@@ -1,12 +1,12 @@
 /**
  * work の issue 書き込み時ハンドシェイク。
  * 入場だけでは不要。gh issue 変更の直前に解錠する。
- * issue/SKILL.md Read → unlock.issue: true。
- * Goal/Discover/Build テンプレ Read → read.refs に `issue/<template>.md`（isIssueReady が参照）。
+ * issue スキル実行（SKILL.md Read 検知）→ unlock.issue: true。
+ * Goal/Discover/Build テンプレ実行（Read 検知）→ read.refs に `issue/<template>.md`（isIssueReady が参照）。
  */
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
 import { normalizeReadRefs } from './refs.mjs';
-import { SPEC_FLOW_PHASES } from './state.mjs';
+import { isSpecFlowPhase } from './state.mjs';
 
 export const ISSUE_SKILL_REL = '.cursor/skills/issue/SKILL.md';
 const ISSUE_REFS_DIR = '.cursor/skills/issue/references';
@@ -63,10 +63,6 @@ export function hasPhaseIssueTemplate(phase, refs) {
   return phaseIssueTemplateRefIds(phase).some((id) => have.has(id));
 }
 
-export function isSpecFlowPhase(phase) {
-  return SPEC_FLOW_PHASES.has(phase);
-}
-
 export function isIssueReady(state) {
   if (!isSpecFlowPhase(state?.phase)) return true;
   return state?.unlock?.issue === true && hasPhaseIssueTemplate(state.phase, state?.read?.refs);
@@ -83,9 +79,9 @@ export function templateHintForPhase(phase) {
 export function denyIssueMessage(state) {
   if (!isSpecFlowPhase(state?.phase)) return '[gate-issue] unexpected phase';
   if (state.unlock?.issue !== true) {
-    return `[gate-issue] Before issue writes, Read \`${ISSUE_SKILL_REL}\` first.`;
+    return `[gate-issue] Before issue writes, run \`${ISSUE_SKILL_REL}\` first.`;
   }
-  return `[gate-issue] Before issue writes, Read the matching template: ${templateHintForPhase(state.phase)}.`;
+  return `[gate-issue] Before issue writes, execute the matching template: ${templateHintForPhase(state.phase)}.`;
 }
 
 function stripQuotesAndHeredoc(command) {

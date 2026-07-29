@@ -8,10 +8,10 @@ steps: 8
 permission:
   edit: deny
   bash:
-    "*": deny
-    "git diff*": allow
-    "git log*": allow
-    "git status*": allow
+    '*': deny
+    'git diff*': allow
+    'git log*': allow
+    'git status*': allow
   read: allow
   grep: allow
   glob: allow

@@ -1,6 +1,6 @@
 ---
 name: trace
-description: "Organize the session into a structured handoff. Captures current state, key decisions with rationale, discussion topics, and next steps. Use when the conversation is long, context is fragmented, or a clear picture of where things stand is needed."
+description: 'Organize the session into a structured handoff. Captures current state, key decisions with rationale, discussion topics, and next steps. Use when the conversation is long, context is fragmented, or a clear picture of where things stand is needed.'
 ---
 
 # trace

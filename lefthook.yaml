@@ -5,7 +5,7 @@ pre-commit:
         parallel: true
         jobs:
           - name: format
-            glob: '*.{js,jsx,ts,tsx,mjs,cjs}'
+            glob: '*.{js,jsx,ts,tsx,mjs,cjs,md,mdx,json,jsonc}'
             run: pnpm format {staged_files}
             stage_fixed: true
             fail_text: 'Format auto-fixed. Re-stage and re-commit if needed (stage_fixed usually handles this).'
