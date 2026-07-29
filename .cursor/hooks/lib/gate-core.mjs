@@ -61,6 +61,9 @@ function denyShellMessage(phase) {
   return `[gate] Shell blocked (phase=${p}). Read-only commands + read-only gh/git only. Enter a work phase for gh/git writes; other commands need rules Read.`;
 }
 
+const DENY_SCOPE =
+  '[gate-scope] Scope is closed. Read `.cursor/skills/scope/SKILL.md` to agree Theme and open `unlock.scope` before edits. Close is `/discussion` only.';
+
 const DENY_BOOTSTRAP =
   '[gate] Bootstrap marker is hooks-only. User invokes /bootstrap or /bootstrap off.';
 
@@ -485,7 +488,7 @@ function isSetLabelShellSegment(segment) {
   if (!cleaned) return false;
   // セグメント内の複合は不可。`&` は `&&` より後で判定
   if (/&&|\|\||;|\n|\||&/.test(cleaned)) return false;
-  return /(?:^|[\s/])node(?:\s+|$).*\.cursor\/skills\/label\/scripts\/set-label\.mjs(?:\s|$)/.test(
+  return /(?:^|[\s/])node(?:\s+|$).*\.cursor\/skills\/scope\/scripts\/set-label\.mjs(?:\s|$)/.test(
     cleaned,
   );
 }
@@ -630,6 +633,15 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
   // pnpm test — work|chore のみ、rules 不要（mentor 下の検証用）
   if (WORK_PHASES.has(state.phase) && isPnpmTestShellCommand(command)) return allow();
 
+  // scope: rules / mentor メッセージより先（allowlist 外の Shell）
+  if (
+    inWorkPhase &&
+    state.unlock?.scope !== true &&
+    !isAllowedWithoutCodeUnlock(command, inWorkPhase)
+  ) {
+    return deny(DENY_SCOPE);
+  }
+
   // mentor: コード path に触る書き込みうる Shell は stub 無しでは deny
   // （ls/cat・git/gh の read-only のみ例外。work の git 書き込みは例外にしない）
   if (
@@ -691,6 +703,11 @@ export async function handleGate(payload) {
   if (isBootstrapActive(root)) return allow();
 
   const id = conversationId(payload);
+
+  // scope: rules / mentor / root-md 例外より先（work|chore の編集は unlock.scope 必須）
+  if (WRITE_TOOLS.has(toolName) && inWorkPhase && state.unlock?.scope !== true) {
+    return deny(DENY_SCOPE);
+  }
 
   // mentor: コード系 path の編集は stub 無しでは deny（通常 unlock より上）
   if (WRITE_TOOLS.has(toolName) && fileArg && isMentorDeniedPath(root, state, id, fileArg)) {

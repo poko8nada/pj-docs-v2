@@ -17,12 +17,18 @@ export function runCdRoot(smoke) {
       ...cdBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/scope/SKILL.md') },
+    });
+    run('track.mjs', {
+      ...cdBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
       tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
     const stCd = loadState(root, cdId);
     assert(
       'cd test conversation unlocked',
-      stCd.phase === 'chore' && stCd.unlock.rules === true,
+      stCd.phase === 'chore' && stCd.unlock.rules === true && stCd.unlock.scope === true,
       JSON.stringify(stCd),
     );
 

@@ -280,6 +280,7 @@ export function defaultUnlock(phase = PHASE_DISCUSSION) {
   return {
     rules: normalizeRules(p, null),
     issue: normalizeIssue(p, null),
+    scope: false,
   };
 }
 
@@ -290,7 +291,7 @@ export function defaultRead() {
 /**
  * @returns {{
  *   phase: string,
- *   unlock: { rules: boolean | null, issue: boolean | null },
+ *   unlock: { rules: boolean | null, issue: boolean | null, scope: boolean },
  *   read: { skills: string[], refs: string[] },
  *   review: ReturnType<typeof defaultReview>,
  *   check: ReturnType<typeof defaultCheck>,
@@ -314,6 +315,11 @@ export function defaultState() {
 
 /** mentor レイヤー（明示 /mentor・/mentor off のみ） */
 export function normalizeMentor(value) {
+  return value === true;
+}
+
+/** unlock.scope（scope スキル Read で true、/discussion で false） */
+export function normalizeScope(value) {
   return value === true;
 }
 
@@ -362,6 +368,7 @@ export function normalizeUnlock(phase, unlock) {
   return {
     rules: normalizeRules(phase, rulesFromUnlockSrc(src)),
     issue: normalizeIssue(phase, src.issue),
+    scope: normalizeScope(src.scope),
   };
 }
 
@@ -444,7 +451,7 @@ export function loadState(root, id) {
  * @param {string} id
  * @param {{
  *   phase?: string,
- *   unlock?: Partial<{ rules: boolean | null, implement: boolean | null, issue: boolean | null }>,
+ *   unlock?: Partial<{ rules: boolean | null, implement: boolean | null, issue: boolean | null, scope: boolean }>,
  *   read?: Partial<{ skills: string[], refs: string[] }>,
  *   review?: unknown,
  *   check?: unknown,
@@ -476,6 +483,7 @@ export function saveState(root, id, state) {
     unlock: normalizeUnlock(phase, {
       rules: nextRules,
       issue: unlockPatch.issue !== undefined ? unlockPatch.issue : prev.unlock.issue,
+      scope: unlockPatch.scope !== undefined ? unlockPatch.scope : prev.unlock.scope,
     }),
     read: normalizeRead(
       {

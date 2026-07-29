@@ -29,6 +29,12 @@ export function runReviewGate(smoke) {
       ...reviewBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/scope/SKILL.md') },
+    });
+    run('track.mjs', {
+      ...reviewBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
       tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
     writeFileSync(join(root, 'utils/_review-probe.ts'), 'export const reviewProbe = 1;\n');

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 会話 state の label だけを書き換える（hooks は import しない）。
- * 使い方: node .cursor/skills/label/scripts/set-label.mjs <label>
+ * 使い方: node .cursor/skills/scope/scripts/set-label.mjs <label>
  *
  * id は CURSOR_CONVERSATION_ID。gate はこのコマンドをどのフェーズでも allow する。
  */
@@ -58,7 +58,7 @@ function formatJstIso(date = new Date()) {
 function main() {
   const rawLabel = process.argv[2];
   if (!rawLabel) {
-    process.stderr.write('usage: node .cursor/skills/label/scripts/set-label.mjs <label>\n');
+    process.stderr.write('usage: node .cursor/skills/scope/scripts/set-label.mjs <label>\n');
     process.exit(2);
   }
 

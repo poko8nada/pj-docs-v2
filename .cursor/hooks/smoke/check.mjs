@@ -28,6 +28,12 @@ export function runCheckPending(smoke) {
       ...checkBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/scope/SKILL.md') },
+    });
+    run('track.mjs', {
+      ...checkBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
       tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
     run('track.mjs', {

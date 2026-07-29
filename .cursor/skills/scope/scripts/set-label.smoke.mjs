@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * set-label.mjs の smoke（hooks は import しない）。
- * 使い方: node .cursor/skills/label/scripts/set-label.smoke.mjs
+ * 使い方: node .cursor/skills/scope/scripts/set-label.smoke.mjs
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

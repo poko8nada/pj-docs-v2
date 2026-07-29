@@ -101,6 +101,17 @@ function isRulesSkill(root, filePath) {
   }
 }
 
+function isScopeSkill(root, filePath) {
+  if (!filePath) return false;
+  try {
+    const abs = realpathSync(isAbsolute(filePath) ? filePath : resolve(root, filePath));
+    const target = realpathSync(join(root, '.cursor/skills/scope/SKILL.md'));
+    return abs === target;
+  } catch {
+    return false;
+  }
+}
+
 function isIssueSkill(root, filePath) {
   if (!filePath) return false;
   try {
@@ -145,6 +156,18 @@ function maybeUnlockRules(root, payload) {
       review: prev.review,
     });
   }
+}
+
+/** scope スキル Read → どのフェーズでも unlock.scope を開く */
+function maybeOpenScope(root, payload) {
+  const filePath = filePathFromPayload(payload);
+  if (!isScopeSkill(root, String(filePath))) return;
+  const id = conversationId(payload);
+  const prev = loadState(root, id);
+  saveState(root, id, {
+    phase: prev.phase,
+    unlock: { ...prev.unlock, scope: true },
+  });
 }
 
 /** 任意 skill の references 配下 md Read → read.refs（`skill/name.md`） */
@@ -200,15 +223,15 @@ function handleBeforeSubmitPrompt(root, payload) {
   const read = defaultRead();
 
   if (phase === PHASE_DISCUSSION) {
-    unlock = { rules: null, issue: null };
+    unlock = { rules: null, issue: null, scope: false };
   } else if (phase === 'chore') {
-    unlock = { rules: false, issue: null };
+    unlock = { rules: false, issue: null, scope: prev.unlock.scope === true };
   } else {
-    // work — rules on entry; issue stays false until issue writes
-    unlock = { rules: false, issue: false };
+    // work — rules on entry; issue stays false until issue writes; scope は維持
+    unlock = { rules: false, issue: false, scope: prev.unlock.scope === true };
   }
 
-  // mentor はフェーズ変更でも維持
+  // mentor はフェーズ変更でも維持。scope は /discussion でのみ閉じる（上で false）
   saveState(root, id, { phase, unlock, read, review, mentor: prev.mentor });
   return respond({ continue: true });
 }
@@ -319,6 +342,7 @@ async function main() {
     maybeMarkReadSkill(root, payload);
     maybeUnlockIssue(root, payload);
     maybeUnlockRules(root, payload);
+    maybeOpenScope(root, payload);
     maybeMarkReadRef(root, payload);
     if (event === 'postToolUse') return empty();
     return allow();

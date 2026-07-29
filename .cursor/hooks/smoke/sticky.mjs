@@ -33,8 +33,15 @@ export function runTranscriptFallback(smoke) {
 
     writeFileSync(
       join(stateTmp, `20260716-120000+0900__${transcriptId}.json`),
-      JSON.stringify({ phase: 'chore', implement: true, updatedAt: formatJstIso() }, null, 2) +
-        '\n',
+      JSON.stringify(
+        {
+          phase: 'chore',
+          unlock: { rules: true, issue: null, scope: true },
+          updatedAt: formatJstIso(),
+        },
+        null,
+        2,
+      ) + '\n',
     );
 
     const out = run('gate.mjs', {
@@ -77,6 +84,7 @@ export function runStickyContamination(smoke) {
       transcript_path: join(smokeTmpRoot, 'agent-transcripts', staleId, `${staleId}.jsonl`),
     };
     const rulesPath = join(root, '.cursor/skills/rules/SKILL.md');
+    const scopePath = join(root, '.cursor/skills/scope/SKILL.md');
     const probePath = join(root, '.cursor/hooks/_integration-probe.txt');
 
     run('track.mjs', {
@@ -112,12 +120,18 @@ export function runStickyContamination(smoke) {
       ...noId,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
+      tool_input: { path: scopePath },
+    });
+    run('track.mjs', {
+      ...noId,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
       tool_input: { path: rulesPath },
     });
     st = loadState(root, realId);
     assert(
       'integration sticky unlocks without payload id',
-      st.unlock.rules === true,
+      st.unlock.rules === true && st.unlock.scope === true,
       JSON.stringify(st),
     );
 

@@ -13,6 +13,7 @@ export function runReadRefs(smoke) {
       hook_event_name: 'beforeSubmitPrompt',
       prompt: '/chore refs test',
     });
+    trackRead(refsBase, '.cursor/skills/scope/SKILL.md');
     run('track.mjs', {
       ...refsBase,
       hook_event_name: 'preToolUse',
@@ -206,6 +207,8 @@ export function runIssueHeredoc(smoke) {
       outPnpm.permission === 'allow',
       JSON.stringify(outPnpm),
     );
+
+    trackRead(heredocBase, '.cursor/skills/scope/SKILL.md');
 
     const outPnpmInstall = run('gate.mjs', {
       ...heredocBase,

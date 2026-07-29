@@ -122,6 +122,10 @@ export function createSmokeCtx() {
     trackRead(convBase, '.cursor/skills/issue/SKILL.md');
   }
 
+  function trackReadScope(convBase) {
+    trackRead(convBase, '.cursor/skills/scope/SKILL.md');
+  }
+
   function trackReadBuildTemplate(convBase) {
     trackRead(convBase, '.cursor/skills/issue/references/build-template.md');
   }
@@ -152,6 +156,7 @@ export function createSmokeCtx() {
     trackRead,
     trackReadTsRef,
     trackReadIssueSkill,
+    trackReadScope,
     trackReadBuildTemplate,
     stateAbs,
     readState,

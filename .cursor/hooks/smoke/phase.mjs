@@ -11,6 +11,7 @@ export function runPhaseCore(smoke) {
     assert,
     trackReadTsRef,
     trackReadIssueSkill,
+    trackReadScope,
     trackReadBuildTemplate,
     stateAbs,
     readState,
@@ -194,14 +195,14 @@ export function runPhaseCore(smoke) {
     const out = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
-      command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a',
+      command: 'node .cursor/skills/scope/scripts/set-label.mjs topic-a',
     });
     assert('locked set-label allow', out.permission === 'allow', JSON.stringify(out));
 
     const outWithReadonly = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
-      command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a && git status',
+      command: 'node .cursor/skills/scope/scripts/set-label.mjs topic-a && git status',
     });
     assert(
       'locked set-label + readonly allow',
@@ -212,21 +213,21 @@ export function runPhaseCore(smoke) {
     const outChain = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
-      command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a && pnpm test:run',
+      command: 'node .cursor/skills/scope/scripts/set-label.mjs topic-a && pnpm test:run',
     });
     assert('locked set-label chain deny', outChain.permission === 'deny', JSON.stringify(outChain));
 
     const outBg = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
-      command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a & pnpm test:run',
+      command: 'node .cursor/skills/scope/scripts/set-label.mjs topic-a & pnpm test:run',
     });
     assert('locked set-label bg deny', outBg.permission === 'deny', JSON.stringify(outBg));
 
     const outNl = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
-      command: 'node .cursor/skills/label/scripts/set-label.mjs topic-a\npnpm test:run',
+      command: 'node .cursor/skills/scope/scripts/set-label.mjs topic-a\npnpm test:run',
     });
     assert(
       'locked set-label newline then pnpm deny',
@@ -260,7 +261,7 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 7. still deny Write after phase only — gh issue write needs handshake; git writes unlock
+  // 7. still deny Write after phase only — scope before rules; gh issue write needs handshake; git writes unlock
   {
     const out = run('gate.mjs', {
       ...base,
@@ -268,7 +269,44 @@ export function runPhaseCore(smoke) {
       tool_name: 'Write',
       tool_input: { path: join(root, 'utils/foo.ts') },
     });
-    assert('phase-only Write deny', out.permission === 'deny', JSON.stringify(out));
+    assert(
+      'phase-only Write deny is gate-scope',
+      out.permission === 'deny' && String(out.agent_message).includes('[gate-scope]'),
+      JSON.stringify(out),
+    );
+
+    const outPnpmInstall = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'pnpm install',
+    });
+    assert(
+      'phase-only pnpm install deny is gate-scope',
+      outPnpmInstall.permission === 'deny' &&
+        String(outPnpmInstall.agent_message).includes('[gate-scope]'),
+      JSON.stringify(outPnpmInstall),
+    );
+
+    trackReadScope(base);
+    assert(
+      'scope Read opens scope',
+      loadState(root, id).unlock.scope === true,
+      JSON.stringify(loadState(root, id)),
+    );
+
+    const outAfterScope = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/foo.ts') },
+    });
+    assert(
+      'scope open still denies Write without rules',
+      outAfterScope.permission === 'deny' &&
+        String(outAfterScope.agent_message).includes('rules≠true') &&
+        !String(outAfterScope.agent_message).includes('[gate-scope]'),
+      JSON.stringify(outAfterScope),
+    );
 
     const outGhList = run('gate.mjs', {
       ...base,
@@ -306,15 +344,16 @@ export function runPhaseCore(smoke) {
     });
     assert('phase-only pnpm test allow', outPnpm.permission === 'allow', JSON.stringify(outPnpm));
 
-    const outPnpmInstall = run('gate.mjs', {
+    const outPnpmInstallRules = run('gate.mjs', {
       ...base,
       hook_event_name: 'beforeShellExecution',
       command: 'pnpm install',
     });
     assert(
-      'phase-only pnpm install deny',
-      outPnpmInstall.permission === 'deny',
-      JSON.stringify(outPnpmInstall),
+      'scope open pnpm install deny is rules',
+      outPnpmInstallRules.permission === 'deny' &&
+        String(outPnpmInstallRules.agent_message).includes('rules≠true'),
+      JSON.stringify(outPnpmInstallRules),
     );
   }
 
@@ -384,6 +423,7 @@ export function runPhaseCore(smoke) {
       st.phase === 'discussion' && st.unlock.rules === null,
       JSON.stringify(st),
     );
+    assert('discussion closes scope', st.unlock.scope === false, JSON.stringify(st));
     const out2 = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
@@ -418,9 +458,10 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 8b. work のあと rules Read で解禁
+  // 8b. work のあと scope + rules Read で解禁
   {
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/work go' });
+    trackReadScope(base);
     const out = run('track.mjs', {
       ...base,
       hook_event_name: 'beforeReadFile',
@@ -494,6 +535,7 @@ export function runPhaseCore(smoke) {
       'phase switch resets rules and read',
       st.phase === 'chore' &&
         st.unlock.rules === false &&
+        st.unlock.scope === true &&
         Array.isArray(st.read.refs) &&
         st.read.refs.length === 0 &&
         Array.isArray(st.read.skills) &&
@@ -501,6 +543,7 @@ export function runPhaseCore(smoke) {
       JSON.stringify(st),
     );
 
+    trackReadScope(base);
     run('track.mjs', {
       ...base,
       hook_event_name: 'beforeReadFile',
@@ -510,6 +553,7 @@ export function runPhaseCore(smoke) {
     assert(
       'chore unlock + ref before re-entry',
       loadState(root, id).unlock.rules === true &&
+        loadState(root, id).unlock.scope === true &&
         loadState(root, id).read.refs?.includes('rules/shared.md') &&
         loadState(root, id).read.skills?.includes('rules'),
       JSON.stringify(loadState(root, id)),
@@ -521,9 +565,10 @@ export function runPhaseCore(smoke) {
     });
     const stRe = readState();
     assert(
-      'same-phase re-entry resets rules and read',
+      'same-phase re-entry resets rules and read, keeps scope',
       stRe.phase === 'chore' &&
         stRe.unlock.rules === false &&
+        stRe.unlock.scope === true &&
         Array.isArray(stRe.read.refs) &&
         stRe.read.refs.length === 0 &&
         Array.isArray(stRe.read.skills) &&
@@ -540,6 +585,12 @@ export function runPhaseCore(smoke) {
       ...persistBase,
       hook_event_name: 'beforeSubmitPrompt',
       prompt: '/chore review persist',
+    });
+    run('track.mjs', {
+      ...persistBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/scope/SKILL.md') },
     });
     run('track.mjs', {
       ...persistBase,

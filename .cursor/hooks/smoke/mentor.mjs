@@ -36,9 +36,11 @@ export function runMentorStub(smoke) {
     assert('mentor on in state', loadState(root, mentorId).mentor === true);
     assert('chore phase with mentor', loadState(root, mentorId).phase === 'chore');
 
+    trackRead(mentorBase, '.cursor/skills/scope/SKILL.md');
     trackRead(mentorBase, '.cursor/skills/rules/SKILL.md');
     trackReadTsRef(mentorBase);
     assert('mentor unlock.rules', loadState(root, mentorId).unlock.rules === true);
+    assert('mentor scope open', loadState(root, mentorId).unlock.scope === true);
 
     const codePath = join(root, '.cursor/hooks/_mentor-smoke-probe.ts');
     const denyCode = run('gate.mjs', {

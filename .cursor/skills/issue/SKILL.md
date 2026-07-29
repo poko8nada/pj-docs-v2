@@ -17,7 +17,7 @@ Do **not** invent product work or re-argue decisions here. If the caller already
 
 **From a phase skill (usual):** agreement and content are already settled. Skip scope chat. Read the matching template → create or update → soft comments as needed.
 
-**Standalone / unclear:** agree in chat what issue, why now, and title (brief — not `discussion` Scope agreement unless session direction is unsettled). Revise until agreed, then proceed.
+**Standalone / unclear:** agree in chat what issue, why now, and title (brief — call `scope` when session direction is unsettled). Revise until agreed, then proceed.
 
 **Chore:** only create/update when the user asks.
 
@@ -30,7 +30,7 @@ Do **not** invent product work or re-argue decisions here. If the caller already
 
 ## What you do not own
 
-- Phase entry or “what should we do this session?” — `discussion` / `work`
+- Phase entry or “what should we do this session?” — `discussion` / `scope` / `work`
 - Soft investigation itself — soft skills write `findings/` and return; this skill only persists the comment pointer
 - Product / harness file edits — `rules` via the caller
 

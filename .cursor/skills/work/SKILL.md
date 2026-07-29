@@ -69,12 +69,14 @@ Execute may include soft runs, `findings/`, cheap media, product edits, and even
 
 ## On entry
 
-**Handshake:** File edits → Read `.cursor/skills/rules/SKILL.md`, then a matching `rules/references/*`. Issue create/update → Read `.cursor/skills/issue/SKILL.md`, then `goal` / `discover` / `build` template.
+**Handshake:** Session focus → Read `.cursor/skills/scope/SKILL.md` if `scope` is not open (even when obvious). File edits → Read `.cursor/skills/rules/SKILL.md`, then a matching `rules/references/*`. Issue create/update → Read `.cursor/skills/issue/SKILL.md`, then `goal` / `discover` / `build` template.
+
+Harness: edits need `unlock.scope` **before** `unlock.rules`. `/discussion` closes scope.
 
 Inspect open `[Goal]` / `[Discover]` / `[Build]` and `findings/` as needed.
 
-- **Scope already agreed** (discussion, or user named the slice) → start **inventory** or the agreed slice; no ceremony.
-- **Scope unclear** → name `/discussion` or confirm session scope in chat (situation + first inventory move). Not a question dump.
+- **Scope already agreed** (discussion opened scope, or user named the slice) → start **inventory** or the agreed slice; no ceremony.
+- **Scope unclear** → Read `scope` or name `/discussion` (situation + first inventory move). Not a question dump.
 
 Then Read the matching reference and stay on the rail:
 
@@ -91,4 +93,4 @@ Scope changed mid-session → name `/discussion`. Do not redefine session direct
 - Do not skip inventory → slice plan → agree before execute.
 - Do not treat Build issue as a durable Plan of slices — session slices stay in chat.
 
-Hand off to `issue` / `rules` / soft skills by name — do not copy their contents here.
+Hand off to `scope` / `issue` / `rules` / soft skills by name — do not copy their contents here.
