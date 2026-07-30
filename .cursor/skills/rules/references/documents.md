@@ -14,5 +14,7 @@ Apply when writing or modifying `.md` / `.mdc` body shape. Issue / README substa
 
 ## Writing
 
-- Bold (`**…**`) — at most one per paragraph. Use only when emphasis is truly necessary (e.g., important warnings or terms defined only once).
+- Bold (`**…**`) — at most one per paragraph (a list item counts as its own paragraph). Bold is scarce, not forbidden: keep one signal when readers must not skip a constraint, boundary, or cross-ref.
+- Structural labels (`**Default:**`, `**Exit:**`, `**Harness:**`) — preserve structure with headings (or an equivalent outline), not bold lead-ins.
+- When cleaning label-bold, do not strip other emphasis; remove decoration, keep sparse signals.
 - Tables — small/medium width, **total cell characters per row < 100**. For multi-row content, use headings or nested bullet points. If a table is in a provided template, follow the template but keep it compact.

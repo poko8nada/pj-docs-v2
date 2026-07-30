@@ -10,7 +10,9 @@ disable-model-invocation: true
 
 # work
 
-Hands-on phase for what **this session** already agreed in discussion. Judgment lives in Goal / Discover / Build issues; concrete soft output lives under `findings/`.
+Hands-on phase for what **this session** already agreed in discussion.
+
+Judgment lives in Goal / Discover / Build issues; concrete soft output lives under `findings/`.
 
 Harness / meta / unrelated light fixes → `/chore`. Session direction → `/discussion`.
 
@@ -18,11 +20,17 @@ Running a skill unlocks the harness (it detects the skill file Read). That is no
 
 ## Agenda (required)
 
-Planning lives in the **`agenda` skill**. Situation guidance lives in its `references/` — execute the matching Goal/Discover or Build ref when inventoring and slicing.
+Planning lives in the `agenda` skill. Situation guidance lives in its `references/` — execute the matching Goal/Discover or Build ref when inventoring and slicing.
 
-**Harness:** Running the agenda skill opens `unlock.agenda` in work (the harness detects the skill file Read). Edits need `unlock.scope` → `unlock.agenda` → `unlock.rules`. `/chore` keeps `unlock.agenda` null.
+### Harness
 
-**Agreement:** After presenting the agenda (or the next slice), stop and wait for the user. Do not implement in the same turn as the first agenda dump.
+Running the agenda skill opens `unlock.agenda` in work (the harness detects the skill file Read).
+
+Edits need `unlock.scope` → `unlock.agenda` → `unlock.rules`. `/chore` keeps `unlock.agenda` null.
+
+### Agreement
+
+After presenting the agenda (or the next slice), stop and wait for the user. Do not implement **in the same turn** as the first agenda dump.
 
 ## Rail (every situation)
 

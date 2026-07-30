@@ -8,18 +8,25 @@ disable-model-invocation: true
 
 # chore
 
-Small, bounded changes only: typos, harness tweaks, meta fixes, and other light edits. **No Goal / Discover / Build track required.** Not for growing Discover/Build product work — that is `/work`.
+Small, bounded changes only: typos, harness tweaks, meta fixes, and other light edits.
+
+**No Goal / Discover / Build track required.** Not for growing Discover/Build product work — that is `/work`.
 
 ## On entry
 
 Inspect the repo (and issues only if relevant).
 
+- **Scope already agreed** in discussion → state the exact touch list briefly; do not re-dump Theme unless boundaries shifted.
 - **Scope clear** from the user (files named, `/chore` with a concrete ask) → execute `scope` (thin Theme is fine), state the exact touch list briefly, then edit after executing `rules`.
 - **Scope unclear** → execute `scope` and agree Theme / In / Out in chat before editing. Not a question dump.
 - **Actually product work** → say so; user invokes `/work` (or `/discussion` first).
 - **Scope creeps mid-work** → stop, restate the agreed touch list, or ask the user to switch phase (`/discussion` closes harness scope).
 
-Harness: edits need `unlock.scope` (running the scope skill) **before** `unlock.rules`. `/discussion` closes scope. **`unlock.agenda` is null here** — product planning is `/work` only.
+### Harness
+
+Edits need `unlock.scope` (running the scope skill) **before** `unlock.rules`. `/discussion` closes scope.
+
+**`unlock.agenda` is null here** — product planning is `/work` only.
 
 Revise until the user agrees the scope. Do not start editing on a vague “fix stuff”.
 

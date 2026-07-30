@@ -32,8 +32,10 @@ Two layers — do not collapse them:
 
 | Layer  | When                         | Density                                            |
 | ------ | ---------------------------- | -------------------------------------------------- |
-| Digest | slice enters implementation  | map — 完了, なぜ, steps with files and entries     |
+| Digest | slice enters implementation  | map — Done, Why, Steps with files and entries      |
 | Hint   | step number or stuck on beat | per-entry processing — no full implementation code |
+
+Before emitting Digest or Hint, execute `references/output-templates.md`.
 
 Deeper questions → answer in chat. Starting shape → `/stub` (one turn).
 
@@ -46,87 +48,13 @@ Numbered steps are **concern beats** — each beat advances the vertical concern
 - Do **not** invent test steps for UI-only work (Surface is enough).
 - Target **3–7** steps. Fewer than 3 → keep short. More than 7 → slice is too thick; cut the slice (Drive / `/work`), do not inflate the Digest.
 
-#### 1 — Digest
+#### Digest
 
-Output once when the slice enters implementation. No code fences (entries go under each file as plain text).
+Output once when the slice enters implementation. Shape, entry kinds, and field rules → `references/output-templates.md`.
 
-```markdown
-**完了:** （このスライスが終わったときの状態・1文）
+#### Hint
 
-**なぜ:**
-
-- （完了に近い条件）
-- （その前提）
-- …
-
-**ステップ:**（3–7）
-
-1. （動詞で始まる到達点・1行）
-   - **`package.json`** (`edit`)
-     - dependency: `zod` — runtime validation
-     - script: `test:run` → `vitest run`
-
-   - **`path/to/file.ts`** (`new`)
-     - `type Session = { userId: string; expiresAt: Date }`
-     - `function parseSession(raw: unknown): Session | null` — `raw`: … / returns: …
-
-   - **`path/to/file.test.ts`** (`new`)
-     - `describe('parseSession')` — cases: null input, invalid shape, valid
-
-2. …
-```
-
-**完了** — slice end state in one sentence. Not the whole product goal.
-
-**なぜ** — bullets only. Read top → bottom: closer to **完了** first, then prerequisites. Explains why this slice exists; do not repeat per step.
-
-**ステップ** — implementation order. Each file is one bullet; nest **that file’s entries** under it. Same path may appear in multiple steps.
-
-Write entries by kind — enough to implement without prose algorithms:
-
-| Kind           | Include                                                 |
-| -------------- | ------------------------------------------------------- |
-| 型             | fields, optional, union members                         |
-| 関数           | params, return type, throws if any                      |
-| コンポーネント | props, children, events                                 |
-| テスト         | `describe` / `it` angles                                |
-| 依存           | package name, dev/prod; `pnpm add` when one-off         |
-| config         | keys, plugins, paths, env var names                     |
-| ルート / API   | path, method, handler name                              |
-| スキーマ       | table, column, migration direction                      |
-| 定数 / env     | name, meaning, example value                            |
-| スクリプト     | `package.json` script name and command                  |
-| その他         | when not a symbol — what to do in that file (1–2 lines) |
-
-Do **not** add フロー, チェック, or per-step なぜ fields.
-
-Close with: step number → Hint; deeper detail → chat or `/stub`.
-
-#### 2 — Hint
-
-When the learner names a Digest step (by number) or is stuck on one beat.
-
-For **each entry in that step**, describe **what it does** — input, branches, return, config effect — in short bullets or lines. Teach processing, not file layout (Digest already has that).
-
-**Write:** responsibility, data flow, edge cases, one pitfall if non-obvious.
-
-**Do not write:** function bodies, import lists, or copy-paste-ready code. That is `/stub` or normal implementation, not Hint.
-
-```markdown
-### Hint: ステップ 2
-
-**`parseSession`**
-
-- takes `unknown`; non-object → `null`
-- requires `userId` string; otherwise `null`
-- returns `{ userId, expiresAt }` when valid
-
-**`Session`**
-
-- return shape for parse; `expiresAt` typed here if used later
-```
-
-Do not re-dump the whole Digest unless they ask to reorient.
+When the learner names a Digest step (by number) or is stuck on one beat. Shape and write/do-not-write rules → `references/output-templates.md`.
 
 ### `/stub`
 
@@ -154,3 +82,7 @@ While on and **not** in a `/stub` turn:
 
 - **Agents must not** invoke `/mentor`, `/mentor off`, or `/stub` on their own.
 - `/stub` while mentor is off is a harness no-op (see `stub` skill).
+
+## References
+
+- `references/output-templates.md` — Digest and Hint output shape (execute before emitting)
