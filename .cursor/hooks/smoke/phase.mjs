@@ -39,13 +39,8 @@ export function runPhaseCore(smoke) {
     const ctx0 = outInject.additional_context || '';
     assert('inject does not export gate env', outInject.env == null, JSON.stringify(outInject));
     assert(
-      'inject hints glob path',
-      ctx0.includes(`*__${id}.json`),
-      ctx0.includes('hooks/state') ? 'glob missing' : 'no gate section',
-    );
-    assert(
       'inject includes shell cwd rule',
-      ctx0.includes('Shell cwd') && ctx0.includes('git -C'),
+      ctx0.includes('Special rules') && ctx0.includes('## Shell') && ctx0.includes('git -C'),
       'shell section missing',
     );
     assert(
@@ -55,7 +50,7 @@ export function runPhaseCore(smoke) {
     );
     assert(
       'inject includes web tools',
-      ctx0.includes('Web tools') && ctx0.includes('web_search_exa') && ctx0.includes('WebFetch'),
+      ctx0.includes('## Web') && ctx0.includes('web_search_exa') && ctx0.includes('WebFetch'),
       'web section missing',
     );
     assert(
@@ -64,11 +59,14 @@ export function runPhaseCore(smoke) {
       'gate rules / review hint missing',
     );
     assert(
-      'inject includes discussion skill body last',
-      ctx0.includes('discussion (default phase)') &&
-        ctx0.includes('Agree **this session') &&
-        ctx0.lastIndexOf('discussion (default phase)') > ctx0.lastIndexOf('Gate state'),
-      'discussion section missing or not after gate',
+      'inject Gate rules are structured markdown',
+      ctx0.includes('## Phase') && ctx0.includes('## Edits') && ctx0.includes('## Review'),
+      'gate rules headings missing',
+    );
+    assert(
+      'inject has no discussion skill dump',
+      !ctx0.includes('discussion (default phase)'),
+      'discussion section should be gone',
     );
     assert('inject still no file', findStateFileName(root, id) === null);
 
@@ -338,7 +336,7 @@ export function runPhaseCore(smoke) {
     assert(
       'agenda open still denies Write without rules',
       outAfterAgenda.permission === 'deny' &&
-        String(outAfterAgenda.agent_message).includes('rules≠true') &&
+        String(outAfterAgenda.agent_message).includes('unlock.rules is not true') &&
         !String(outAfterAgenda.agent_message).includes('[gate-agenda]'),
       JSON.stringify(outAfterAgenda),
     );
@@ -387,7 +385,7 @@ export function runPhaseCore(smoke) {
     assert(
       'agenda open pnpm install deny is rules',
       outPnpmInstallRules.permission === 'deny' &&
-        String(outPnpmInstallRules.agent_message).includes('rules≠true'),
+        String(outPnpmInstallRules.agent_message).includes('unlock.rules is not true'),
       JSON.stringify(outPnpmInstallRules),
     );
   }

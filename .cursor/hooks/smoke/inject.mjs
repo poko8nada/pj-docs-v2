@@ -2,33 +2,65 @@
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runInjectGateListing(smoke) {
-  // inject Gate state + dir sort (13–14)
+  // inject Gate rules + dir sort (13–14)
   const { root, stateTmp, id, base, run, assert, findStateFileName, readdirSync } = smoke;
-  // 13. inject が Gate state を含む（既存ファイルがあれば実名）
+  // 13. inject は Shell / Web / Gate rules のみ（ライブ Gate state なし）
   {
     const out = run('inject-context.mjs', { ...base, is_background_agent: false });
     const ctx = out.additional_context || '';
-    const name = findStateFileName(root, id);
-    assert('inject mentions Gate state', ctx.includes('Gate state'), ctx.slice(0, 200));
-    assert('inject includes live review.files', ctx.includes('review.files:'), ctx.slice(0, 400));
-    assert('inject includes live read.skills', ctx.includes('read.skills:'), ctx.slice(0, 400));
-    assert('inject includes live read.refs', ctx.includes('read.refs:'), ctx.slice(0, 400));
+    assert('inject mentions Gate rules', ctx.includes('Gate rules'), ctx.slice(0, 200));
     assert(
-      'inject includes live issue handshake',
-      ctx.includes('unlock.issue:') && !ctx.includes('unlock.issueTemplate:'),
+      'inject includes Special rules',
+      ctx.includes('Special rules') && ctx.includes('## Shell') && ctx.includes('## Web'),
       ctx.slice(0, 400),
     );
-    assert('inject includes live scope', ctx.includes('unlock.scope:'), ctx.slice(0, 400));
-    assert('inject includes live agenda', ctx.includes('unlock.agenda:'), ctx.slice(0, 400));
+    assert(
+      'inject includes shell cwd rule',
+      ctx.includes('workspace root') && ctx.includes('git -C'),
+      ctx.slice(0, 400),
+    );
+    assert(
+      'inject includes web tools',
+      ctx.includes('web_search_exa') && ctx.includes('WebFetch') && ctx.includes('Context7'),
+      ctx.slice(0, 400),
+    );
+    assert(
+      'inject Gate rules has Phase heading',
+      ctx.includes('## Phase') && ctx.includes('unlock.scope'),
+      ctx.slice(0, 600),
+    );
+    assert(
+      'inject Gate rules has Edits heading',
+      ctx.includes('## Edits') && ctx.includes('unlock.agenda'),
+      ctx.slice(0, 600),
+    );
     assert(
       'inject mentions refs gate',
-      ctx.includes('Gate rules') && ctx.includes('read.refs') && ctx.includes('skill/name.md'),
+      ctx.includes('## References') && ctx.includes('read.refs') && ctx.includes('skill/name.md'),
+      ctx.slice(0, 600),
+    );
+    assert(
+      'inject mentions review',
+      ctx.includes('## Review') && ctx.includes('/pre-commit-reviewer'),
+      ctx.slice(0, 600),
+    );
+    assert(
+      'inject mentions state file naming',
+      ctx.includes('+0900__') && ctx.includes('<conversation_id>'),
+      ctx.slice(0, 600),
+    );
+    assert('inject has no Current values', !ctx.includes('Current values:'), ctx.slice(0, 400));
+    assert('inject has no Gate state section', !ctx.includes('Gate state'), ctx.slice(0, 400));
+    assert('inject has no AGENTS dump', !ctx.includes('# AGENTS.md'), ctx.slice(0, 400));
+    assert(
+      'inject has no discussion skill dump',
+      !ctx.includes('discussion (default phase)'),
       ctx.slice(0, 400),
     );
-    assert('inject mentions dated state path', Boolean(name && ctx.includes(name)), name);
-    assert('inject mentions discussion', ctx.includes('discussion'), '');
-    assert('inject mentions JST naming', ctx.includes('+0900'), '');
-    assert('inject mentions rules null semantics', ctx.includes('`null`'), '');
+    // sessionStart は state を作らない（id は payload にあるがファイル未作成でもよい）
+    void id;
+    void findStateFileName;
+    void root;
   }
 
   // 14. ディレクトリ一覧が日付順（ファイル名ソート）
@@ -59,7 +91,7 @@ export function runInjectSticky(smoke) {
     writeFileSync,
     join,
   } = smoke;
-  // 22. sessionStart inject: 前会話 sticky があっても payload の state を出す（sticky は触らない）
+  // 22. sessionStart inject: sticky があっても触らない（ライブ state は注入しない）
   {
     clearSticky();
     const prevId = 'stickyprv-0000-4000-8000-000000000001';
@@ -79,10 +111,10 @@ export function runInjectSticky(smoke) {
         },
         null,
         2,
-      ) + '\n',
+      ),
     );
     writeFileSync(
-      join(stateTmp, `20260719-130000+0900__${newId}.json`),
+      join(stateTmp, `20260719-120001+0900__${newId}.json`),
       JSON.stringify(
         {
           phase: 'discussion',
@@ -96,7 +128,7 @@ export function runInjectSticky(smoke) {
         },
         null,
         2,
-      ) + '\n',
+      ),
     );
     // 前会話を sticky に残す
     writeFileSync(
@@ -114,13 +146,13 @@ export function runInjectSticky(smoke) {
     });
     const ctx = out.additional_context || '';
     assert(
-      'inject prefers new conversation over sticky',
-      ctx.includes(newId) && ctx.includes('phase: discussion') && ctx.includes('label: new'),
+      'inject still returns slim context',
+      ctx.includes('Gate rules') && ctx.includes('Special rules') && ctx.includes('## Shell'),
       ctx.slice(0, 600),
     );
     assert(
-      'inject does not show previous sticky chore unlock',
-      !ctx.includes('phase: chore') && !ctx.includes('label: prev'),
+      'inject does not dump sticky conversation state',
+      !ctx.includes('label: prev') && !ctx.includes('label: new') && !ctx.includes('phase: chore'),
       ctx.slice(0, 600),
     );
     assert(

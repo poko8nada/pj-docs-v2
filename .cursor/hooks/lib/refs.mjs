@@ -4,6 +4,7 @@
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { formatDeny } from './deny-format.mjs';
 
 const SKILLS_ROOT = '.cursor/skills';
 const RULES_SKILL = 'rules';
@@ -155,10 +156,14 @@ export function refIdToRelPath(refId) {
 /** @param {string[]} missing */
 export function denyRefsMessage(missing) {
   if (missing.includes(ANY_RULES_REF)) {
-    return (
-      `[gate-refs] Missing rules reference. ` +
-      `Execute at least one file under \`${SKILLS_ROOT}/${RULES_SKILL}/references/\` before editing this path.`
-    );
+    return formatDeny({
+      tag: 'gate-refs',
+      why: 'Missing rules reference: at least one file under rules/references is required before editing this path.',
+      next: [
+        `Execute at least one file under \`${SKILLS_ROOT}/${RULES_SKILL}/references/\`.`,
+        'Retry the edit only after that Read is recorded.',
+      ],
+    });
   }
   const list = missing
     .map((m) => {
@@ -166,8 +171,12 @@ export function denyRefsMessage(missing) {
       return rel ? `\`${rel}\`` : `\`${m}\``;
     })
     .join(', ');
-  return (
-    `[gate-refs] Missing rules reference(s): ${list}. ` +
-    'Execute the listed file(s) before editing this path.'
-  );
+  return formatDeny({
+    tag: 'gate-refs',
+    why: `Missing rules reference(s): ${list}.`,
+    next: [
+      'Execute the listed reference file(s).',
+      'Retry the edit only after those Reads are recorded.',
+    ],
+  });
 }

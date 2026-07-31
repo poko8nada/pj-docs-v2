@@ -5,6 +5,7 @@
  * Goal/Discover/Build テンプレ実行（Read 検知）→ read.refs に `issue/<template>.md`（isIssueReady が参照）。
  */
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
+import { formatDeny } from './deny-format.mjs';
 import { normalizeReadRefs } from './refs.mjs';
 import { isSpecFlowPhase } from './state.mjs';
 
@@ -77,11 +78,32 @@ export function templateHintForPhase(phase) {
 
 /** @param {{ phase?: string, unlock?: { issue?: boolean | null }, read?: { refs?: string[] } }} state */
 export function denyIssueMessage(state) {
-  if (!isSpecFlowPhase(state?.phase)) return '[gate-issue] unexpected phase';
-  if (state.unlock?.issue !== true) {
-    return `[gate-issue] Before issue writes, run \`${ISSUE_SKILL_REL}\` first.`;
+  if (!isSpecFlowPhase(state?.phase)) {
+    return formatDeny({
+      tag: 'gate-issue',
+      why: 'Issue write gate invoked in an unexpected phase.',
+      next: ['Use `/work` for Goal/Discover/Build issue mutations.'],
+    });
   }
-  return `[gate-issue] Before issue writes, execute the matching template: ${templateHintForPhase(state.phase)}.`;
+  if (state.unlock?.issue !== true) {
+    return formatDeny({
+      tag: 'gate-issue',
+      why: 'unlock.issue is not true.',
+      next: [
+        `Read \`${ISSUE_SKILL_REL}\` first (opens unlock.issue).`,
+        'Then execute the matching issue template under references/.',
+        'Retry the gh issue write only after that.',
+      ],
+    });
+  }
+  return formatDeny({
+    tag: 'gate-issue',
+    why: 'Issue skill is open but the matching template is not in read.refs yet.',
+    next: [
+      `Execute the matching template: ${templateHintForPhase(state.phase)}.`,
+      'Retry the gh issue write only after the template Read is recorded.',
+    ],
+  });
 }
 
 function stripQuotesAndHeredoc(command) {

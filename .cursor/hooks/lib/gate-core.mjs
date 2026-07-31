@@ -17,6 +17,7 @@ import {
 } from './bootstrap.mjs';
 import { DENY_MENTOR, isMentorCodeBlocked, isMentorDeniedPath } from './mentor.mjs';
 import { logHookIds } from './id-log.mjs';
+import { formatDeny } from './deny-format.mjs';
 import { commandIncludesGitCommit, denyReviewMessage, isReviewablePath } from './review.mjs';
 import { denyRefsMessage, missingRefs, requiredRefsForPath } from './refs.mjs';
 import { commandIncludesGhIssueMutation, denyIssueMessage, isIssueReady } from './issue.mjs';
@@ -37,35 +38,104 @@ import { playDenySound } from './notify-deny.mjs';
 
 const WRITE_TOOLS = new Set(['Write', 'StrReplace', 'Delete', 'EditNotebook']);
 
-const DENY_STATE =
-  '[gate] Gate state files are hooks-only. Read is allowed; do not edit `.cursor/hooks/state/**`.';
+const RULES_SKILL = '.cursor/skills/rules/SKILL.md';
+const SCOPE_SKILL = '.cursor/skills/scope/SKILL.md';
+
+const DENY_STATE = formatDeny({
+  tag: 'gate',
+  why: 'Gate state files are hooks-only (`.cursor/hooks/state/**`).',
+  next: [
+    'Read state if needed; do not Write/StrReplace/Delete or Shell-redirect into that directory.',
+  ],
+  doNot: [
+    'Edit or redirect into `.cursor/hooks/state/**`.',
+    'Retry the same write after renaming paths that still land under state/.',
+  ],
+});
 
 /** @param {string} phase */
 function denyCodeMessage(phase) {
   const p = phase || 'discussion';
   if (WORK_PHASES.has(p)) {
-    return `[gate] Edits blocked (phase=${p}, rules≠true). Run .cursor/skills/rules/SKILL.md to unlock.`;
+    return formatDeny({
+      tag: 'gate',
+      why: `Edits blocked (phase=${p}): unlock.rules is not true.`,
+      next: [
+        `Read \`${RULES_SKILL}\` (opens unlock.rules).`,
+        'Read at least one matching `rules/references/*`.',
+        'Retry the edit only after that.',
+      ],
+    });
   }
-  return `[gate] Edits blocked (phase=${p}). Enter a work phase (/work|/chore), then run .cursor/skills/rules/SKILL.md.`;
+  return formatDeny({
+    tag: 'gate',
+    why: `Edits blocked (phase=${p}): not in a work phase.`,
+    next: [
+      'Ask the user to send `/work` or `/chore`.',
+      `Then read \`${SCOPE_SKILL}\` if unlock.scope is false, then \`${RULES_SKILL}\`.`,
+      'Retry the edit only after unlocks are open.',
+    ],
+  });
 }
 
 /** @param {string} phase */
 function denyShellMessage(phase) {
   const p = phase || 'discussion';
   if (WORK_PHASES.has(p)) {
-    return `[gate] Shell blocked (phase=${p}, rules≠true). gh/git are allowed; other commands need the rules skill. Prefer --body-file path over <(cat <<EOF) if a gh/git command was denied unexpectedly.`;
+    return formatDeny({
+      tag: 'gate',
+      why: `Shell blocked (phase=${p}): unlock.rules is not true (gh/git read-write policy still applies).`,
+      next: [
+        `Read \`${RULES_SKILL}\` for non-allowlisted Shell.`,
+        'Prefer `--body-file` over process-substitution heredoc if gh/git was denied unexpectedly.',
+        'Retry only after unlock.rules is true (or use an allowlisted read-only command).',
+      ],
+    });
   }
-  return `[gate] Shell blocked (phase=${p}). Read-only commands + read-only gh/git only. Enter a work phase for gh/git writes; other commands need the rules skill.`;
+  return formatDeny({
+    tag: 'gate',
+    why: `Shell blocked (phase=${p}): discussion allows read-only commands and read-only gh/git only.`,
+    next: [
+      'Use read-only Shell, or ask the user for `/work`|/chore` for mutating Shell.',
+      `After a work phase: open scope if needed, then \`${RULES_SKILL}\` for non-allowlisted commands.`,
+    ],
+  });
 }
 
-const DENY_SCOPE =
-  '[gate-scope] Scope is closed. Run `.cursor/skills/scope/SKILL.md` to agree Theme and open `unlock.scope` before edits. Close is `/discussion` only.';
+const DENY_SCOPE = formatDeny({
+  tag: 'gate-scope',
+  why: 'unlock.scope is false (session focus is not locked).',
+  next: [
+    `Read \`${SCOPE_SKILL}\` (opens unlock.scope).`,
+    'Agree Theme with the user; run set-label when stable.',
+    'Retry the edit only after unlock.scope is true.',
+  ],
+});
 
-const DENY_BOOTSTRAP =
-  '[gate] Bootstrap marker is hooks-only. User invokes /bootstrap or /bootstrap off.';
+const DENY_BOOTSTRAP = formatDeny({
+  tag: 'gate',
+  why: 'Bootstrap marker is hooks-only (`.cursor/hooks/.bootstrap`).',
+  next: [
+    'User sends `/bootstrap` or `/bootstrap off` — agents must not create or delete the marker.',
+  ],
+  doNot: [
+    'Write/Delete/Shell-redirect the bootstrap marker.',
+    'Invent a bypass while claiming bootstrap is on.',
+  ],
+});
 
-const DENY_CD_ROOT =
-  '[reject-cd-root] Shell is already at the workspace root. Remove `cd` and any absolute path to the workspace (including `git -C`). Run commands as-is — e.g. `git add … && git commit …`.';
+const DENY_CD_ROOT = formatDeny({
+  tag: 'reject-cd-root',
+  why: 'Shell is already at the workspace root; `cd` to root / `git -C <workspace-root>` is prohibited.',
+  next: [
+    'Remove `cd` and any absolute path to the workspace root.',
+    'Run the command as-is from cwd (e.g. `git add … && git commit …`).',
+  ],
+  doNot: [
+    'Retry with a different `cd`/`git -C` spelling to the same root.',
+    'Chain `cd` into subdirs only to `cd ..` back to root for the real work.',
+  ],
+});
 
 const READONLY_CMDS = new Set([
   'ls',
@@ -219,7 +289,18 @@ function checkPathOutsideRoot(root, filePath) {
   const normalized = normalizePath(root, filePath);
   if (isInside(root, normalized)) return null;
   if (allowedExternalRoots().some((p) => isInside(p, normalized))) return null;
-  return `[restrict-root] Access outside the project root directory is prohibited: ${filePath}`;
+  return formatDeny({
+    tag: 'restrict-root',
+    why: `Access outside the project root is prohibited: ${filePath}`,
+    next: [
+      'Use paths under the workspace root only.',
+      'Retry with a relative or in-root absolute path.',
+    ],
+    doNot: [
+      'Retry with another absolute path outside the workspace.',
+      'Use Shell tricks to touch outside-root files.',
+    ],
+  });
 }
 
 function extractPathsFromCommand(command) {

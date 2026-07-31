@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { isBootstrapMarkerPath } from './bootstrap.mjs';
+import { formatDeny } from './deny-format.mjs';
 import { isUnderStateDir } from './state.mjs';
 
 /** コード＋CSS＋HTMLのみ（md/json/yaml は Issue 下書き等で gate を汚さない） */
@@ -18,11 +19,18 @@ export const REVIEW_DIFF_MAX_TOTAL = 48000;
 /** @param {string[]} files */
 export function denyReviewMessage(files) {
   const list = Array.isArray(files) && files.length > 0 ? files.join(', ') : '(none)';
-  return (
-    `[gate-review] review.files is non-empty (unreviewed): ${list}. ` +
-    'Run `/pre-commit-reviewer` to clear them, then `git commit`. ' +
-    '`git add` order does not matter.'
-  );
+  return formatDeny({
+    tag: 'gate-review',
+    why: `review.files is non-empty (unreviewed): ${list}.`,
+    next: [
+      'Run `/pre-commit-reviewer` to clear review.files.',
+      'Then `git commit` (`git add` order does not matter).',
+    ],
+    doNot: [
+      'Retry `git commit` unchanged while review.files is non-empty.',
+      'Skip the reviewer or invent a commit flag to bypass hooks.',
+    ],
+  });
 }
 
 export const REVIEW_INJECT_MARKER = '[harness-review]';

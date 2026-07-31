@@ -4,13 +4,24 @@
  */
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { formatDeny } from './deny-format.mjs';
 import { isReviewablePath } from './review.mjs';
 import { formatJstIso, isUnknownConversationId, stateDir } from './state.mjs';
 
 export const LAST_STUB_FILENAME = 'last-stub';
 
-export const DENY_MENTOR =
-  '[gate-mentor] Code edits blocked while `/mentor` is on. User sends `/stub` for one turn, or `/mentor off` to leave mentor.';
+export const DENY_MENTOR = formatDeny({
+  tag: 'gate-mentor',
+  why: 'Code edits are blocked while `/mentor` is on (human implements; agent advises).',
+  next: [
+    'User sends `/stub` for a one-turn scaffold unlock, or `/mentor off` to leave mentor.',
+    'Agents must not invoke `/stub` or `/mentor` themselves.',
+  ],
+  doNot: [
+    'Retry Write/StrReplace on reviewable code while mentor is on without `/stub`.',
+    'Work around via Shell redirects to the same code paths.',
+  ],
+});
 
 export function lastStubPath(root) {
   return join(stateDir(root), LAST_STUB_FILENAME);
