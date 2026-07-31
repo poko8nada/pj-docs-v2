@@ -2,24 +2,20 @@
 name: stub
 description: >-
   One-turn code scaffold while /mentor is on. Harness no-op if mentor is off.
-  User-only — do not self-invoke.
+  User-only — agents must not self-invoke.
 disable-model-invocation: true
 ---
 
 # stub
 
-**User-only.** Under `/mentor`, ask the agent to **write code for this one turn** — usually a scaffold (signatures, stubs, TODOs) so the human can fill the rest. Normal phase / `unlock.rules` / refs / review still apply.
+Unlocks code edits for the agent response that contains `/stub` only. Prefer signatures / stubs / TODOs unless the user asks for more that turn. Next prompt clears the unlock.
 
-Not an exit from mentor. Leave mentor with `/mentor off`.
+## Steps
 
-## When mentor is on
+1. Mentor on → write minimal scaffold for this turn. Caller still runs `rules` / refs / review as usual.
+2. Mentor off → no-op; use `/mentor` first if mentoring is intended.
+3. Not an exit from mentor — leave with `/mentor off`.
 
-The prompt that contains `/stub` unlocks code edits for that agent response only. Prefer minimal structure over a full implementation unless the user asks for more in the same turn. The next user prompt clears the unlock.
+## Limits
 
-## When mentor is off
-
-**Harness no-op** — does not unlock anything. Mentoring is not active; use normal Agent flow (or `/mentor` first).
-
-## Hard limits
-
-- **Agents must not** invoke `/stub` on their own.
+- Agents must not invoke `/stub`.
