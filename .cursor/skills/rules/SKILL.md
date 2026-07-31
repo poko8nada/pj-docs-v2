@@ -29,6 +29,8 @@ Apply matching references, then edit. Reading this file opens `unlock.rules`.
 4. Confirm — list concrete files / symbols changed.
 5. If pending `NOTE:` in changed files: `rg -n 'NOTE:' …` — keep, or delete after user OK (`notes`), or mention if unsure.
 6. Before commit if `review.files` non-empty: `notes` Commit check → `/pre-commit-reviewer`.
+   - `REVIEW: PASS` → stop or `git commit` (clears via harness).
+   - `REVIEW: GAPS` → show the user. If items match **already agreed** tradeoffs, confirm that exclusion, then re-invoke the reviewer with those items listed as user-accepted (review the rest only). Do not invent PASS. Unagreed gaps → fix or re-agree before another review.
 
 Phase re-entry clears progress — run this skill and refs again.
 

@@ -42,3 +42,12 @@ Report findings above the verdict line. End with exactly one line:
 
 - `REVIEW: PASS` — no blocking gaps
 - `REVIEW: GAPS` — numbered list of issues with file:line references
+
+## Accepted exclusions
+
+When the parent says the user already accepted specific findings (agreed tradeoffs):
+
+1. Do not treat those items as blockers.
+2. Re-check everything else in the injection.
+3. `REVIEW: PASS` only if nothing else blocks. `REVIEW: GAPS` for remaining issues only.
+4. Do not PASS solely because exclusions were listed — still review the rest.
