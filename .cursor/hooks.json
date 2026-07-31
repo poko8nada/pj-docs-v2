@@ -80,6 +80,10 @@
     ],
     "stop": [
       {
+        "command": "node .cursor/hooks/track.mjs",
+        "failClosed": false
+      },
+      {
         "command": "node .cursor/hooks/check.mjs",
         "failClosed": false,
         "timeout": 120

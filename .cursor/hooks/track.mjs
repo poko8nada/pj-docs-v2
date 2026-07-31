@@ -8,6 +8,7 @@
  * | Read*              | unlock + read.skills / read.refs            |
  * | postToolUse Write* | review.files + check.pending + format（失敗は context） |
  * | preToolUse Task         | inject review.files（clear はしない）            |
+ * | stop                    | unused PASS 子があれば review clear + used フラグ |
  * | afterShellExecution     | git commit 成功 → review/check reset          |
  */
 import { realpathSync } from 'node:fs';
@@ -16,9 +17,11 @@ import { disableBootstrap, enableBootstrap } from './lib/bootstrap.mjs';
 import { clearStubTurn, enableStubTurn, isMentorActive } from './lib/mentor.mjs';
 import {
   commandIncludesGitCommit,
+  findReviewPassTranscript,
   injectReviewFilesIntoTaskInput,
   isPreCommitReviewerContext,
   isReviewablePath,
+  markReviewPassUsed,
 } from './lib/review.mjs';
 import { skillRefIdFromPath } from './lib/refs.mjs';
 import { ISSUE_SKILL_REL } from './lib/issue.mjs';
@@ -35,6 +38,7 @@ import {
   markReviewDirty,
   markReadRef,
   markReadSkill,
+  clearReviewFiles,
   normalizeReview,
   normalizeCheck,
   PHASE_DISCUSSION,
@@ -322,9 +326,8 @@ function handlePreToolUseTask(root, payload) {
   if (!isReviewBlocking(state)) return allow();
 
   const files = [...normalizeReview(state.review).files];
-  const nonce = normalizeReview(state.review).nonce;
   const toolInput = payload.tool_input ?? {};
-  const updatedInput = injectReviewFilesIntoTaskInput(toolInput, root, files, nonce);
+  const updatedInput = injectReviewFilesIntoTaskInput(toolInput, root, files);
   // clear は commit 時の PASS transcript スキャンに任せる（起動時 clear しない）
 
   if (updatedInput) {
@@ -360,6 +363,24 @@ function handleAfterShellExecution(root, payload) {
   return empty();
 }
 
+/**
+ * ターン終了: unused PASS 子があればこの会話の review を clear し used フラグを付ける。
+ * commit 前スキャンは保険として残す。
+ */
+function handleStop(root, payload) {
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  if (!isReviewBlocking(state)) return empty();
+
+  const review = normalizeReview(state.review);
+  const passJsonl = findReviewPassTranscript(root, review.dirtyAt, id);
+  if (!passJsonl) return empty();
+
+  markReviewPassUsed(passJsonl);
+  clearReviewFiles(root, id);
+  return empty();
+}
+
 async function main() {
   const payload = await readStdinJson();
   logHookIds(payload, 'track.mjs');
@@ -369,6 +390,10 @@ async function main() {
 
   if (event === 'beforeSubmitPrompt') {
     return handleBeforeSubmitPrompt(root, payload);
+  }
+
+  if (event === 'stop') {
+    return handleStop(root, payload);
   }
 
   if (event === 'afterShellExecution') {

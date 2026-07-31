@@ -13,7 +13,6 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { randomBytes } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeReadRefs, discoverSkillNames } from './refs.mjs';
@@ -237,11 +236,11 @@ export function statePathRelative(root, id) {
   return `.cursor/hooks/state/*__${sanitizeConversationId(id)}.json`;
 }
 
-/** review は files + dirtyAt + nonce。空 files = commit OK */
+/** review は files + dirtyAt。空 files = commit OK */
 
-/** @returns {{ files: string[], dirtyAt: string | null, nonce: string | null }} */
+/** @returns {{ files: string[], dirtyAt: string | null }} */
 export function defaultReview() {
-  return { files: [], dirtyAt: null, nonce: null };
+  return { files: [], dirtyAt: null };
 }
 
 /** @returns {{ pending: string[] }} */
@@ -259,7 +258,7 @@ export function normalizeCheck(check) {
 
 /**
  * 旧 { status } / { required, done } は無視。
- * files + dirtyAt + nonce を正規化。
+ * files + dirtyAt を正規化。
  */
 export function normalizeReview(review) {
   if (!review || typeof review !== 'object') return defaultReview();
@@ -268,11 +267,7 @@ export function normalizeReview(review) {
     : [];
   const dirtyAt =
     typeof review.dirtyAt === 'string' && review.dirtyAt.trim() ? review.dirtyAt.trim() : null;
-  const nonce =
-    typeof review.nonce === 'string' && /^[a-f0-9]{8,32}$/i.test(review.nonce.trim())
-      ? review.nonce.trim().toLowerCase()
-      : null;
-  return { files, dirtyAt, nonce };
+  return { files, dirtyAt };
 }
 
 /** Read した `.cursor/skills/<name>/SKILL.md` の name（重複なし・ソート） */
@@ -531,7 +526,7 @@ export function isReviewBlocking(state) {
   return normalizeReview(state?.review).files.length > 0;
 }
 
-/** rules 解禁後の reviewable 編集を files に積む。毎回 dirtyAt + nonce を更新 */
+/** rules 解禁後の reviewable 編集を files に積む。毎回 dirtyAt を更新 */
 export function markReviewDirty(root, id, filePath) {
   const prev = loadState(root, id);
   const abs = resolve(filePath);
@@ -539,8 +534,6 @@ export function markReviewDirty(root, id, filePath) {
   const review = normalizeReview(prev.review);
   if (rel && !review.files.includes(rel)) review.files.push(rel);
   review.dirtyAt = formatJstIso();
-  // conversation 間の PASS 取り違え防止。再 dirty で旧 PASS を無効化
-  review.nonce = randomBytes(8).toString('hex');
   return saveState(root, id, { phase: prev.phase, review });
 }
 

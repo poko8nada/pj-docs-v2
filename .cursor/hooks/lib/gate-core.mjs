@@ -23,6 +23,7 @@ import {
   denyReviewMessage,
   findReviewPassTranscript,
   isReviewablePath,
+  markReviewPassUsed,
 } from './review.mjs';
 import { denyRefsMessage, missingRefs, requiredRefsForPath } from './refs.mjs';
 import { commandIncludesGhIssueMutation, denyIssueMessage, isIssueReady } from './issue.mjs';
@@ -699,16 +700,18 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
   const outsideErr = denyOutsidePathsInCommand(root, command);
   if (outsideErr) return deny(outsideErr);
 
-  // git commit: dirtyAt（欠落時は epoch）以降の子 transcript に REVIEW: PASS があれば clear
+  // git commit: dirtyAt（欠落時は epoch）以降の unused PASS 子 transcript があれば clear
   if (commandIncludesGitCommit(command) && isReviewBlocking(state)) {
     const review = normalizeReview(state.review);
-    if (findReviewPassTranscript(root, review.dirtyAt, id, review.nonce)) {
+    const passJsonl = findReviewPassTranscript(root, review.dirtyAt, id);
+    if (passJsonl) {
+      markReviewPassUsed(passJsonl);
       clearReviewFiles(root, id);
       state = loadState(root, id);
     }
     if (isReviewBlocking(state)) {
       const blocked = normalizeReview(state.review);
-      return deny(denyReviewMessage(blocked.files, blocked.nonce));
+      return deny(denyReviewMessage(blocked.files));
     }
   }
 

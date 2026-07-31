@@ -1,6 +1,6 @@
 /** smoke: review */
-import { utimesSync } from 'node:fs';
-import { reviewNonceToken } from '../lib/review.mjs';
+import { existsSync, utimesSync } from 'node:fs';
+import { reviewPassUsedPath } from '../lib/review.mjs';
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runReviewGate(smoke) {
@@ -98,7 +98,7 @@ export function runReviewGate(smoke) {
       'preToolUse Task injects review.files into prompt',
       injectOut.permission === 'allow' &&
         injected.includes('[harness-review]') &&
-        injected.includes('[harness-review-nonce:') &&
+        !injected.includes('[harness-review-nonce:') &&
         injected.includes('utils/_review-probe.ts') &&
         injected.includes('.cursor/hooks/_harness-review-probe.mjs') &&
         injected.includes('reviewProbe') &&
@@ -148,24 +148,18 @@ export function runReviewGate(smoke) {
     const transcriptsDir = mkdtempSync(join(smokeTmpRoot, 'review-gate-tx-'));
     const childId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
     mkdirSync(join(transcriptsDir, childId), { recursive: true });
-    const gateNonce = loadState(root, reviewId).review.nonce;
-    const gateToken = reviewNonceToken(gateNonce);
+    const gatePrompt = `Full Repository Path: ${resolve(root)}\nDiff: uncommitted changes\n`;
     writeFileSync(
       join(transcriptsDir, childId, `${childId}.jsonl`),
       `${JSON.stringify({
         role: 'user',
         message: {
-          content: [
-            {
-              type: 'text',
-              text: `Full Repository Path: ${resolve(root)}\nDiff: uncommitted changes\n${gateToken}\n`,
-            },
-          ],
+          content: [{ type: 'text', text: gatePrompt }],
         },
       })}\n${JSON.stringify({
         role: 'assistant',
         message: {
-          content: [{ type: 'text', text: `ack ${gateToken}\nREVIEW: PASS\n` }],
+          content: [{ type: 'text', text: 'REVIEW: PASS\n' }],
         },
       })}\n`,
     );
@@ -180,6 +174,7 @@ export function runReviewGate(smoke) {
       { CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir },
     );
     const stReviewed = loadState(root, reviewId);
+    const gatePassJsonl = join(transcriptsDir, childId, `${childId}.jsonl`);
     assert(
       'PASS transcript after Task allows commit and clears files',
       allowCommit.permission === 'allow' &&
@@ -187,6 +182,11 @@ export function runReviewGate(smoke) {
         stReviewed.review.files.length === 0 &&
         stReviewed.review.dirtyAt == null,
       JSON.stringify({ allowCommit, review: stReviewed.review }),
+    );
+    assert(
+      'Task PASS clear marks harness-pass-used',
+      existsSync(reviewPassUsedPath(gatePassJsonl)),
+      reviewPassUsedPath(gatePassJsonl),
     );
 
     run('track.mjs', {
@@ -298,11 +298,7 @@ export function runReviewGate(smoke) {
       );
     }
 
-    const goodPrompt = () => {
-      const n = loadState(root, passId).review.nonce;
-      const token = reviewNonceToken(n);
-      return `Full Repository Path: ${resolve(root)}\nDiff: uncommitted changes\n${token ? `${token}\n` : ''}`;
-    };
+    const goodPrompt = () => `Full Repository Path: ${resolve(root)}\nDiff: uncommitted changes\n`;
 
     run('track.mjs', {
       ...passBase,
@@ -406,26 +402,6 @@ export function runReviewGate(smoke) {
       JSON.stringify(afterNoSig),
     );
 
-    writeChildJsonl(
-      'REVIEW: PASS\n',
-      `Full Repository Path: ${resolve(root)}\nDiff: uncommitted changes\n[harness-review-nonce:deadbeefcafebabe]\n`,
-    );
-    const afterWrongNonce = run(
-      'gate.mjs',
-      {
-        ...passBase,
-        hook_event_name: 'beforeShellExecution',
-        command: 'git commit -m test',
-      },
-      { CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir },
-    );
-    assert(
-      'PASS with wrong nonce does not clear',
-      afterWrongNonce.permission === 'deny' &&
-        loadState(root, passId).review.files.includes('utils/_review-pass-probe.ts'),
-      JSON.stringify(afterWrongNonce),
-    );
-
     // dirtyAt より後の mtime になるよう、dirty 後に PASS transcript を書く
     writeChildJsonl('Looks good.\n\nREVIEW: PASS\n', goodPrompt());
 
@@ -439,6 +415,7 @@ export function runReviewGate(smoke) {
       { CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir },
     );
     const stCleared = loadState(root, passId);
+    const passJsonlPath = join(childDir, `${childId}.jsonl`);
     assert(
       'PASS transcript clears review and allows commit',
       afterPass.permission === 'allow' &&
@@ -447,8 +424,35 @@ export function runReviewGate(smoke) {
         stCleared.review.dirtyAt == null,
       JSON.stringify({ afterPass, review: stCleared.review }),
     );
+    assert(
+      'PASS clear writes harness-pass-used flag',
+      existsSync(reviewPassUsedPath(passJsonlPath)),
+      reviewPassUsedPath(passJsonlPath),
+    );
 
-    // 移行: dirtyAt null + files 非空でも PASS で clear できる
+    // used 付き PASS は再利用できない
+    saveState(root, passId, {
+      phase: 'chore',
+      review: { files: ['utils/_review-pass-probe.ts'], dirtyAt: null },
+    });
+    const reuseDeny = run(
+      'gate.mjs',
+      {
+        ...passBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      { CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir },
+    );
+    assert(
+      'used PASS does not clear again',
+      reuseDeny.permission === 'deny' &&
+        loadState(root, passId).review.files.includes('utils/_review-pass-probe.ts'),
+      JSON.stringify(reuseDeny),
+    );
+
+    // 移行: dirtyAt null + files 非空でも（unused の）PASS で clear できる
+    unlinkSync(reviewPassUsedPath(passJsonlPath));
     saveState(root, passId, {
       phase: 'chore',
       review: { files: ['utils/_review-pass-probe.ts'], dirtyAt: null },
@@ -525,6 +529,104 @@ export function runReviewGate(smoke) {
 
     try {
       unlinkSync(join(root, 'utils/_review-pass-probe.ts'));
+    } catch {
+      // 無ければ無視
+    }
+  }
+
+  // 21c. stop: unused PASS → clear + used（commit 前にターン終了する想定）
+  {
+    const stopId = 'review-stop-clear-id';
+    const stopBase = { conversation_id: stopId, workspace_roots: [root], cwd: root };
+    const transcriptsDir = mkdtempSync(join(smokeTmpRoot, 'transcripts-stop-'));
+    const childId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    mkdirSync(join(transcriptsDir, childId), { recursive: true });
+
+    run('track.mjs', {
+      ...stopBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore review stop clear',
+    });
+    run('track.mjs', {
+      ...stopBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/scope/SKILL.md') },
+    });
+    run('track.mjs', {
+      ...stopBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
+    });
+    trackReadTsRef(stopBase);
+    writeFileSync(join(root, 'utils/_review-stop-probe.ts'), 'export const reviewStopProbe = 1;\n');
+    run('track.mjs', {
+      ...stopBase,
+      hook_event_name: 'postToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, 'utils/_review-stop-probe.ts') },
+    });
+
+    const jsonl = join(transcriptsDir, childId, `${childId}.jsonl`);
+    writeFileSync(
+      jsonl,
+      `${JSON.stringify({
+        role: 'user',
+        message: {
+          content: [
+            {
+              type: 'text',
+              text: `Full Repository Path: ${resolve(root)}\nDiff: uncommitted changes\n`,
+            },
+          ],
+        },
+      })}\n${JSON.stringify({
+        role: 'assistant',
+        message: { content: [{ type: 'text', text: 'REVIEW: PASS\n' }] },
+      })}\n`,
+    );
+
+    run(
+      'track.mjs',
+      {
+        ...stopBase,
+        hook_event_name: 'stop',
+        status: 'completed',
+      },
+      { CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir },
+    );
+    const stStopped = loadState(root, stopId);
+    assert(
+      'stop clears review on unused PASS',
+      Array.isArray(stStopped.review?.files) &&
+        stStopped.review.files.length === 0 &&
+        stStopped.review.dirtyAt == null,
+      JSON.stringify(stStopped.review),
+    );
+    assert(
+      'stop marks harness-pass-used',
+      existsSync(reviewPassUsedPath(jsonl)),
+      reviewPassUsedPath(jsonl),
+    );
+
+    const afterStopCommit = run(
+      'gate.mjs',
+      {
+        ...stopBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      { CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir },
+    );
+    assert(
+      'commit allows after stop clear',
+      afterStopCommit.permission === 'allow',
+      JSON.stringify(afterStopCommit),
+    );
+
+    try {
+      unlinkSync(join(root, 'utils/_review-stop-probe.ts'));
     } catch {
       // 無ければ無視
     }

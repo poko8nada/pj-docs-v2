@@ -2,10 +2,10 @@
  * Pre-commit reviewer gate — path rules, Task 識別、review.files + diff の Task 注入、
  * commit 時の子 transcript PASS クリア。
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { homedir } from 'node:os';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { isBootstrapMarkerPath } from './bootstrap.mjs';
 import { formatDeny } from './deny-format.mjs';
 import { isUnderStateDir } from './state.mjs';
@@ -18,38 +18,24 @@ export const REVIEW_DIFF_MAX_PER_FILE = 8000;
 /** 注入全体のソフト上限 */
 export const REVIEW_DIFF_MAX_TOTAL = 48000;
 
-/** @param {string[]} files @param {string | null} [nonce] */
-export function denyReviewMessage(files, nonce = null) {
+/** @param {string[]} files */
+export function denyReviewMessage(files) {
   const list = Array.isArray(files) && files.length > 0 ? files.join(', ') : '(none)';
-  const token = reviewNonceToken(nonce);
   return formatDeny({
     tag: 'gate-review',
     why: `review.files is non-empty (unreviewed): ${list}.`,
     next: [
-      token
-        ? `Run \`/pre-commit-reviewer\` (or Task/Subagent) with token \`${token}\` in the prompt; need \`REVIEW: PASS\`.`
-        : 'Run `/pre-commit-reviewer` (need `REVIEW: PASS` in the child transcript).',
-      'Then `git commit` (`git add` order does not matter).',
+      'Run `/pre-commit-reviewer` (need `REVIEW: PASS` in the child transcript).',
+      'Then stop or `git commit` (`git add` order does not matter).',
     ],
     doNot: [
       'Retry `git commit` unchanged while review.files is non-empty.',
       'Skip the reviewer or invent a commit flag to bypass hooks.',
-      "Reuse another conversation's PASS to clear this review.",
     ],
   });
 }
 
 export const REVIEW_INJECT_MARKER = '[harness-review]';
-export const REVIEW_NONCE_MARKER = '[harness-review-nonce:';
-
-/** @param {string | null | undefined} nonce */
-export function reviewNonceToken(nonce) {
-  const n = String(nonce ?? '')
-    .trim()
-    .toLowerCase();
-  if (!n) return null;
-  return `${REVIEW_NONCE_MARKER}${n}]`;
-}
 
 /** pre-commit-reviewer 相当の Task / subagent か */
 export function isPreCommitReviewerContext(payload) {
@@ -152,18 +138,15 @@ function truncateBlock(text, max, label) {
 /**
  * @param {string} root
  * @param {string[]} files
- * @param {string | null} [nonce]
  */
-export function buildReviewTaskInjection(root, files, nonce = null) {
+export function buildReviewTaskInjection(root, files) {
   if (!Array.isArray(files) || files.length === 0) return null;
 
-  const token = reviewNonceToken(nonce);
   const lines = [
     `${REVIEW_INJECT_MARKER} Review the following changes (from review.files).`,
-    token ? `Echo the token ${token} somewhere in your reply (required for harness clear).` : null,
     'Focus on the injected diff / new-file content. Do not run git. Do not Read whole files unless the injection is truncated and critical context is missing.',
     '',
-  ].filter((l) => l != null);
+  ];
 
   let total = lines.join('\n').length;
   for (const f of files) {
@@ -195,9 +178,9 @@ export function buildReviewTaskInjection(root, files, nonce = null) {
   return lines.join('\n');
 }
 
-/** preToolUse Task 用: review.files + diff (+ nonce) を prompt / description / task に前置 */
-export function injectReviewFilesIntoTaskInput(toolInput, root, files, nonce = null) {
-  const block = buildReviewTaskInjection(root, files, nonce);
+/** preToolUse Task 用: review.files + diff を prompt / description / task に前置 */
+export function injectReviewFilesIntoTaskInput(toolInput, root, files) {
+  const block = buildReviewTaskInjection(root, files);
   if (!block) return null;
   const input = toolInput && typeof toolInput === 'object' ? { ...toolInput } : {};
   const original = String(input.prompt ?? input.description ?? input.task ?? '');
@@ -268,15 +251,11 @@ export function reviewDirtySinceMs(dirtyAt) {
  * 子 transcript がこの workspace の pre-commit reviewer 試行か（verdict は見ない）。
  * - 絶対 path 必須
  * - 署名: `pre-commit-reviewer` / `[harness-review]` / (`Full Repository Path:` + `Diff:`)
- * - nonce があるときはその token 必須（会話横断 PASS 取り違え防止）
  */
-export function isReviewerTranscriptText(root, text, nonce = null) {
+export function isReviewerTranscriptText(root, text) {
   const body = String(text ?? '');
   const rootAbs = resolve(root);
   if (!body.includes(rootAbs)) return false;
-
-  const token = reviewNonceToken(nonce);
-  if (token && !body.includes(token)) return false;
 
   const hasType = /\bpre-commit-reviewer\b/i.test(body);
   const hasHarness = body.includes(REVIEW_INJECT_MARKER);
@@ -286,16 +265,16 @@ export function isReviewerTranscriptText(root, text, nonce = null) {
 }
 
 /** reviewer 試行かつ最終 verdict が PASS */
-export function isReviewPassTranscriptText(root, text, nonce = null) {
-  return isReviewerTranscriptText(root, text, nonce) && lastReviewVerdict(text) === 'PASS';
+export function isReviewPassTranscriptText(root, text) {
+  return isReviewerTranscriptText(root, text) && lastReviewVerdict(text) === 'PASS';
 }
 
 /**
- * dirtyAt 以降の reviewer 子 jsonl のうち **最新 mtime** が PASS ならその path。
- * nonce 付きなら token 一致必須。親 conversation は除外。
+ * dirtyAt 以降の unused reviewer 子 jsonl のうち **最新 mtime** が PASS ならその path。
+ * 親 conversation / used フラグ付きは除外。
  * @returns {string | null}
  */
-export function findReviewPassTranscript(root, dirtyAt, excludeId = null, nonce = null) {
+export function findReviewPassTranscript(root, dirtyAt, excludeId = null) {
   const dirtyMs = reviewDirtySinceMs(dirtyAt);
 
   const dir = agentTranscriptsDir(root);
@@ -315,6 +294,7 @@ export function findReviewPassTranscript(root, dirtyAt, excludeId = null, nonce 
     if (excludeId && name === excludeId) continue;
     const jsonl = join(dir, name, `${name}.jsonl`);
     if (!existsSync(jsonl)) continue;
+    if (isReviewPassUsed(jsonl)) continue;
 
     let st;
     try {
@@ -330,7 +310,7 @@ export function findReviewPassTranscript(root, dirtyAt, excludeId = null, nonce 
     } catch {
       continue;
     }
-    if (!isReviewerTranscriptText(root, text, nonce)) continue;
+    if (!isReviewerTranscriptText(root, text)) continue;
 
     if (!latest || st.mtimeMs >= latest.mtimeMs) {
       latest = { mtimeMs: st.mtimeMs, jsonl, text };
@@ -340,4 +320,26 @@ export function findReviewPassTranscript(root, dirtyAt, excludeId = null, nonce 
   if (!latest) return null;
   if (lastReviewVerdict(latest.text) !== 'PASS') return null;
   return latest.jsonl;
+}
+
+/** jsonl 隣の使い済みフラグ path（`<id>.jsonl` → `<id>.harness-pass-used`） */
+export function reviewPassUsedPath(jsonlPath) {
+  const dir = dirname(jsonlPath);
+  const id = basename(String(jsonlPath), '.jsonl');
+  return join(dir, `${id}.harness-pass-used`);
+}
+
+export function isReviewPassUsed(jsonlPath) {
+  try {
+    return existsSync(reviewPassUsedPath(jsonlPath));
+  } catch {
+    return false;
+  }
+}
+
+/** PASS を使い捨てた印（jsonl は残す） */
+export function markReviewPassUsed(jsonlPath) {
+  const flag = reviewPassUsedPath(jsonlPath);
+  writeFileSync(flag, '', 'utf8');
+  return flag;
 }
