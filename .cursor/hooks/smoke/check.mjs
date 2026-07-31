@@ -11,7 +11,9 @@ export function runCheckPending(smoke) {
     loadState,
     isCheckToolingReady,
     runFormatLint,
+    mkdirSync,
     mkdtempSync,
+    saveState,
     writeFileSync,
     join,
   } = smoke;
@@ -36,12 +38,16 @@ export function runCheckPending(smoke) {
       tool_name: 'ReadFile',
       tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
-    run('track.mjs', {
-      ...checkBase,
-      hook_event_name: 'postToolUse',
-      tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/types.ts') },
-    });
+    run(
+      'track.mjs',
+      {
+        ...checkBase,
+        hook_event_name: 'postToolUse',
+        tool_name: 'Write',
+        tool_input: { path: join(root, 'utils/types.ts') },
+      },
+      { CURSOR_CHECK_DRY_RUN: '1' },
+    );
     const stPending = loadState(root, checkId);
     assert(
       'check pending after product write',
@@ -49,12 +55,16 @@ export function runCheckPending(smoke) {
       JSON.stringify(stPending.check),
     );
 
-    run('track.mjs', {
-      ...checkBase,
-      hook_event_name: 'postToolUse',
-      tool_name: 'Write',
-      tool_input: { path: join(root, '.cursor/hooks/_probe-check.mjs') },
-    });
+    run(
+      'track.mjs',
+      {
+        ...checkBase,
+        hook_event_name: 'postToolUse',
+        tool_name: 'Write',
+        tool_input: { path: join(root, '.cursor/hooks/_probe-check.mjs') },
+      },
+      { CURSOR_CHECK_DRY_RUN: '1' },
+    );
     const stHarness = loadState(root, checkId);
     assert(
       'harness write adds check pending',
@@ -75,12 +85,16 @@ export function runCheckPending(smoke) {
       JSON.stringify(stCleared),
     );
 
-    run('track.mjs', {
-      ...checkBase,
-      hook_event_name: 'postToolUse',
-      tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/types.ts') },
-    });
+    run(
+      'track.mjs',
+      {
+        ...checkBase,
+        hook_event_name: 'postToolUse',
+        tool_name: 'Write',
+        tool_input: { path: join(root, 'utils/types.ts') },
+      },
+      { CURSOR_CHECK_DRY_RUN: '1' },
+    );
     const outFail = run(
       'check.mjs',
       { ...checkBase, hook_event_name: 'stop', status: 'completed', loop_count: 0 },
@@ -93,12 +107,16 @@ export function runCheckPending(smoke) {
       JSON.stringify(outFail),
     );
 
-    run('track.mjs', {
-      ...checkBase,
-      hook_event_name: 'postToolUse',
-      tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/types.ts') },
-    });
+    run(
+      'track.mjs',
+      {
+        ...checkBase,
+        hook_event_name: 'postToolUse',
+        tool_name: 'Write',
+        tool_input: { path: join(root, 'utils/types.ts') },
+      },
+      { CURSOR_CHECK_DRY_RUN: '1' },
+    );
     const outLoop = run(
       'check.mjs',
       { ...checkBase, hook_event_name: 'stop', status: 'completed', loop_count: 1 },
@@ -116,7 +134,7 @@ export function runCheckPending(smoke) {
       JSON.stringify(stLoop),
     );
 
-    // deps 未 install なら format/lint を失敗にせずスキップする
+    // deps 未 install なら deny-format 形式でセットアップを要求する
     {
       const noDepsRoot = mkdtempSync(join(smokeTmpRoot, 'no-deps-'));
       writeFileSync(join(noDepsRoot, 'probe.mjs'), 'export const x = 1;\n');
@@ -125,16 +143,126 @@ export function runCheckPending(smoke) {
         !isCheckToolingReady(noDepsRoot),
         noDepsRoot,
       );
-      const skipped = runFormatLint(noDepsRoot, ['probe.mjs']);
-      assert('runFormatLint skips when deps missing', skipped.ok, JSON.stringify(skipped));
+      const direct = runFormatLint(noDepsRoot, ['probe.mjs']);
+      assert(
+        'runFormatLint reports missing tooling',
+        !direct.ok &&
+          direct.kind === 'tooling-missing' &&
+          direct.message?.startsWith('[harness-check] BLOCKED') &&
+          direct.message.includes('oxfmt') &&
+          direct.message.includes('oxlint') &&
+          direct.message.includes('pnpm install --frozen-lockfile') &&
+          direct.message.includes('Do not:'),
+        JSON.stringify(direct),
+      );
+
+      const typecheckRoot = mkdtempSync(join(smokeTmpRoot, 'typecheck-missing-'));
+      writeFileSync(join(typecheckRoot, 'probe.ts'), 'export const x: number = 1;\n');
+      mkdirSync(join(typecheckRoot, 'node_modules', 'oxfmt'), { recursive: true });
+      mkdirSync(join(typecheckRoot, 'node_modules', 'oxlint'), { recursive: true });
+      const typecheckMissing = runFormatLint(typecheckRoot, ['probe.ts']);
+      assert(
+        'typecheck reports only missing typecheck tooling',
+        !typecheckMissing.ok &&
+          typecheckMissing.kind === 'tooling-missing' &&
+          typecheckMissing.message.includes('tsc-files') &&
+          typecheckMissing.message.includes('typescript') &&
+          !typecheckMissing.message.includes('oxfmt,'),
+        JSON.stringify(typecheckMissing),
+      );
+
+      const missingCheckId = 'check-missing-tooling-id';
+      const missingCheckBase = {
+        conversation_id: missingCheckId,
+        workspace_roots: [noDepsRoot],
+        cwd: noDepsRoot,
+      };
+      run('track.mjs', {
+        ...missingCheckBase,
+        hook_event_name: 'beforeSubmitPrompt',
+        prompt: '/chore check missing tooling',
+      });
+      saveState(noDepsRoot, missingCheckId, {
+        phase: 'chore',
+        unlock: { rules: true, scope: true },
+        check: { pending: ['probe.mjs'] },
+      });
+      const missingStop = run('check.mjs', {
+        ...missingCheckBase,
+        hook_event_name: 'stop',
+        status: 'completed',
+        loop_count: 0,
+      });
+      assert(
+        'missing tooling emits deny-format followup',
+        missingStop.followup_message?.startsWith('[harness-check] BLOCKED') &&
+          missingStop.followup_message.includes('pnpm install --frozen-lockfile'),
+        JSON.stringify(missingStop),
+      );
+      assert(
+        'missing tooling retains pending',
+        loadState(noDepsRoot, missingCheckId).check?.pending?.includes('probe.mjs'),
+        JSON.stringify(loadState(noDepsRoot, missingCheckId)),
+      );
+      const missingLoop = run('check.mjs', {
+        ...missingCheckBase,
+        hook_event_name: 'stop',
+        status: 'completed',
+        loop_count: 1,
+      });
+      assert(
+        'missing tooling at loop limit retains pending without followup',
+        !missingLoop.followup_message &&
+          loadState(noDepsRoot, missingCheckId).check?.pending?.includes('probe.mjs'),
+        JSON.stringify(missingLoop),
+      );
+      const missingPrompt = run('check.mjs', {
+        ...missingCheckBase,
+        hook_event_name: 'beforeSubmitPrompt',
+        prompt: 'continue',
+      });
+      assert(
+        'beforeSubmitPrompt returns deny-format setup message',
+        missingPrompt.continue === false &&
+          missingPrompt.user_message?.startsWith('[harness-check] BLOCKED'),
+        JSON.stringify(missingPrompt),
+      );
+
+      mkdirSync(join(noDepsRoot, 'node_modules', 'oxfmt'), { recursive: true });
+      mkdirSync(join(noDepsRoot, 'node_modules', 'oxlint'), { recursive: true });
+      const localBin = mkdtempSync(join(smokeTmpRoot, 'local-bin-'));
+      writeFileSync(join(localBin, 'pnpm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+      const previousPath = process.env.PATH;
+      process.env.PATH = `${localBin}${previousPath ? `:${previousPath}` : ''}`;
+      try {
+        const retried = run('check.mjs', {
+          ...missingCheckBase,
+          hook_event_name: 'stop',
+          status: 'completed',
+          loop_count: 0,
+        });
+        assert('local check succeeds after tooling install', !retried.followup_message);
+        assert(
+          'successful retry clears pending',
+          loadState(noDepsRoot, missingCheckId).check?.pending?.length === 0,
+          JSON.stringify(loadState(noDepsRoot, missingCheckId)),
+        );
+      } finally {
+        if (previousPath === undefined) delete process.env.PATH;
+        else process.env.PATH = previousPath;
+      }
     }
 
-    run('track.mjs', {
-      ...checkBase,
-      hook_event_name: 'postToolUse',
-      tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/types.ts') },
-    });
+    run(
+      'track.mjs',
+      {
+        ...checkBase,
+        hook_event_name: 'postToolUse',
+        tool_name: 'Write',
+        tool_input: { path: join(root, 'utils/types.ts') },
+      },
+      { CURSOR_CHECK_DRY_RUN: '1' },
+    );
     run('track.mjs', {
       ...checkBase,
       hook_event_name: 'afterShellExecution',
@@ -146,6 +274,61 @@ export function runCheckPending(smoke) {
       'successful commit clears check pending',
       stCommitReset.check?.pending?.length === 0,
       JSON.stringify(stCommitReset.check),
+    );
+  }
+
+  // dirty 直後 format 失敗 → additional_context のみ（pending は残す・commit gate にはしない）
+  {
+    const { clearSticky, trackReadTsRef } = smoke;
+    clearSticky();
+    const formatId = 'check-format-dirty-id';
+    const formatBase = { conversation_id: formatId, workspace_roots: [root], cwd: root };
+    run('track.mjs', {
+      ...formatBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore format dirty',
+    });
+    run('track.mjs', {
+      ...formatBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/scope/SKILL.md') },
+    });
+    run('track.mjs', {
+      ...formatBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'ReadFile',
+      tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
+    });
+    trackReadTsRef(formatBase);
+
+    const formatOut = run(
+      'track.mjs',
+      {
+        ...formatBase,
+        hook_event_name: 'postToolUse',
+        tool_name: 'Write',
+        tool_input: { path: join(root, 'utils/types.ts') },
+      },
+      { CURSOR_CHECK_DRY_RUN: 'fail' },
+    );
+    const stFormatFail = loadState(root, formatId);
+    assert(
+      'format-on-dirty failure returns additional_context',
+      typeof formatOut.additional_context === 'string' &&
+        formatOut.additional_context.includes('format failed') &&
+        formatOut.additional_context.includes('dry-run: format failed'),
+      JSON.stringify(formatOut),
+    );
+    assert(
+      'format-on-dirty failure still marks pending',
+      stFormatFail.check?.pending?.includes('utils/types.ts'),
+      JSON.stringify(stFormatFail.check),
+    );
+    assert(
+      'format-on-dirty failure still marks review.files',
+      stFormatFail.review?.files?.includes('utils/types.ts'),
+      JSON.stringify(stFormatFail.review),
     );
   }
 }

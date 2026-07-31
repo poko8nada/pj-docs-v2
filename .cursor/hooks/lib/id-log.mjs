@@ -5,6 +5,7 @@
  * 方針:
  * - 無限追記しない（行数上限、古い行から落とす）
  * - mismatch / healthy 遷移 / beforeSubmitPrompt は必ず残す
+ * - Task（reviewer inject）は間引きしない
  * - sticky と payload が一致し続ける通常ツールイベントは間引き
  * - 連続一致で `cursor_id_healthy: true`（Cursor 側改修の探知用）
  *
@@ -108,6 +109,7 @@ export function logHookIds(payload, source) {
     const health = readHealth(root);
     let healthTransition = null;
 
+    const toolName = String(payload?.tool_name ?? '');
     // ツール系で sticky と payload を比較して healthy 探知
     const isToolish =
       event === 'preToolUse' ||
@@ -115,6 +117,8 @@ export function logHookIds(payload, source) {
       event === 'beforeReadFile' ||
       event === 'beforeShellExecution' ||
       event === 'afterShellExecution';
+    // reviewer inject 経路は間引き対象外
+    const isTaskTool = event === 'preToolUse' && toolName === 'Task';
 
     if (isToolish && bothKnown) {
       if (mismatch) {
@@ -132,7 +136,7 @@ export function logHookIds(payload, source) {
     }
 
     const isPrompt = event === 'beforeSubmitPrompt';
-    let shouldLog = isPrompt || mismatch || healthTransition !== null;
+    let shouldLog = isPrompt || mismatch || healthTransition !== null || isTaskTool;
 
     if (!shouldLog && isToolish && bothKnown && !mismatch) {
       health.sampleCounter = (health.sampleCounter + 1) % Math.max(MATCH_SAMPLE_EVERY, 1);
@@ -152,6 +156,8 @@ export function logHookIds(payload, source) {
       source: String(source ?? ''),
       hook_event_name: payload?.hook_event_name ?? null,
       tool_name: payload?.tool_name ?? null,
+      subagent_type: payload?.subagent_type ?? payload?.tool_input?.subagent_type ?? null,
+      parent_conversation_id: payload?.parent_conversation_id ?? null,
       resolved_id: resolved.id,
       resolved_via: resolved.via,
       sticky_id: sticky,

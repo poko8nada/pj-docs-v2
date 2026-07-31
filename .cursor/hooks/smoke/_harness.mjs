@@ -32,6 +32,7 @@ import {
   PHASE_DISCUSSION,
   purgeStaleStates,
   readLastPromptId,
+  saveState,
   STATE_TTL_DAYS,
   workspaceRoot,
 } from '../lib/state.mjs';
@@ -174,6 +175,7 @@ export function createSmokeCtx() {
     PHASE_DISCUSSION,
     purgeStaleStates,
     readLastPromptId,
+    saveState,
     STATE_TTL_DAYS,
     workspaceRoot,
     bootstrapMarkerPath,

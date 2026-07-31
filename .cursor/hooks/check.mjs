@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * check.mjs — 編集ファイルを溜め、エージェント停止時に format/lint/typecheck を一括実行。
+ * （dirty 直後の format のみは track.mjs postToolUse。ここは stop 保険＋lint/tsc）
  *
  * | Event | Action |
  * |-------|--------|
@@ -44,14 +45,15 @@ function runPendingChecks(root, id) {
   if (pending.length === 0) return { ran: false, result: { ok: true } };
 
   const result = runFormatLint(root, pending);
-  resetCheck(root, id);
+  // 依存不足は install 後に同じ pending を再チェックするため保持する。
+  if (result.kind !== 'tooling-missing') resetCheck(root, id);
   return { ran: true, result };
 }
 
 function maybeFollowup(result, loopCount) {
   if (result.ok) return empty();
   if (loopCount >= FOLLOWUP_LOOP_LIMIT) return empty();
-  const followup = buildCheckFollowup(result.message);
+  const followup = buildCheckFollowup(result.message, result.kind);
   if (followup) return respond({ followup_message: followup });
   return empty();
 }
@@ -68,10 +70,10 @@ function handleBeforeSubmitPrompt(root, payload) {
   const id = conversationId(payload);
   const { result, ran } = runPendingChecks(root, id);
   if (!ran || result.ok) return empty();
-  const body = String(result.message ?? '').trim();
+  const body = buildCheckFollowup(result.message, result.kind);
   return respond({
     continue: false,
-    user_message: `[harness-check] Fix format/lint/typecheck issues before sending:\n\n${body}`,
+    user_message: body,
   });
 }
 

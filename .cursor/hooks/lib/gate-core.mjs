@@ -1,5 +1,5 @@
 /**
- * gate-core.mjs — gate 本体（許可/拒否のみ。state は書かない）
+ * gate-core.mjs — gate 本体（許可/拒否。review PASS transcript クリアのみ state を書く）
  * 入口は `gate.mjs`（bootstrap 救命胴衣）。ここを壊しても entry が bootstrap 中は allow できる。
  *
  * | Event              | Checks                                              |
@@ -18,11 +18,17 @@ import {
 import { DENY_MENTOR, isMentorCodeBlocked, isMentorDeniedPath } from './mentor.mjs';
 import { logHookIds } from './id-log.mjs';
 import { formatDeny } from './deny-format.mjs';
-import { commandIncludesGitCommit, denyReviewMessage, isReviewablePath } from './review.mjs';
+import {
+  commandIncludesGitCommit,
+  denyReviewMessage,
+  findReviewPassTranscript,
+  isReviewablePath,
+} from './review.mjs';
 import { denyRefsMessage, missingRefs, requiredRefsForPath } from './refs.mjs';
 import { commandIncludesGhIssueMutation, denyIssueMessage, isIssueReady } from './issue.mjs';
 import { denyAgendaMessage, isAgendaReady } from './agenda.mjs';
 import {
+  clearReviewFiles,
   conversationId,
   isReviewBlocking,
   isSpecFlowPhase,
@@ -693,8 +699,17 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
   const outsideErr = denyOutsidePathsInCommand(root, command);
   if (outsideErr) return deny(outsideErr);
 
+  // git commit: dirtyAt（欠落時は epoch）以降の子 transcript に REVIEW: PASS があれば clear
   if (commandIncludesGitCommit(command) && isReviewBlocking(state)) {
-    return deny(denyReviewMessage(normalizeReview(state.review).files));
+    const review = normalizeReview(state.review);
+    if (findReviewPassTranscript(root, review.dirtyAt, id, review.nonce)) {
+      clearReviewFiles(root, id);
+      state = loadState(root, id);
+    }
+    if (isReviewBlocking(state)) {
+      const blocked = normalizeReview(state.review);
+      return deny(denyReviewMessage(blocked.files, blocked.nonce));
+    }
   }
 
   if (

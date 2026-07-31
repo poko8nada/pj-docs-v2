@@ -6,12 +6,12 @@
  * |--------------------|---------------------------------------------|
  * | beforeSubmitPrompt | phase / bootstrap                           |
  * | Read*              | unlock + read.skills / read.refs            |
- * | postToolUse Write* | review.pending + check.pending              |
- * | preToolUse Task         | inject review.files → reviewed on reviewer    |
+ * | postToolUse Write* | review.files + check.pending + format（失敗は context） |
+ * | preToolUse Task         | inject review.files（clear はしない）            |
  * | afterShellExecution     | git commit 成功 → review/check reset          |
  */
 import { realpathSync } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { relative, isAbsolute, join, resolve } from 'node:path';
 import { disableBootstrap, enableBootstrap } from './lib/bootstrap.mjs';
 import { clearStubTurn, enableStubTurn, isMentorActive } from './lib/mentor.mjs';
 import {
@@ -23,7 +23,7 @@ import {
 import { skillRefIdFromPath } from './lib/refs.mjs';
 import { ISSUE_SKILL_REL } from './lib/issue.mjs';
 import { AGENDA_SKILL_REL } from './lib/agenda.mjs';
-import { isCheckablePath } from './lib/check.mjs';
+import { buildFormatContext, isCheckablePath, runFormat } from './lib/check.mjs';
 import { logHookIds } from './lib/id-log.mjs';
 import {
   conversationId,
@@ -35,7 +35,6 @@ import {
   markReviewDirty,
   markReadRef,
   markReadSkill,
-  clearReviewFiles,
   normalizeReview,
   normalizeCheck,
   PHASE_DISCUSSION,
@@ -242,7 +241,7 @@ function handleBeforeSubmitPrompt(root, payload) {
   const phase = match[1].toLowerCase();
   const prev = loadState(root, id);
   let unlock;
-  // review.files はフェーズ変更・再入場でも残す（clear は reviewer / commit のみ）
+  // review.files はフェーズ変更・再入場でも残す（clear は PASS transcript / commit 成功）
   const review = normalizeReview(prev.review);
   // phase 再入場: read はクリア（skills / refs）
   const read = defaultRead();
@@ -294,6 +293,27 @@ function maybeMarkReviewDirty(root, payload) {
   markReviewDirty(root, id, abs);
 }
 
+/** dirty 直後に format のみ。失敗は additional_context（gate / pending は触らない） */
+function maybeFormatOnDirty(root, payload) {
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  if (!WORK_PHASES.has(state.phase) || state.unlock?.rules !== true) return null;
+
+  const filePath = filePathFromPayload(payload);
+  if (!filePath || !isCheckablePath(root, String(filePath))) return null;
+
+  const abs = resolve(
+    isAbsolute(String(filePath)) ? String(filePath) : resolve(root, String(filePath)),
+  );
+  const rel = relative(root, abs).split(/[/\\]/).join('/');
+  if (!rel || rel.startsWith('..')) return null;
+
+  const result = runFormat(root, [rel]);
+  if (result.ok) return null;
+  const ctx = buildFormatContext(result.message, result.kind);
+  return ctx || null;
+}
+
 function handlePreToolUseTask(root, payload) {
   if (!isPreCommitReviewerContext(payload)) return allow();
 
@@ -302,9 +322,10 @@ function handlePreToolUseTask(root, payload) {
   if (!isReviewBlocking(state)) return allow();
 
   const files = [...normalizeReview(state.review).files];
+  const nonce = normalizeReview(state.review).nonce;
   const toolInput = payload.tool_input ?? {};
-  const updatedInput = injectReviewFilesIntoTaskInput(toolInput, root, files);
-  clearReviewFiles(root, id);
+  const updatedInput = injectReviewFilesIntoTaskInput(toolInput, root, files, nonce);
+  // clear は commit 時の PASS transcript スキャンに任せる（起動時 clear しない）
 
   if (updatedInput) {
     return respond({ permission: 'allow', updated_input: updatedInput });
@@ -382,6 +403,8 @@ async function main() {
   if (event === 'postToolUse' && WRITE_TOOLS.has(toolName)) {
     maybeMarkReviewDirty(root, payload);
     maybeMarkCheckPending(root, payload);
+    const formatCtx = maybeFormatOnDirty(root, payload);
+    if (formatCtx) return respond({ additional_context: formatCtx });
     return empty();
   }
 

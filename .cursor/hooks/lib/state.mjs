@@ -13,6 +13,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeReadRefs, discoverSkillNames } from './refs.mjs';
@@ -236,11 +237,11 @@ export function statePathRelative(root, id) {
   return `.cursor/hooks/state/*__${sanitizeConversationId(id)}.json`;
 }
 
-/** review は files のみ。空 = commit OK、非空 = 未レビューで commit ブロック */
+/** review は files + dirtyAt + nonce。空 files = commit OK */
 
-/** @returns {{ files: string[] }} */
+/** @returns {{ files: string[], dirtyAt: string | null, nonce: string | null }} */
 export function defaultReview() {
-  return { files: [] };
+  return { files: [], dirtyAt: null, nonce: null };
 }
 
 /** @returns {{ pending: string[] }} */
@@ -256,13 +257,22 @@ export function normalizeCheck(check) {
   return { pending };
 }
 
-/** 旧 { status } / { required, done } は無視。files だけ残す */
+/**
+ * 旧 { status } / { required, done } は無視。
+ * files + dirtyAt + nonce を正規化。
+ */
 export function normalizeReview(review) {
   if (!review || typeof review !== 'object') return defaultReview();
   const files = Array.isArray(review.files)
     ? [...new Set(review.files.map((f) => String(f)).filter(Boolean))]
     : [];
-  return { files };
+  const dirtyAt =
+    typeof review.dirtyAt === 'string' && review.dirtyAt.trim() ? review.dirtyAt.trim() : null;
+  const nonce =
+    typeof review.nonce === 'string' && /^[a-f0-9]{8,32}$/i.test(review.nonce.trim())
+      ? review.nonce.trim().toLowerCase()
+      : null;
+  return { files, dirtyAt, nonce };
 }
 
 /** Read した `.cursor/skills/<name>/SKILL.md` の name（重複なし・ソート） */
@@ -521,20 +531,20 @@ export function isReviewBlocking(state) {
   return normalizeReview(state?.review).files.length > 0;
 }
 
-/** rules 解禁後の reviewable 編集を files に積む */
+/** rules 解禁後の reviewable 編集を files に積む。毎回 dirtyAt + nonce を更新 */
 export function markReviewDirty(root, id, filePath) {
   const prev = loadState(root, id);
   const abs = resolve(filePath);
   const rel = relative(root, abs).split(sep).join('/');
   const review = normalizeReview(prev.review);
   if (rel && !review.files.includes(rel)) review.files.push(rel);
+  review.dirtyAt = formatJstIso();
+  // conversation 間の PASS 取り違え防止。再 dirty で旧 PASS を無効化
+  review.nonce = randomBytes(8).toString('hex');
   return saveState(root, id, { phase: prev.phase, review });
 }
 
-/**
- * preToolUse Task で /pre-commit-reviewer が呼ばれたとき。
- * PASS/GAPS は見ない。起動検知のみ → files クリア。
- */
+/** review.files / dirtyAt をクリア（commit 前クリアや reset 用） */
 export function clearReviewFiles(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, {
@@ -543,7 +553,7 @@ export function clearReviewFiles(root, id) {
   });
 }
 
-/** git commit 成功後に review.files を空へ */
+/** git commit 成功後に review.files / dirtyAt を空へ */
 export function resetReview(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, {
@@ -597,7 +607,7 @@ export function clearReadRefs(root, id) {
   return clearRead(root, id);
 }
 
-/** rules 解禁後の checkable 編集を溜める（stop で一括 format/lint/typecheck） */
+/** rules 解禁後の checkable 編集を溜める（dirty で format、stop で format/lint/typecheck） */
 export function markCheckPending(root, id, filePath) {
   const prev = loadState(root, id);
   const abs = resolve(filePath);

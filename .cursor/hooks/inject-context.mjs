@@ -74,7 +74,7 @@ function readGateRules() {
     '## Review',
     '',
     '- `review.files` non-empty → `git commit` blocked.',
-    '- Clear with `/pre-commit-reviewer`. Persists across phase changes.',
+    '- Clear: `/pre-commit-reviewer` with harness nonce → `REVIEW: PASS` → next `git commit`.',
     '- `md` / `json` / `yaml` are not tracked in `review.files`.',
     '',
     '## State files',
