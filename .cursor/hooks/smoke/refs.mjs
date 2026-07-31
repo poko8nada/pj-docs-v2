@@ -2,9 +2,9 @@
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runReadRefs(smoke) {
-  // readRefs 弱ゲート (23)
+  // read.refs 弱ゲート
   const { root, run, assert, trackRead, join } = smoke;
-  // 23. readRefs gate: 弱ゲート（rules/references を1つ以上）
+  // read.refs gate: 弱ゲート（rules/references を1つ以上）
   {
     const refsId = 'refs-gate-id';
     const refsBase = { conversation_id: refsId, workspace_roots: [root], cwd: root };
@@ -39,7 +39,7 @@ export function runReadRefs(smoke) {
       ...refsBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.test.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.test.ts') },
     });
     assert(
       'test write without rules ref deny',
@@ -90,7 +90,7 @@ export function runReadRefs(smoke) {
       ...refsBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.test.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.test.ts') },
     });
     assert(
       'test write after any rules ref allow',
@@ -114,7 +114,7 @@ export function runReadRefs(smoke) {
       ...refsBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert(
       'ts write after any rules ref allow',
@@ -126,10 +126,8 @@ export function runReadRefs(smoke) {
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runIssueHeredoc(smoke) {
-  // issue process-sub heredoc (旧21)
+  // issue: process-sub + heredoc を許可しつつ、改行崩し bypass は拒否
   const { root, run, assert, trackRead, trackReadIssueSkill, loadState, join } = smoke;
-  // 21. work + issue ready: gh issue edit with process-sub heredoc allows
-  //     （旧バグ: heredoc 除去後の改行で `)` が単独セグメント → DENY_SHELL）
   {
     const heredocId = 'heredoc00-0000-4000-8000-000000000001';
     const heredocBase = {
@@ -196,18 +194,7 @@ export function runIssueHeredoc(smoke) {
       JSON.stringify(outBypassGh),
     );
 
-    // rules 前でも pnpm test は work で allow。install は deny
-    const outPnpm = run('gate.mjs', {
-      ...heredocBase,
-      hook_event_name: 'beforeShellExecution',
-      command: 'pnpm test',
-    });
-    assert(
-      'work pnpm test allow without rules',
-      outPnpm.permission === 'allow',
-      JSON.stringify(outPnpm),
-    );
-
+    // rules 前でも install は deny（test の early allow は mentor smoke 側）
     trackRead(heredocBase, '.cursor/skills/scope/SKILL.md');
     trackRead(heredocBase, '.cursor/skills/agenda/SKILL.md');
 
@@ -232,7 +219,7 @@ export function runIssueHeredoc(smoke) {
       ...heredocBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     const writeMsg = String(outWrite.agent_message ?? '');
     assert(

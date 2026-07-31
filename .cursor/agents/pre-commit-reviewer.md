@@ -13,14 +13,14 @@ Execute `.cursor/skills/rules/references/` files that apply to the changed files
 
 | File            | When                             |
 | --------------- | -------------------------------- |
-| `documents.md`  | `.md` / `.mdc`                   |
-| `logic.md`      | pure / domain logic              |
-| `components.md` | UI, CSS, a11y                    |
-| `html.md`       | document / website markup        |
-| `state.md`      | client state / `use*`            |
 | `api.md`        | HTTP / fetch                     |
+| `components.md` | UI, CSS, a11y                    |
 | `data.md`       | objects, JSON, persistence       |
+| `documents.md`  | `.md` / `.mdc`                   |
+| `html.md`       | document / website markup        |
+| `logic.md`      | pure / domain logic              |
 | `shared.md`     | cross-cutting; default if unsure |
+| `state.md`      | client state / `use*`            |
 
 Use these as review criteria, not just style preference. Pick at least the refs that match the injection.
 

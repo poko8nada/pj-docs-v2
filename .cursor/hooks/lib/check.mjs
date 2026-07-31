@@ -113,13 +113,6 @@ function toolingMissingMessage(packages) {
 
 /** @returns {{ ok: boolean, kind?: string, message?: string }} */
 export function runFormat(root, relPaths) {
-  if (process.env.CURSOR_CHECK_DRY_RUN === '1') {
-    return { ok: true };
-  }
-  if (process.env.CURSOR_CHECK_DRY_RUN === 'fail') {
-    return { ok: false, kind: 'failed', message: '[check] dry-run: format failed' };
-  }
-
   const files = filterByExt(existingRelPaths(root, relPaths), FORMAT_LINT_EXT);
   if (files.length === 0) return { ok: true };
 
@@ -144,13 +137,6 @@ export function runFormat(root, relPaths) {
 
 /** @returns {{ ok: boolean, kind?: string, message?: string }} */
 export function runFormatLint(root, relPaths) {
-  if (process.env.CURSOR_CHECK_DRY_RUN === '1') {
-    return { ok: true };
-  }
-  if (process.env.CURSOR_CHECK_DRY_RUN === 'fail') {
-    return { ok: false, kind: 'failed', message: '[check] dry-run: lint failed' };
-  }
-
   const existing = existingRelPaths(root, relPaths);
   const formatLintFiles = filterByExt(existing, FORMAT_LINT_EXT);
   const typecheckFiles = filterByExt(existing, TYPECHECK_EXT);

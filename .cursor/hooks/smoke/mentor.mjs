@@ -2,7 +2,7 @@
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runMentorStub(smoke) {
-  // mentor / stub (旧18)
+  // mentor / stub
   const {
     root,
     run,
@@ -18,7 +18,7 @@ export function runMentorStub(smoke) {
     unlinkSync,
     join,
   } = smoke;
-  // 18. mentor / stub（コード deny・stub 1ターン・mentor OFF で stub no-op）
+  // mentor / stub（コード deny・stub 1ターン・mentor OFF で stub no-op）
   {
     const mentorId = 'test-mentor';
     const mentorBase = {
@@ -204,9 +204,9 @@ export function runMentorStub(smoke) {
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runPnpmEarly(smoke) {
-  // pnpm test early allow (旧19)
+  // pnpm test early allow
   const { root, run, assert, clearSticky, loadState } = smoke;
-  // 19. pnpm test early allow (work|chore, no rules unlock)
+  // pnpm test early allow (work|chore, no rules unlock)
   {
     const testId = 'test-pnpm-early';
     const testBase = {

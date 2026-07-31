@@ -2,5 +2,6 @@ plans/
 hooks/probe/
 hooks/state/
 hooks/.smoke-tmp/
+hooks/_smoke-*
 hooks/.bootstrap
 tmp/

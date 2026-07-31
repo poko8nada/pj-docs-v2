@@ -17,7 +17,6 @@ export function runPhaseCore(smoke) {
     stateAbs,
     readState,
     findStateFileName,
-    formatJstIso,
     loadState,
     onSessionStart,
     unlinkSync,
@@ -39,34 +38,9 @@ export function runPhaseCore(smoke) {
     const ctx0 = outInject.additional_context || '';
     assert('inject does not export gate env', outInject.env == null, JSON.stringify(outInject));
     assert(
-      'inject includes shell cwd rule',
-      ctx0.includes('Special rules') && ctx0.includes('## Shell') && ctx0.includes('git -C'),
-      'shell section missing',
-    );
-    assert(
       'inject includes shell chain guidance',
       ctx0.includes('one logical action') && ctx0.includes('unrelated steps'),
       'shell chain guidance missing',
-    );
-    assert(
-      'inject includes web tools',
-      ctx0.includes('## Web') && ctx0.includes('web_search_exa') && ctx0.includes('WebFetch'),
-      'web section missing',
-    );
-    assert(
-      'inject includes pre-commit review',
-      ctx0.includes('Gate rules') && ctx0.includes('/pre-commit-reviewer'),
-      'gate rules / review hint missing',
-    );
-    assert(
-      'inject Gate rules are structured markdown',
-      ctx0.includes('## Phase') && ctx0.includes('## Edits') && ctx0.includes('## Review'),
-      'gate rules headings missing',
-    );
-    assert(
-      'inject has no discussion skill dump',
-      !ctx0.includes('discussion (default phase)'),
-      'discussion section should be gone',
     );
     assert('inject still no file', findStateFileName(root, id) === null);
 
@@ -74,7 +48,7 @@ export function runPhaseCore(smoke) {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert('gate deny without state file', outGate.permission === 'deny', JSON.stringify(outGate));
     assert('gate does not create file', findStateFileName(root, id) === null);
@@ -105,7 +79,7 @@ export function runPhaseCore(smoke) {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert('locked Write deny', out.permission === 'deny', JSON.stringify(out));
   }
@@ -267,7 +241,7 @@ export function runPhaseCore(smoke) {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert(
       'phase-only Write deny is gate-scope',
@@ -298,7 +272,7 @@ export function runPhaseCore(smoke) {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert(
       'scope open Write deny is gate-agenda',
@@ -331,7 +305,7 @@ export function runPhaseCore(smoke) {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert(
       'agenda open still denies Write without rules',
@@ -461,7 +435,7 @@ export function runPhaseCore(smoke) {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert('discussion Write still deny', out2.permission === 'deny', JSON.stringify(out2));
 
@@ -477,21 +451,7 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 8a. 旧 state（discussion + false）は読み込み時に null へ正規化
-  {
-    writeFileSync(
-      stateAbs(),
-      JSON.stringify({ phase: 'discussion', implement: false, updatedAt: formatJstIso() }, null, 2),
-    );
-    const st = loadState(root, id);
-    assert(
-      'legacy discussion false normalizes to null',
-      st.phase === 'discussion' && st.unlock.rules === null,
-      JSON.stringify(st),
-    );
-  }
-
-  // 8b. work のあと scope + agenda + rules スキル実行で解禁
+  // work のあと scope + agenda + rules スキル実行で解禁
   {
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/work go' });
     trackReadScope(base);
@@ -506,7 +466,7 @@ export function runPhaseCore(smoke) {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert(
       'unlocked Write without rules ref deny',
@@ -519,7 +479,7 @@ export function runPhaseCore(smoke) {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/foo.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert('unlocked Write allow', out2.permission === 'allow', JSON.stringify(out2));
   }
@@ -555,7 +515,7 @@ export function runPhaseCore(smoke) {
     assert('redirect into state deny', out.permission === 'deny', JSON.stringify(out));
   }
 
-  // 10. phase switch / re-entry resets rules + readRefs
+  // phase switch / re-entry resets rules + read
   {
     trackReadTsRef(base);
     assert(
@@ -632,17 +592,22 @@ export function runPhaseCore(smoke) {
       tool_name: 'ReadFile',
       tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
-    writeFileSync(join(root, 'utils/_review-persist-probe.ts'), 'export const persistProbe = 1;\n');
+    writeFileSync(
+      join(root, '.cursor/hooks/_smoke-review-persist-probe.mjs'),
+      'export const smokePersistProbe = 1;\n',
+    );
     trackReadTsRef(persistBase);
     run('track.mjs', {
       ...persistBase,
       hook_event_name: 'postToolUse',
       tool_name: 'Write',
-      tool_input: { path: join(root, 'utils/_review-persist-probe.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-review-persist-probe.mjs') },
     });
     assert(
       'review files before phase switch',
-      loadState(root, persistId).review.files.includes('utils/_review-persist-probe.ts'),
+      loadState(root, persistId).review.files.includes(
+        '.cursor/hooks/_smoke-review-persist-probe.mjs',
+      ),
       JSON.stringify(loadState(root, persistId)),
     );
     run('track.mjs', {
@@ -654,7 +619,7 @@ export function runPhaseCore(smoke) {
     assert(
       'review files persist across phase switch',
       stPersist.phase === 'work' &&
-        stPersist.review.files.includes('utils/_review-persist-probe.ts') &&
+        stPersist.review.files.includes('.cursor/hooks/_smoke-review-persist-probe.mjs') &&
         stPersist.read.refs.length === 0,
       JSON.stringify(stPersist),
     );
@@ -665,11 +630,13 @@ export function runPhaseCore(smoke) {
     });
     assert(
       'review files persist into discussion',
-      loadState(root, persistId).review.files.includes('utils/_review-persist-probe.ts'),
+      loadState(root, persistId).review.files.includes(
+        '.cursor/hooks/_smoke-review-persist-probe.mjs',
+      ),
       JSON.stringify(loadState(root, persistId)),
     );
     try {
-      unlinkSync(join(root, 'utils/_review-persist-probe.ts'));
+      unlinkSync(join(root, '.cursor/hooks/_smoke-review-persist-probe.mjs'));
     } catch {
       // 無ければ無視
     }
@@ -700,7 +667,15 @@ export function runResumeTtl(smoke) {
     const nameBefore = findStateFileName(root, id);
     writeFileSync(
       stateAbs(),
-      JSON.stringify({ phase: 'work', implement: true, updatedAt: formatJstIso() }, null, 2),
+      JSON.stringify(
+        {
+          phase: 'work',
+          unlock: { rules: true, issue: false, agenda: false, scope: false },
+          updatedAt: formatJstIso(),
+        },
+        null,
+        2,
+      ),
     );
     onSessionStart(root);
     const st = loadState(root, id);
@@ -725,7 +700,7 @@ export function runResumeTtl(smoke) {
     writeFileSync(
       oldPath,
       JSON.stringify(
-        { phase: 'discussion', implement: null, updatedAt: formatJstIso(oldDate) },
+        { phase: 'discussion', unlock: { rules: null }, updatedAt: formatJstIso(oldDate) },
         null,
         2,
       ),
@@ -742,7 +717,7 @@ export function runResumeTtl(smoke) {
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runRulesUnlock(smoke) {
-  // preToolUse Read で rules 解禁 (16)
+  // preToolUse Read で rules 解禁
   const {
     root,
     stateTmp,
@@ -810,8 +785,15 @@ export function runRulesUnlock(smoke) {
     try {
       writeFileSync(
         join(stateTmp, `20260716-130000+0900__${envId}.json`),
-        JSON.stringify({ phase: 'chore', implement: false, updatedAt: formatJstIso() }, null, 2) +
-          '\n',
+        JSON.stringify(
+          {
+            phase: 'chore',
+            unlock: { rules: false, issue: null, agenda: null, scope: false },
+            updatedAt: formatJstIso(),
+          },
+          null,
+          2,
+        ) + '\n',
       );
       run('track.mjs', {
         workspace_roots: [root],
@@ -849,7 +831,7 @@ export function runRulesUnlock(smoke) {
       ...base,
       hook_event_name: 'preToolUse',
       tool_name: 'Read',
-      tool_input: { path: join(root, 'utils/foo.ts') },
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert('locked Read allow', outRead.permission === 'allow', JSON.stringify(outRead));
   }

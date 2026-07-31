@@ -45,6 +45,33 @@ export const hooksDir = resolve(smokeDir, '..');
 export const root = resolve(hooksDir, '../..');
 export const smokeTmpRoot = join(hooksDir, '.smoke-tmp');
 
+/** review/check 追跡用の一時 probe（`.smoke-tmp` は除外されるので hooks 直下） */
+export function smokeProbeRel(name) {
+  return `.cursor/hooks/${name}`;
+}
+
+export function smokeProbeAbs(name) {
+  return join(hooksDir, name);
+}
+
+/** 残った `_smoke-*` probe を消す */
+export function cleanupSmokeProbes() {
+  let names;
+  try {
+    names = readdirSync(hooksDir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (!name.startsWith('_smoke-')) continue;
+    try {
+      unlinkSync(join(hooksDir, name));
+    } catch {
+      // 無ければ無視
+    }
+  }
+}
+
 /**
  * @typedef {ReturnType<typeof createSmokeCtx>} SmokeCtx
  */
@@ -146,6 +173,8 @@ export function createSmokeCtx() {
     hooksDir,
     stateTmp,
     smokeTmpRoot,
+    smokeProbeRel,
+    smokeProbeAbs,
     id,
     base,
     restoreBootstrap,
@@ -206,6 +235,7 @@ export function createSmokeCtx() {
 /** 一時ディレクトリ掃除と bootstrap 復元。失敗数を返す。 */
 export function finishSmokeCtx(ctx) {
   const { stateTmp, smokeTmpRoot: tmpRoot, restoreBootstrap } = ctx;
+  cleanupSmokeProbes();
   rmSync(stateTmp, { recursive: true, force: true });
   rmSync(tmpRoot, { recursive: true, force: true });
   if (restoreBootstrap) enableBootstrap(root);

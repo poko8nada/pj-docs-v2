@@ -2,9 +2,9 @@
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runInjectGateListing(smoke) {
-  // inject Gate rules + dir sort (13–14)
+  // inject Gate rules + dir sort
   const { root, stateTmp, id, base, run, assert, findStateFileName, readdirSync } = smoke;
-  // 13. inject は Shell / Web / Gate rules のみ（ライブ Gate state なし）
+  // inject は Shell / Web / Gate rules のみ（ライブ Gate state なし）
   {
     const out = run('inject-context.mjs', { ...base, is_background_agent: false });
     const ctx = out.additional_context || '';
@@ -63,7 +63,7 @@ export function runInjectGateListing(smoke) {
     void root;
   }
 
-  // 14. ディレクトリ一覧が日付順（ファイル名ソート）
+  // ディレクトリ一覧が日付順（ファイル名ソート）
   {
     const names = readdirSync(stateTmp)
       .filter((n) => n.endsWith('.json'))
@@ -78,7 +78,7 @@ export function runInjectGateListing(smoke) {
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runInjectSticky(smoke) {
-  // inject が sticky を盗まない (旧22)
+  // sessionStart inject: sticky があってもライブ state は注入しない
   const {
     root,
     stateTmp,
@@ -91,7 +91,6 @@ export function runInjectSticky(smoke) {
     writeFileSync,
     join,
   } = smoke;
-  // 22. sessionStart inject: sticky があっても触らない（ライブ state は注入しない）
   {
     clearSticky();
     const prevId = 'stickyprv-0000-4000-8000-000000000001';
@@ -101,11 +100,10 @@ export function runInjectSticky(smoke) {
       JSON.stringify(
         {
           phase: 'chore',
-          implement: true,
-          issue: null,
-          review: { files: [] },
+          unlock: { rules: true, issue: null, agenda: null, scope: false },
+          review: { files: [], dirtyAt: null },
           check: { pending: [] },
-          readRefs: [],
+          read: { skills: [], refs: [] },
           label: 'prev',
           updatedAt: formatJstIso(),
         },
@@ -118,11 +116,10 @@ export function runInjectSticky(smoke) {
       JSON.stringify(
         {
           phase: 'discussion',
-          implement: null,
-          issue: null,
-          review: { files: [] },
+          unlock: { rules: null, issue: null, agenda: null, scope: false },
+          review: { files: [], dirtyAt: null },
           check: { pending: [] },
-          readRefs: [],
+          read: { skills: [], refs: [] },
           label: 'new',
           updatedAt: formatJstIso(),
         },

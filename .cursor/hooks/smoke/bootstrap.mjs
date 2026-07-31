@@ -21,7 +21,7 @@ export function runBootstrap(smoke) {
     writeFileSync,
     join,
   } = smoke;
-  // 17. bootstrap: discussion でも gate バイパス（state / マーカー編集は除く）
+  // bootstrap: discussion でも gate バイパス（state / マーカー編集は除く）
   {
     enableBootstrap(root);
     assert('bootstrap marker active', isBootstrapActive(root));
@@ -63,7 +63,11 @@ export function runBootstrap(smoke) {
     writeFileSync(
       stateAbs(),
       JSON.stringify(
-        { phase: PHASE_DISCUSSION, implement: null, updatedAt: formatJstIso() },
+        {
+          phase: PHASE_DISCUSSION,
+          unlock: { rules: null, issue: null, agenda: null, scope: false },
+          updatedAt: formatJstIso(),
+        },
         null,
         2,
       ) + '\n',
@@ -76,7 +80,7 @@ export function runBootstrap(smoke) {
     assert('off bootstrap denies node', outLocked.permission === 'deny', JSON.stringify(outLocked));
   }
 
-  // 17b. entry: core が壊れても bootstrap 中は allow（entry 救命胴衣）
+  // entry: core が壊れても bootstrap 中は allow（entry 救命胴衣）
   {
     const brokenCore = join(stateTmp, 'broken-core.mjs');
     writeFileSync(
@@ -128,7 +132,7 @@ export function runBootstrap(smoke) {
         ...base,
         hook_event_name: 'preToolUse',
         tool_name: 'Write',
-        tool_input: { path: join(root, 'utils/foo.ts') },
+        tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
       },
       { CURSOR_GATE_CORE_PATH: brokenImport },
     );
@@ -140,7 +144,7 @@ export function runBootstrap(smoke) {
     disableBootstrap(root);
   }
 
-  // 18. track-phase: /bootstrap と /bootstrap off
+  // track-phase: /bootstrap と /bootstrap off
   {
     const outOn = run('track.mjs', {
       ...base,
@@ -158,7 +162,7 @@ export function runBootstrap(smoke) {
     assert('track-phase removed marker', !isBootstrapActive(root));
   }
 
-  // 19. sessionEnd でマーカー削除
+  // sessionEnd でマーカー削除
   {
     enableBootstrap(root);
     run('session-end.mjs', { ...base });

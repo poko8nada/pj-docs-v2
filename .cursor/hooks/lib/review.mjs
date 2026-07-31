@@ -239,7 +239,7 @@ export function lastReviewVerdict(text) {
 
 /**
  * dirtyAt → スキャン下限 ms。
- * null/不正は 0（移行: 旧 state に dirtyAt が無い場合でも PASS で clear できる）。
+ * null/不正は 0（カットオフなし → dirtyAt 以降に限らず PASS 候補になる）。
  */
 export function reviewDirtySinceMs(dirtyAt) {
   if (dirtyAt == null || String(dirtyAt).trim() === '') return 0;

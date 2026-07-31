@@ -2,7 +2,7 @@
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runTranscriptFallback(smoke) {
-  // transcript_path sticky fallback (15)
+  // transcript_path sticky fallback
   const {
     root,
     stateTmp,
@@ -15,7 +15,7 @@ export function runTranscriptFallback(smoke) {
     writeFileSync,
     join,
   } = smoke;
-  // 15. transcript_path のみでも gate が chore state を読める（sticky 無しのフォールバック）
+  // transcript_path のみでも gate が chore state を読める（sticky 無しのフォールバック）
   {
     clearSticky();
     const transcriptId = 'aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee';
@@ -57,7 +57,7 @@ export function runTranscriptFallback(smoke) {
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runStickyContamination(smoke) {
-  // sticky 汚染に勝つ統合 (旧20)
+  // sticky 汚染に勝つ統合
   const {
     root,
     smokeTmpRoot,
@@ -69,7 +69,7 @@ export function runStickyContamination(smoke) {
     unlinkSync,
     join,
   } = smoke;
-  // 20. 統合: sticky（発話 ID）が汚染 payload より勝つ
+  // 統合: sticky（発話 ID）が汚染 payload より勝つ
   {
     clearSticky();
     const realId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';

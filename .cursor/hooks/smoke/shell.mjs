@@ -2,9 +2,9 @@
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runCdRoot(smoke) {
-  // root への cd 拒否 (旧20)
+  // root への cd 拒否
   const { root, run, assert, loadState, join } = smoke;
-  // 20. gate: root への cd は拒否
+  // gate: root への cd は拒否
   {
     const cdId = 'cd-root-test-id';
     const cdBase = { conversation_id: cdId, workspace_roots: [root], cwd: root };
