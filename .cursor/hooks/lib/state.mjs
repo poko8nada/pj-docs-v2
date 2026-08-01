@@ -203,6 +203,13 @@ export function formatJstIso(date = new Date()) {
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}+09:00`;
 }
 
+/** reviewer fallback の境界用。秒未満を失わない JST timestamp */
+export function formatReviewSnapshotAt(date = new Date()) {
+  const jst = formatJstIso(date);
+  const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
+  return jst.replace('+09:00', `.${milliseconds}+09:00`);
+}
+
 function idSuffix(id) {
   return `__${sanitizeConversationId(id)}.json`;
 }
@@ -236,11 +243,18 @@ export function statePathRelative(root, id) {
   return `.cursor/hooks/state/*__${sanitizeConversationId(id)}.json`;
 }
 
-/** review は files + dirtyAt。空 files = commit OK */
+/** review は Git snapshot と reviewer transcript の binding。 */
+export const REVIEW_BINDING_UNBOUND = 'unbound';
+export const REVIEW_BINDING_BOUND = 'bound';
 
-/** @returns {{ files: string[], dirtyAt: string | null }} */
+/** @returns {{ snapshotHash: string | null, snapshotAt: string | null, reviewerTranscriptId: string | null, binding: 'unbound' | 'bound' | null }} */
 export function defaultReview() {
-  return { files: [], dirtyAt: null };
+  return {
+    snapshotHash: null,
+    snapshotAt: null,
+    reviewerTranscriptId: null,
+    binding: null,
+  };
 }
 
 /** @returns {{ pending: string[] }} */
@@ -257,17 +271,32 @@ export function normalizeCheck(check) {
 }
 
 /**
- * 旧 { status } / { required, done } は無視。
- * files + dirtyAt を正規化。
+ * 旧 files / dirtyAt / reviewerTranscriptPath は読み捨て、snapshot の binding だけを正規化。
+ * full path は state に残さず、transcript UUID へ縮約する。
  */
 export function normalizeReview(review) {
   if (!review || typeof review !== 'object') return defaultReview();
-  const files = Array.isArray(review.files)
-    ? [...new Set(review.files.map((f) => String(f)).filter(Boolean))]
-    : [];
-  const dirtyAt =
-    typeof review.dirtyAt === 'string' && review.dirtyAt.trim() ? review.dirtyAt.trim() : null;
-  return { files, dirtyAt };
+  const snapshotHash =
+    typeof review.snapshotHash === 'string' && review.snapshotHash.trim()
+      ? review.snapshotHash.trim()
+      : null;
+  const snapshotAt =
+    typeof review.snapshotAt === 'string' &&
+    review.snapshotAt.trim() &&
+    Number.isFinite(Date.parse(review.snapshotAt.trim()))
+      ? review.snapshotAt.trim()
+      : null;
+  const reviewerTranscriptId =
+    idFromTranscriptPath(review.reviewerTranscriptId) ??
+    idFromTranscriptPath(review.reviewerTranscriptPath);
+  const hasSnapshot = snapshotHash !== null || snapshotAt !== null || reviewerTranscriptId !== null;
+  const binding =
+    hasSnapshot && review.binding === REVIEW_BINDING_BOUND
+      ? REVIEW_BINDING_BOUND
+      : hasSnapshot
+        ? REVIEW_BINDING_UNBOUND
+        : null;
+  return { snapshotHash, snapshotAt, reviewerTranscriptId, binding };
 }
 
 /** Read した `.cursor/skills/<name>/SKILL.md` の name（重複なし・ソート） */
@@ -521,24 +550,13 @@ export function saveState(root, id, state) {
   return next;
 }
 
-/** commit ブロック条件: 未レビュー path が残っているか */
-export function isReviewBlocking(state) {
-  return normalizeReview(state?.review).files.length > 0;
+/** reviewer 対象の snapshot が state に保存されているか */
+export function hasReviewSnapshot(state) {
+  return normalizeReview(state?.review).snapshotHash !== null;
 }
 
-/** rules 解禁後の reviewable 編集を files に積む。毎回 dirtyAt を更新 */
-export function markReviewDirty(root, id, filePath) {
-  const prev = loadState(root, id);
-  const abs = resolve(filePath);
-  const rel = relative(root, abs).split(sep).join('/');
-  const review = normalizeReview(prev.review);
-  if (rel && !review.files.includes(rel)) review.files.push(rel);
-  review.dirtyAt = formatJstIso();
-  return saveState(root, id, { phase: prev.phase, review });
-}
-
-/** review.files / dirtyAt をクリア（commit 前クリアや reset 用） */
-export function clearReviewFiles(root, id) {
+/** review binding をクリア（empty snapshot や reset 用） */
+export function clearReview(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, {
     phase: prev.phase,
@@ -546,7 +564,7 @@ export function clearReviewFiles(root, id) {
   });
 }
 
-/** git commit 成功後に review.files / dirtyAt を空へ */
+/** git commit 成功後に reviewer snapshot binding を空へ */
 export function resetReview(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, {

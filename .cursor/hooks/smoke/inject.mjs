@@ -35,6 +35,11 @@ export function runInjectGateListing(smoke) {
       ctx.slice(0, 600),
     );
     assert(
+      'inject states discussion is read-only',
+      ctx.includes('discussion` is read-only'),
+      ctx.slice(0, 600),
+    );
+    assert(
       'inject mentions refs gate',
       ctx.includes('## References') && ctx.includes('read.refs') && ctx.includes('skill/name.md'),
       ctx.slice(0, 600),
@@ -42,6 +47,11 @@ export function runInjectGateListing(smoke) {
     assert(
       'inject mentions review',
       ctx.includes('## Review') && ctx.includes('/pre-commit-reviewer'),
+      ctx.slice(0, 600),
+    );
+    assert(
+      'inject explains direct reviewer transcript lookup',
+      ctx.includes('exact JSONL'),
       ctx.slice(0, 600),
     );
     assert(
@@ -101,7 +111,7 @@ export function runInjectSticky(smoke) {
         {
           phase: 'chore',
           unlock: { rules: true, issue: null, agenda: null, scope: false },
-          review: { files: [], dirtyAt: null },
+          review: { snapshotHash: null, snapshotAt: null, reviewerTranscriptId: null },
           check: { pending: [] },
           read: { skills: [], refs: [] },
           label: 'prev',
@@ -117,7 +127,7 @@ export function runInjectSticky(smoke) {
         {
           phase: 'discussion',
           unlock: { rules: null, issue: null, agenda: null, scope: false },
-          review: { files: [], dirtyAt: null },
+          review: { snapshotHash: null, snapshotAt: null, reviewerTranscriptId: null },
           check: { pending: [] },
           read: { skills: [], refs: [] },
           label: 'new',

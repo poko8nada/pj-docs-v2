@@ -1,6 +1,24 @@
 # Data
 
-Apply when shaping data — objects, JSON, and persistence / schema thinking (not the HTTP call itself → `api`).
+## Apply when
+
+Use when shaping data — objects, JSON, and persistence / schema thinking (not the HTTP call itself → `api`).
+
+## Owns
+
+- Domain object shape, schemas, JSON mapping, persistence mapping, and units of consistency.
+- The boundary between stored or external data representation and domain meaning.
+
+## Does not own
+
+- HTTP transport, domain decisions, UI composition, or UI interaction state.
+- Driver-specific details in pure domain modules.
+
+## Handoff
+
+- Use `api` for HTTP transport and request/response handling.
+- Use `logic` for domain rules and pure transformations.
+- Use `ui-state` or `components` for UI-facing data and interaction.
 
 ## Premise
 
@@ -10,7 +28,7 @@ Apply when shaping data — objects, JSON, and persistence / schema thinking (no
 
 ## Placement
 
-- Keep domain types and mappers next to the feature that owns them (with code / logic / tests — see `shared` colocation).
+- Keep domain types and mappers next to the feature that owns them (with code / logic / tests — see `conventions` colocation).
 - Row↔domain (or JSON↔domain) mapping stays at the persistence edge; pure domain modules should not depend on driver / ORM / raw JSON wire types.
 - When a new entity has no folder yet, propose one to the user before scattering types across the tree.
 

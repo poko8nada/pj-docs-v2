@@ -1,6 +1,22 @@
-# HTML
+# Markup
 
-Apply when writing document markup for the web — static pages or the HTML structure inside UI. React/Tailwind/compound API → `components`; this file is **website document manners**.
+## Apply when
+
+Use when changing semantic web markup or document structure — static pages or markup inside UI. Component composition and styling → `components`; this file is **website markup guidance**.
+
+## Owns
+
+- Element semantics, document outline, landmarks, links, forms, images, and keyboard-accessible markup.
+
+## Does not own
+
+- Component composition, styling, compound APIs, or UI state.
+- Domain logic, network I/O, or persistence.
+
+## Handoff
+
+- Read `components` for component contracts and presentation.
+- Read `ui-state` for interaction state and `logic`, `api`, or `data` for non-UI concerns.
 
 ## Premise
 
@@ -10,7 +26,7 @@ Apply when writing document markup for the web — static pages or the HTML stru
 
 ## Placement
 
-- Keep page shell / layout markup with the route or feature folder (colocate with its styles and small helpers — see `shared`).
+- Keep page shell / layout markup with the route or feature folder (colocate with its styles and small helpers — see `conventions`).
 - Shared chrome (`header`, `nav`, `footer`) lives in one place; do not copy-paste landmark structure per page.
 
 ## Writing

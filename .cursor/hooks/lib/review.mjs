@@ -1,14 +1,14 @@
 /**
- * Pre-commit reviewer gate — path rules, Task 識別、review.files + diff の Task 注入、
- * commit 時の子 transcript PASS クリア。
+ * Pre-commit reviewer gate — path rules, Task 識別、Git snapshot の Task 注入、
+ * commit 前の子 transcript PASS binding。
  */
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { isBootstrapMarkerPath } from './bootstrap.mjs';
 import { formatDeny } from './deny-format.mjs';
-import { isUnderStateDir } from './state.mjs';
+import { idFromTranscriptPath, isUnderStateDir } from './state.mjs';
 
 /** コード＋CSS＋HTMLのみ（md/json/yaml は Issue 下書き等で gate を汚さない） */
 const REVIEWABLE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|css|html)$/i;
@@ -18,18 +18,43 @@ export const REVIEW_DIFF_MAX_PER_FILE = 8000;
 /** 注入全体のソフト上限 */
 export const REVIEW_DIFF_MAX_TOTAL = 48000;
 
-/** @param {string[]} files */
-export function denyReviewMessage(files) {
-  const list = Array.isArray(files) && files.length > 0 ? files.join(', ') : '(none)';
+/**
+ * @param {{ kind: string, hash?: string | null, paths?: string[], message?: string | null }} snapshot
+ * @param {{
+ *   snapshotHash: string | null,
+ *   snapshotAt: string | null,
+ *   reviewerTranscriptId: string | null,
+ *   binding: 'unbound' | 'bound' | null
+ * }} review
+ */
+export function denyReviewMessage(snapshot, review) {
+  const list =
+    Array.isArray(snapshot?.paths) && snapshot.paths.length > 0
+      ? snapshot.paths.join(', ')
+      : '(none)';
+  let reason;
+  if (snapshot?.kind === 'error') {
+    reason = `Unable to calculate the current Git snapshot: ${snapshot.message ?? 'unknown error'}.`;
+  } else if (!review?.snapshotHash) {
+    reason = `Current Git snapshot has reviewable changes: ${list}. No reviewer snapshot has been recorded yet.`;
+  } else if (review.snapshotHash !== snapshot?.hash) {
+    reason = `Current Git snapshot differs from the reviewer snapshot: ${list}.`;
+  } else if (review?.binding === 'bound') {
+    reason = 'The current Git snapshot already has a bound reviewer PASS.';
+  } else if (review.reviewerTranscriptId) {
+    reason = 'The recorded reviewer transcript does not end with `REVIEW: PASS`.';
+  } else {
+    reason = 'No verified reviewer PASS is bound to the current Git snapshot yet.';
+  }
   return formatDeny({
     tag: 'gate-review',
-    why: `review.files is non-empty (unreviewed): ${list}.`,
+    why: reason,
     next: [
       'Run `/pre-commit-reviewer` (need `REVIEW: PASS` in the child transcript).',
       'Then stop or `git commit` (`git add` order does not matter).',
     ],
     doNot: [
-      'Retry `git commit` unchanged while review.files is non-empty.',
+      'Retry `git commit` unchanged while the current Git snapshot is unreviewed.',
       'Skip the reviewer or invent a commit flag to bypass hooks.',
     ],
   });
@@ -59,7 +84,7 @@ function relPosix(root, filePath) {
   return rel.split(sep).join('/');
 }
 
-/** review.files 蓄積から除外（state / bootstrap / smoke 一時） */
+/** Git snapshot から除外（state / bootstrap / smoke 一時） */
 export function isExcludedFromReviewTrack(root, filePath) {
   if (!filePath) return true;
   const abs = resolve(isAbsolute(filePath) ? filePath : resolve(root, String(filePath)));
@@ -85,6 +110,31 @@ function gitRun(root, args) {
     encoding: 'utf8',
     maxBuffer: 2 * 1024 * 1024,
   });
+}
+
+function gitPathList(root, args, label) {
+  const run = gitRun(root, args);
+  if (run.error) {
+    return { error: `${label} failed: ${run.error.message}` };
+  }
+  if (Number(run.status ?? 0) !== 0) {
+    const err = String(run.stderr ?? '').trim() || `exit ${run.status}`;
+    return { error: `${label} failed: ${err}` };
+  }
+  return {
+    paths: String(run.stdout ?? '')
+      .split('\0')
+      .filter((path) => path.length > 0),
+  };
+}
+
+function readReviewFile(root, relPath) {
+  const abs = resolve(root, relPath);
+  try {
+    return { kind: 'new', body: readFileSync(abs, 'utf8') };
+  } catch (e) {
+    return { kind: 'error', body: `read failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
 }
 
 /**
@@ -117,13 +167,87 @@ export function collectReviewDiff(root, relPath) {
   }
   const tracked = String(lsRun.stdout ?? '').trim();
   if (!tracked && existsSync(abs)) {
-    try {
-      return { kind: 'new', body: readFileSync(abs, 'utf8') };
-    } catch (e) {
-      return { kind: 'error', body: `read failed: ${e instanceof Error ? e.message : String(e)}` };
-    }
+    return readReviewFile(root, posix);
   }
   return { kind: 'empty', body: '' };
+}
+
+/**
+ * Git の現在差分をレビュー対象の拡張子で絞り、内容 fingerprint を作る。
+ * tracked の staged/unstaged/deleted と untracked を同じ snapshot に含める。
+ * @param {{ includeEntries?: boolean }} options
+ */
+export function collectReviewSnapshot(root, options = {}) {
+  const tracked = gitPathList(
+    root,
+    ['diff', '--name-only', '--no-renames', '-z', 'HEAD', '--'],
+    'git diff path list',
+  );
+  if (tracked.error) {
+    return { kind: 'error', message: tracked.error, paths: [], entries: [], hash: null };
+  }
+
+  const untracked = gitPathList(
+    root,
+    ['ls-files', '--others', '--exclude-standard', '-z'],
+    'git untracked path list',
+  );
+  if (untracked.error) {
+    return { kind: 'error', message: untracked.error, paths: [], entries: [], hash: null };
+  }
+
+  const trackedPaths = tracked.paths.filter((path) => isReviewablePath(root, path)).toSorted();
+  const untrackedPaths = untracked.paths.filter((path) => isReviewablePath(root, path)).toSorted();
+  const paths = [...new Set([...trackedPaths, ...untrackedPaths])].toSorted();
+  if (paths.length === 0) {
+    return { kind: 'empty', message: null, paths: [], entries: [], hash: null };
+  }
+
+  const trackedDiffRun = gitRun(
+    root,
+    trackedPaths.length > 0
+      ? ['diff', '--no-renames', '--binary', 'HEAD', '--', ...trackedPaths]
+      : ['diff', '--no-renames', '--binary', 'HEAD', '--'],
+  );
+  const trackedDiffCode = Number(trackedDiffRun.status ?? 0);
+  if (trackedDiffRun.error || (trackedDiffCode !== 0 && trackedDiffCode !== 1)) {
+    const error =
+      trackedDiffRun.error?.message ||
+      String(trackedDiffRun.stderr ?? '').trim() ||
+      `exit ${trackedDiffRun.status}`;
+    return {
+      kind: 'error',
+      message: `git diff content failed: ${error}`,
+      paths,
+      entries: [],
+      hash: null,
+    };
+  }
+
+  const untrackedBodies = [];
+  for (const path of untrackedPaths) {
+    const result = readReviewFile(root, path);
+    if (result.kind === 'error') {
+      return {
+        kind: 'error',
+        message: `${path}: ${result.body}`,
+        paths,
+        entries: [],
+        hash: null,
+      };
+    }
+    untrackedBodies.push({ path, body: result.body });
+  }
+
+  const serialized = [
+    `tracked\0${trackedPaths.join('\0')}\0${String(trackedDiffRun.stdout ?? '')}\0`,
+    ...untrackedBodies.map(({ path, body }) => `untracked\0${path}\0${body}\0`),
+  ].join('');
+  const hash = `sha256:${createHash('sha256').update(serialized).digest('hex')}`;
+  const entries = options.includeEntries
+    ? paths.map((path) => ({ path, ...collectReviewDiff(root, path) }))
+    : [];
+  return { kind: 'snapshot', message: null, paths, entries, hash };
 }
 
 function truncateBlock(text, max, label) {
@@ -136,21 +260,20 @@ function truncateBlock(text, max, label) {
 }
 
 /**
- * @param {string} root
- * @param {string[]} files
+ * @param {{ path: string, kind: string, body: string }[]} entries
+ * @param {string | null} root
  */
-export function buildReviewTaskInjection(root, files) {
-  if (!Array.isArray(files) || files.length === 0) return null;
-
+function buildReviewTaskInjectionFromEntries(entries, root = null) {
+  if (!Array.isArray(entries) || entries.length === 0) return null;
   const lines = [
-    `${REVIEW_INJECT_MARKER} Review the following changes (from review.files).`,
+    `${REVIEW_INJECT_MARKER} Review the following current Git snapshot.`,
+    ...(root ? [`Full Repository Path: ${resolve(root)}`, 'Diff: current Git snapshot'] : []),
     'Focus on the injected diff / new-file content. Do not run git. Do not Read whole files unless the injection is truncated and critical context is missing.',
     '',
   ];
 
   let total = lines.join('\n').length;
-  for (const f of files) {
-    const { kind, body } = collectReviewDiff(root, f);
+  for (const { path: f, kind, body } of entries) {
     let section;
     if (kind === 'diff') {
       const text = truncateBlock(body, REVIEW_DIFF_MAX_PER_FILE, f);
@@ -178,9 +301,18 @@ export function buildReviewTaskInjection(root, files) {
   return lines.join('\n');
 }
 
-/** preToolUse Task 用: review.files + diff を prompt / description / task に前置 */
-export function injectReviewFilesIntoTaskInput(toolInput, root, files) {
-  const block = buildReviewTaskInjection(root, files);
+export function buildReviewTaskInjection(root, files) {
+  if (!Array.isArray(files) || files.length === 0) return null;
+  const entries = files.map((path) => ({ path, ...collectReviewDiff(root, path) }));
+  return buildReviewTaskInjectionFromEntries(entries, root);
+}
+
+export function buildReviewSnapshotTaskInjection(root, snapshot) {
+  if (!snapshot || snapshot.kind !== 'snapshot') return null;
+  return buildReviewTaskInjectionFromEntries(snapshot.entries, root);
+}
+
+function mergeReviewTaskInput(toolInput, block) {
   if (!block) return null;
   const input = toolInput && typeof toolInput === 'object' ? { ...toolInput } : {};
   const original = String(input.prompt ?? input.description ?? input.task ?? '');
@@ -190,6 +322,11 @@ export function injectReviewFilesIntoTaskInput(toolInput, root, files) {
   input.description = merged;
   input.task = merged;
   return input;
+}
+
+/** preToolUse Task 用: current Git snapshot を prompt / description / task に前置 */
+export function injectReviewSnapshotIntoTaskInput(toolInput, root, snapshot) {
+  return mergeReviewTaskInput(toolInput, buildReviewSnapshotTaskInjection(root, snapshot));
 }
 
 function shellSegments(command) {
@@ -207,22 +344,56 @@ export function commandIncludesGitCommit(command) {
   return shellSegments(command).some((seg) => /\bgit\b/.test(seg) && /\bcommit\b/.test(seg));
 }
 
-/** Cursor の projects スラッグ（`/Users/a/_b` → `Users-a-b`。`_` は除去） */
-export function cursorProjectSlug(root) {
-  return resolve(root)
-    .replace(/^[\\/]+/, '')
-    .replace(/_/g, '')
-    .replace(/[:\\/]+/g, '-');
+/**
+ * agent-transcripts 置き場。
+ * 実行時の transcript path から解決する。テストは
+ * CURSOR_GATE_TRANSCRIPTS_DIR で上書きする。
+ */
+export function transcriptRootFromPath(transcriptPath) {
+  if (!transcriptPath || typeof transcriptPath !== 'string') return null;
+  const abs = resolve(transcriptPath);
+  const id = idFromTranscriptPath(abs);
+  if (!id || basename(dirname(abs)) !== id) return null;
+  return dirname(dirname(abs));
+}
+
+export function agentTranscriptsDir() {
+  const override = process.env.CURSOR_GATE_TRANSCRIPTS_DIR;
+  if (override && String(override).trim()) return resolve(String(override).trim());
+  return transcriptRootFromPath(process.env.CURSOR_TRANSCRIPT_PATH);
+}
+
+function transcriptPathFromId(transcriptId) {
+  const dir = agentTranscriptsDir();
+  const id = idFromTranscriptPath(transcriptId);
+  if (!dir || !id) return null;
+  return join(dir, id, `${id}.jsonl`);
 }
 
 /**
- * agent-transcripts 置き場。
- * テストは CURSOR_GATE_TRANSCRIPTS_DIR で上書き。
+ * 子 agent の hook payload から reviewer transcript を特定する。
+ * 親 state の id は sticky で解決済みなので、child id と比較して親イベントを除外する。
  */
-export function agentTranscriptsDir(root) {
-  const override = process.env.CURSOR_GATE_TRANSCRIPTS_DIR;
-  if (override && String(override).trim()) return resolve(String(override).trim());
-  return join(homedir(), '.cursor', 'projects', cursorProjectSlug(root), 'agent-transcripts');
+export function reviewerTranscriptIdFromPayload(root, payload, parentId) {
+  const path = transcriptPathFromPath(payload?.transcript_path);
+  const childId = path ? idFromTranscriptPath(path) : null;
+  if (!path || !childId || childId === String(parentId)) return null;
+  if (!existsSync(path)) return null;
+
+  let text;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+  if (!isReviewerTranscriptText(root, text)) return null;
+  return childId;
+}
+
+function transcriptPathFromPath(transcriptPath) {
+  if (!transcriptPath || typeof transcriptPath !== 'string') return null;
+  const abs = resolve(transcriptPath);
+  return transcriptRootFromPath(abs) ? abs : null;
 }
 
 /** 本文中の最後の `REVIEW: PASS|GAPS`（大文字化）。無ければ null */
@@ -235,16 +406,6 @@ export function lastReviewVerdict(text) {
     last = m[1].toUpperCase();
   }
   return last;
-}
-
-/**
- * dirtyAt → スキャン下限 ms。
- * null/不正は 0（カットオフなし → dirtyAt 以降に限らず PASS 候補になる）。
- */
-export function reviewDirtySinceMs(dirtyAt) {
-  if (dirtyAt == null || String(dirtyAt).trim() === '') return 0;
-  const ms = Date.parse(String(dirtyAt));
-  return Number.isFinite(ms) ? ms : 0;
 }
 
 /**
@@ -270,15 +431,26 @@ export function isReviewPassTranscriptText(root, text) {
 }
 
 /**
- * dirtyAt 以降の unused reviewer 子 jsonl のうち **最新 mtime** が PASS ならその path。
- * 親 conversation / used フラグ付きは除外。
+ * state に保存された reviewer transcript ID を優先して直接確認する。
+ * ID が未保存の場合だけ、snapshotAt 以降の runtime transcript を fallback 走査する。
  * @returns {string | null}
  */
-export function findReviewPassTranscript(root, dirtyAt, excludeId = null) {
-  const dirtyMs = reviewDirtySinceMs(dirtyAt);
+export function findReviewPassTranscript(
+  root,
+  excludeId = null,
+  reviewerTranscriptId = null,
+  snapshotAt = null,
+) {
+  if (reviewerTranscriptId) {
+    const path = transcriptPathFromId(reviewerTranscriptId);
+    return path ? readPassTranscript(root, path, excludeId) : null;
+  }
 
-  const dir = agentTranscriptsDir(root);
-  if (!existsSync(dir)) return null;
+  const snapshotAtMs = Date.parse(String(snapshotAt ?? ''));
+  if (!Number.isFinite(snapshotAtMs)) return null;
+
+  const dir = agentTranscriptsDir();
+  if (!dir || !existsSync(dir)) return null;
 
   let names;
   try {
@@ -302,8 +474,7 @@ export function findReviewPassTranscript(root, dirtyAt, excludeId = null) {
     } catch {
       continue;
     }
-    if (st.mtimeMs < dirtyMs) continue;
-
+    if (st.mtimeMs < snapshotAtMs) continue;
     let text;
     try {
       text = readFileSync(jsonl, 'utf8');
@@ -320,6 +491,25 @@ export function findReviewPassTranscript(root, dirtyAt, excludeId = null) {
   if (!latest) return null;
   if (lastReviewVerdict(latest.text) !== 'PASS') return null;
   return latest.jsonl;
+}
+
+function readPassTranscript(root, transcriptPath, excludeId = null) {
+  const jsonl = transcriptPathFromPath(transcriptPath);
+  if (!jsonl) return null;
+
+  const id = idFromTranscriptPath(jsonl);
+  if (excludeId && id === excludeId) return null;
+  if (isReviewPassUsed(jsonl)) return null;
+
+  let text;
+  try {
+    text = readFileSync(jsonl, 'utf8');
+  } catch {
+    return null;
+  }
+  if (!isReviewerTranscriptText(root, text)) return null;
+  if (lastReviewVerdict(text) !== 'PASS') return null;
+  return jsonl;
 }
 
 /** jsonl 隣の使い済みフラグ path（`<id>.jsonl` → `<id>.harness-pass-used`） */

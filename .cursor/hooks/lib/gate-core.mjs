@@ -9,7 +9,7 @@
  * | beforeReadFile     | outside-root                                        |
  */
 import { homedir } from 'node:os';
-import { basename, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
+import { basename, isAbsolute, join, normalize, resolve } from 'node:path';
 import {
   isBootstrapActive,
   isBootstrapMarkerPath,
@@ -19,6 +19,7 @@ import { DENY_MENTOR, isMentorCodeBlocked, isMentorDeniedPath } from './mentor.m
 import { logHookIds } from './id-log.mjs';
 import { formatDeny } from './deny-format.mjs';
 import {
+  collectReviewSnapshot,
   commandIncludesGitCommit,
   denyReviewMessage,
   findReviewPassTranscript,
@@ -29,14 +30,17 @@ import { denyRefsMessage, missingRefs, requiredRefsForPath } from './refs.mjs';
 import { commandIncludesGhIssueMutation, denyIssueMessage, isIssueReady } from './issue.mjs';
 import { denyAgendaMessage, isAgendaReady } from './agenda.mjs';
 import {
-  clearReviewFiles,
+  clearReview,
   conversationId,
-  isReviewBlocking,
+  formatReviewSnapshotAt,
   isSpecFlowPhase,
   isUnderStateDir,
   isUnlocked,
   loadState,
   normalizeReview,
+  REVIEW_BINDING_BOUND,
+  REVIEW_BINDING_UNBOUND,
+  saveState,
   stateDir,
   WORK_PHASES,
   workspaceRoot,
@@ -256,15 +260,6 @@ function fileArgFromToolInput(toolInput) {
     toolInput.target_notebook ??
     undefined
   );
-}
-
-function isRootMarkdown(root, filePath) {
-  if (!filePath) return false;
-  const abs = resolve(isAbsolute(filePath) ? filePath : resolve(root, filePath));
-  const rel = relative(root, abs);
-  if (!rel || rel.startsWith('..') || rel.includes(`..${sep}`)) return false;
-  if (rel.includes(sep) || rel.includes('/')) return false;
-  return /\.md$/i.test(rel);
 }
 
 function expandPath(filePath) {
@@ -700,18 +695,60 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
   const outsideErr = denyOutsidePathsInCommand(root, command);
   if (outsideErr) return deny(outsideErr);
 
-  // git commit: dirtyAt（欠落時は epoch）以降の unused PASS 子 transcript があれば clear
-  if (commandIncludesGitCommit(command) && isReviewBlocking(state)) {
+  // git commit: 現在の Git snapshot と reviewer の対象 snapshot が一致するか確認する
+  if (commandIncludesGitCommit(command)) {
+    const snapshot = collectReviewSnapshot(root);
     const review = normalizeReview(state.review);
-    const passJsonl = findReviewPassTranscript(root, review.dirtyAt, id);
-    if (passJsonl) {
-      markReviewPassUsed(passJsonl);
-      clearReviewFiles(root, id);
-      state = loadState(root, id);
+    if (snapshot.kind === 'error') {
+      return deny(denyReviewMessage(snapshot, review));
     }
-    if (isReviewBlocking(state)) {
-      const blocked = normalizeReview(state.review);
-      return deny(denyReviewMessage(blocked.files));
+    if (snapshot.kind === 'empty') {
+      if (
+        review.snapshotHash !== null ||
+        review.snapshotAt !== null ||
+        review.reviewerTranscriptId !== null ||
+        review.binding !== null
+      ) {
+        clearReview(root, id);
+        state = loadState(root, id);
+      }
+    } else {
+      if (review.snapshotHash !== snapshot.hash || review.snapshotAt === null) {
+        const sameSnapshot = review.snapshotHash === snapshot.hash;
+        saveState(root, id, {
+          phase: state.phase,
+          review: {
+            snapshotHash: snapshot.hash,
+            snapshotAt: sameSnapshot
+              ? (review.snapshotAt ?? formatReviewSnapshotAt())
+              : formatReviewSnapshotAt(),
+            reviewerTranscriptId: sameSnapshot ? review.reviewerTranscriptId : null,
+            binding: sameSnapshot ? review.binding : REVIEW_BINDING_UNBOUND,
+          },
+        });
+        state = loadState(root, id);
+      }
+      const boundReview = normalizeReview(state.review);
+      if (boundReview.binding !== REVIEW_BINDING_BOUND) {
+        const passJsonl = findReviewPassTranscript(
+          root,
+          id,
+          boundReview.reviewerTranscriptId,
+          boundReview.snapshotAt,
+        );
+        if (passJsonl) {
+          markReviewPassUsed(passJsonl);
+          saveState(root, id, {
+            phase: state.phase,
+            review: { ...boundReview, binding: REVIEW_BINDING_BOUND },
+          });
+          state = loadState(root, id);
+        }
+      }
+      const remainingReview = normalizeReview(state.review);
+      if (remainingReview.binding !== REVIEW_BINDING_BOUND) {
+        return deny(denyReviewMessage(snapshot, remainingReview));
+      }
     }
   }
 
@@ -805,7 +842,7 @@ export async function handleGate(payload) {
 
   const id = conversationId(payload);
 
-  // scope: rules / mentor / root-md 例外より先（work|chore の編集は unlock.scope 必須）
+  // scope: rules / mentor より先（work|chore の編集は unlock.scope 必須）
   if (WRITE_TOOLS.has(toolName) && inWorkPhase && state.unlock?.scope !== true) {
     return deny(DENY_SCOPE);
   }
@@ -829,6 +866,5 @@ export async function handleGate(payload) {
     return allow();
   }
 
-  if (fileArg && isRootMarkdown(root, String(fileArg))) return allow();
   return deny(denyCodeMessage(state.phase));
 }

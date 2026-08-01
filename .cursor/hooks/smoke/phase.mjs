@@ -9,7 +9,7 @@ export function runPhaseCore(smoke) {
     base,
     run,
     assert,
-    trackReadTsRef,
+    trackReadConventionsRef,
     trackReadIssueSkill,
     trackReadScope,
     trackReadAgenda,
@@ -23,6 +23,7 @@ export function runPhaseCore(smoke) {
     writeFileSync,
     join,
     workspaceRoot,
+    collectReviewSnapshot,
   } = smoke;
   // lib/ 移動後も payload 無しの root fallback がリポジトリ根を指すこと
   assert(
@@ -84,7 +85,7 @@ export function runPhaseCore(smoke) {
     assert('locked Write deny', out.permission === 'deny', JSON.stringify(out));
   }
 
-  // 2. root md allow while locked
+  // 2. root md deny while locked
   {
     const out = run('gate.mjs', {
       ...base,
@@ -92,7 +93,7 @@ export function runPhaseCore(smoke) {
       tool_name: 'Write',
       tool_input: { path: join(root, 'README.md') },
     });
-    assert('locked root md allow', out.permission === 'allow', JSON.stringify(out));
+    assert('locked root md deny', out.permission === 'deny', JSON.stringify(out));
   }
 
   // 3. locked nested md deny
@@ -342,7 +343,14 @@ export function runPhaseCore(smoke) {
       hook_event_name: 'beforeShellExecution',
       command: 'git commit -m msg',
     });
-    assert('phase unlocks git write', outGit.permission === 'allow', JSON.stringify(outGit));
+    const currentSnapshot = collectReviewSnapshot(root);
+    assert(
+      'phase unlocks git write unless reviewable diff is unreviewed',
+      currentSnapshot.kind === 'empty'
+        ? outGit.permission === 'allow'
+        : outGit.permission === 'deny',
+      JSON.stringify({ outGit, currentSnapshot }),
+    );
 
     const outPnpm = run('gate.mjs', {
       ...base,
@@ -474,7 +482,7 @@ export function runPhaseCore(smoke) {
         String(denyNoRef.agent_message ?? '').includes('rules/references'),
       JSON.stringify(denyNoRef),
     );
-    trackReadTsRef(base);
+    trackReadConventionsRef(base);
     const out2 = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
@@ -517,10 +525,10 @@ export function runPhaseCore(smoke) {
 
   // phase switch / re-entry resets rules + read
   {
-    trackReadTsRef(base);
+    trackReadConventionsRef(base);
     assert(
-      'read.refs records rules/shared.md',
-      loadState(root, id).read.refs?.includes('rules/shared.md'),
+      'read.refs records rules/conventions.md',
+      loadState(root, id).read.refs?.includes('rules/conventions.md'),
       JSON.stringify(loadState(root, id)),
     );
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore typo' });
@@ -543,12 +551,12 @@ export function runPhaseCore(smoke) {
       hook_event_name: 'beforeReadFile',
       file_path: join(root, '.cursor/skills/rules/SKILL.md'),
     });
-    trackReadTsRef(base);
+    trackReadConventionsRef(base);
     assert(
       'chore unlock + ref before re-entry',
       loadState(root, id).unlock.rules === true &&
         loadState(root, id).unlock.scope === true &&
-        loadState(root, id).read.refs?.includes('rules/shared.md') &&
+        loadState(root, id).read.refs?.includes('rules/conventions.md') &&
         loadState(root, id).read.skills?.includes('rules'),
       JSON.stringify(loadState(root, id)),
     );
@@ -571,7 +579,7 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 10b. review.files はフェーズ変更でも残る
+  // 10b. reviewer snapshot はフェーズ変更でも同じ Git 差分を binding する
   {
     const persistId = 'review-persist-id';
     const persistBase = { conversation_id: persistId, workspace_roots: [root], cwd: root };
@@ -596,19 +604,26 @@ export function runPhaseCore(smoke) {
       join(root, '.cursor/hooks/_smoke-review-persist-probe.mjs'),
       'export const smokePersistProbe = 1;\n',
     );
-    trackReadTsRef(persistBase);
+    trackReadConventionsRef(persistBase);
     run('track.mjs', {
       ...persistBase,
       hook_event_name: 'postToolUse',
       tool_name: 'Write',
       tool_input: { path: join(root, '.cursor/hooks/_smoke-review-persist-probe.mjs') },
     });
+    const taskOut = run('track.mjs', {
+      ...persistBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Task',
+      tool_input: { subagent_type: 'pre-commit-reviewer', description: 'review persist' },
+    });
+    const snapshotHash = loadState(root, persistId).review.snapshotHash;
     assert(
-      'review files before phase switch',
-      loadState(root, persistId).review.files.includes(
-        '.cursor/hooks/_smoke-review-persist-probe.mjs',
-      ),
-      JSON.stringify(loadState(root, persistId)),
+      'review snapshot before phase switch',
+      typeof snapshotHash === 'string' &&
+        snapshotHash.startsWith('sha256:') &&
+        taskOut.updated_input?.description?.includes('[harness-review]'),
+      JSON.stringify({ taskOut, review: loadState(root, persistId).review }),
     );
     run('track.mjs', {
       ...persistBase,
@@ -617,9 +632,9 @@ export function runPhaseCore(smoke) {
     });
     const stPersist = loadState(root, persistId);
     assert(
-      'review files persist across phase switch',
+      'review snapshot persists across phase switch',
       stPersist.phase === 'work' &&
-        stPersist.review.files.includes('.cursor/hooks/_smoke-review-persist-probe.mjs') &&
+        stPersist.review.snapshotHash === snapshotHash &&
         stPersist.read.refs.length === 0,
       JSON.stringify(stPersist),
     );
@@ -629,10 +644,8 @@ export function runPhaseCore(smoke) {
       prompt: '/discussion clear phase',
     });
     assert(
-      'review files persist into discussion',
-      loadState(root, persistId).review.files.includes(
-        '.cursor/hooks/_smoke-review-persist-probe.mjs',
-      ),
+      'review snapshot persists into discussion',
+      loadState(root, persistId).review.snapshotHash === snapshotHash,
       JSON.stringify(loadState(root, persistId)),
     );
     try {

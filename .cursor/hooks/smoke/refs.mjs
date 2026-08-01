@@ -1,9 +1,25 @@
 /** smoke: refs */
+import { normalizeReadRefs, refIdToRelPath } from '../lib/refs.mjs';
 
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runReadRefs(smoke) {
   // read.refs 弱ゲート
   const { root, run, assert, trackRead, join } = smoke;
+  const migratedRefs = normalizeReadRefs(
+    ['rules/shared.md', 'rules/html.md', 'rules/state.md'],
+    root,
+  );
+  assert(
+    'legacy rules reference IDs migrate',
+    JSON.stringify(migratedRefs) ===
+      JSON.stringify(['rules/conventions.md', 'rules/markup.md', 'rules/ui-state.md']),
+    JSON.stringify(migratedRefs),
+  );
+  assert(
+    'legacy reference path resolves to new file',
+    refIdToRelPath('rules/shared.md') === '.cursor/skills/rules/references/conventions.md',
+    refIdToRelPath('rules/shared.md'),
+  );
   // read.refs gate: 弱ゲート（rules/references を1つ以上）
   {
     const refsId = 'refs-gate-id';

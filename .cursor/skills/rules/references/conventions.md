@@ -1,6 +1,26 @@
-# Shared
+# Conventions
 
-Cross-cutting writing manners — apply with logic, components, or either. Default if unsure which reference fits.
+Cross-cutting conventions — apply with logic, components, or either. Default if unsure which reference fits.
+
+## Apply when
+
+Use for cross-cutting changes to placement, naming, exports, comments, or test conventions. Start here when the change does not have a clearer semantic owner.
+
+## Owns
+
+- Feature-folder colocation and dependency direction.
+- Stable English names, named exports, Japanese comments, and focused test descriptions.
+- General test quality: observable behavior, important failure or edge paths, deterministic fixtures, and minimal mocks.
+
+## Does not own
+
+- UI composition or semantic markup.
+- Domain rules, network I/O, persistence, or UI interaction state.
+
+## Handoff
+
+- Read `components` or `markup` for presentation and semantic markup.
+- Read `logic`, `ui-state`, `api`, or `data` for their respective semantic concerns.
 
 ## Premise
 
@@ -19,4 +39,5 @@ Cross-cutting writing manners — apply with logic, components, or either. Defau
 
 - Add Japanese comments to functions and important processes. Keep them minimal.
 - Test descriptions: include a Japanese translation in the test's comment (same bar as important process comments — the one place tests should be a bit more verbose).
+- Tests should describe behavior rather than mirror implementation details. Keep fixtures deterministic and cover important failure or edge paths without adding unnecessary mocks.
 - File and export names in English; names should state the role (`parseInvoice`, `InvoiceRow`), not vague utilities (`helpers`, `utils2`).

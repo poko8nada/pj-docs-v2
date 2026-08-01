@@ -286,7 +286,7 @@ export function runCheckPending(smoke) {
 
   // dirty 直後 format 失敗 → additional_context のみ（pending は残す・commit gate にはしない）
   {
-    const { clearSticky, trackReadTsRef } = smoke;
+    const { clearSticky, trackReadConventionsRef } = smoke;
     clearSticky();
     const formatId = 'check-format-dirty-id';
     const formatBase = { conversation_id: formatId, workspace_roots: [root], cwd: root };
@@ -307,7 +307,7 @@ export function runCheckPending(smoke) {
       tool_name: 'ReadFile',
       tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
-    trackReadTsRef(formatBase);
+    trackReadConventionsRef(formatBase);
 
     writeFileSync(probeAbs, badSrc);
     const formatOut = run('track.mjs', {
@@ -329,8 +329,10 @@ export function runCheckPending(smoke) {
       JSON.stringify(stFormatFail.check),
     );
     assert(
-      'format-on-dirty failure still marks review.files',
-      stFormatFail.review?.files?.includes(probeRel),
+      'format-on-dirty failure records current reviewer snapshot',
+      typeof stFormatFail.review?.snapshotHash === 'string' &&
+        typeof stFormatFail.review?.snapshotAt === 'string' &&
+        stFormatFail.review?.reviewerTranscriptId == null,
       JSON.stringify(stFormatFail.review),
     );
 

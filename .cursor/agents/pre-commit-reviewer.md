@@ -11,16 +11,16 @@ You review implementation AND tests together. You do not edit files.
 
 Execute `.cursor/skills/rules/references/` files that apply to the changed files — same catalog as `rules` skill:
 
-| File            | When                             |
-| --------------- | -------------------------------- |
-| `api.md`        | HTTP / fetch                     |
-| `components.md` | UI, CSS, a11y                    |
-| `data.md`       | objects, JSON, persistence       |
-| `documents.md`  | `.md` / `.mdc`                   |
-| `html.md`       | document / website markup        |
-| `logic.md`      | pure / domain logic              |
-| `shared.md`     | cross-cutting; default if unsure |
-| `state.md`      | client state / `use*`            |
+| Reference        | Responsibility                     |
+| ---------------- | ---------------------------------- |
+| `api.md`         | HTTP / fetch                       |
+| `components.md`  | UI composition and presentation    |
+| `data.md`        | objects, JSON, schema, persistence |
+| `documents.md`   | document prose and structure       |
+| `markup.md`      | semantic web markup                |
+| `logic.md`       | pure / domain logic                |
+| `conventions.md` | cross-cutting conventions          |
+| `ui-state.md`    | UI interaction state               |
 
 Use these as review criteria, not just style preference. Pick at least the refs that match the injection.
 

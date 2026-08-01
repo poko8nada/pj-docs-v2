@@ -3,12 +3,14 @@
  * 使い方は run.mjs。一時ファイルは `.cursor/hooks/.smoke-tmp/`。
  */
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
+  utimesSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -36,7 +38,12 @@ import {
   STATE_TTL_DAYS,
   workspaceRoot,
 } from '../lib/state.mjs';
-import { buildReviewTaskInjection, collectReviewDiff, isReviewablePath } from '../lib/review.mjs';
+import {
+  buildReviewTaskInjection,
+  collectReviewDiff,
+  collectReviewSnapshot,
+  isReviewablePath,
+} from '../lib/review.mjs';
 import { isCheckToolingReady, runFormatLint } from '../lib/check.mjs';
 
 const smokeDir = fileURLToPath(new URL('.', import.meta.url));
@@ -56,6 +63,11 @@ export function smokeProbeAbs(name) {
 
 /** 残った `_smoke-*` probe を消す */
 export function cleanupSmokeProbes() {
+  // ignored probe を smoke 中だけ intent-to-add にした場合も index を戻す
+  spawnSync('git', ['reset', '-q', '--', '.cursor/hooks/_smoke-*'], {
+    cwd: root,
+    stdio: 'ignore',
+  });
   let names;
   try {
     names = readdirSync(hooksDir);
@@ -82,9 +94,18 @@ export function createSmokeCtx() {
   const stateTmp = mkdtempSync(join(smokeTmpRoot, 'state-'));
   const id = 'test-conversation';
   const restoreBootstrap = isBootstrapActive(root);
+  const previousGitIndexFile = process.env.GIT_INDEX_FILE;
+  const sourceGitIndexFile = previousGitIndexFile
+    ? resolve(root, previousGitIndexFile)
+    : join(root, '.git/index');
+  const smokeGitIndexFile = join(stateTmp, 'git-index');
+  if (existsSync(sourceGitIndexFile)) {
+    copyFileSync(sourceGitIndexFile, smokeGitIndexFile);
+  }
   let failed = 0;
 
   process.env.CURSOR_GATE_STATE_DIR = stateTmp;
+  process.env.GIT_INDEX_FILE = smokeGitIndexFile;
   delete process.env.CURSOR_GATE_BOOTSTRAP;
   disableBootstrap(root);
 
@@ -142,8 +163,8 @@ export function createSmokeCtx() {
     });
   }
 
-  function trackReadTsRef(convBase) {
-    trackRead(convBase, '.cursor/skills/rules/references/shared.md');
+  function trackReadConventionsRef(convBase) {
+    trackRead(convBase, '.cursor/skills/rules/references/conventions.md');
   }
 
   function trackReadIssueSkill(convBase) {
@@ -173,6 +194,7 @@ export function createSmokeCtx() {
     hooksDir,
     stateTmp,
     smokeTmpRoot,
+    previousGitIndexFile,
     smokeProbeRel,
     smokeProbeAbs,
     id,
@@ -188,7 +210,7 @@ export function createSmokeCtx() {
     assert,
     clearSticky,
     trackRead,
-    trackReadTsRef,
+    trackReadConventionsRef,
     trackReadIssueSkill,
     trackReadScope,
     trackReadAgenda,
@@ -216,15 +238,18 @@ export function createSmokeCtx() {
     lastStubPath,
     buildReviewTaskInjection,
     collectReviewDiff,
+    collectReviewSnapshot,
     isReviewablePath,
     isCheckToolingReady,
     runFormatLint,
     existsSync,
+    copyFileSync,
     mkdirSync,
     mkdtempSync,
     readdirSync,
     readFileSync,
     rmSync,
+    utimesSync,
     unlinkSync,
     writeFileSync,
     join,
@@ -234,8 +259,10 @@ export function createSmokeCtx() {
 
 /** 一時ディレクトリ掃除と bootstrap 復元。失敗数を返す。 */
 export function finishSmokeCtx(ctx) {
-  const { stateTmp, smokeTmpRoot: tmpRoot, restoreBootstrap } = ctx;
+  const { stateTmp, smokeTmpRoot: tmpRoot, restoreBootstrap, previousGitIndexFile } = ctx;
   cleanupSmokeProbes();
+  if (previousGitIndexFile === undefined) delete process.env.GIT_INDEX_FILE;
+  else process.env.GIT_INDEX_FILE = previousGitIndexFile;
   rmSync(stateTmp, { recursive: true, force: true });
   rmSync(tmpRoot, { recursive: true, force: true });
   if (restoreBootstrap) enableBootstrap(root);

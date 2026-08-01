@@ -1,6 +1,23 @@
-# State
+# UI State
 
-Apply when writing client / UI state (`use*`, local store, derived UI state).
+## Apply when
+
+Use when writing client / UI state (`use*`, local store, derived UI state).
+
+## Owns
+
+- UI interaction state, local state transitions, derived view state, and loading or error status exposed to a view.
+
+## Does not own
+
+- Domain invariants, server or cache policy, network transport, or persistence.
+- Component composition or semantic markup.
+
+## Handoff
+
+- Use `components` and `markup` for rendering and markup.
+- Use `logic` for domain decisions.
+- Use `api` or `data` for external data sources and persistence boundaries.
 
 ## Premise
 
