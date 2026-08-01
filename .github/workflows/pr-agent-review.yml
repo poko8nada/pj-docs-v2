@@ -1,0 +1,33 @@
+name: PR Agent Review
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+      - synchronize
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  review:
+    if: ${{ github.event.sender.type != 'Bot' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run PR Agent
+        # v0.38.0 のリリースコミットに固定する
+        uses: The-PR-Agent/pr-agent@bd09b6cf89c6d6f3d16b159fa7603fa0e7768cf2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          openrouter__key: ${{ secrets.OPENROUTER_API_KEY }}
+          config.model: "openrouter/deepseek/deepseek-v4-flash-0731"
+          config.fallback_models: '["openrouter/openai/gpt-5.6-luna"]'
+          config.custom_model_max_tokens: "32000"
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "false"
+          github_action_config.auto_improve: "false"
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "synchronize"]'
