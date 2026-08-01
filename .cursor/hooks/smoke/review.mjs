@@ -3,6 +3,23 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { reviewPassUsedPath } from '../lib/review.mjs';
 
+function execGitWithoutSmokeIndex(cwd, gitArgs, options = {}) {
+  const env = { ...process.env };
+  delete env.GIT_INDEX_FILE;
+  return execFileSync('git', gitArgs, { ...options, cwd, env });
+}
+
+function withRealGitIndex(callback) {
+  const previousGitIndexFile = process.env.GIT_INDEX_FILE;
+  delete process.env.GIT_INDEX_FILE;
+  try {
+    return callback();
+  } finally {
+    if (previousGitIndexFile === undefined) delete process.env.GIT_INDEX_FILE;
+    else process.env.GIT_INDEX_FILE = previousGitIndexFile;
+  }
+}
+
 /** @param {import('./_harness.mjs').SmokeCtx} smoke */
 export function runReviewGate(smoke) {
   const {
@@ -27,26 +44,30 @@ export function runReviewGate(smoke) {
     join,
   } = smoke;
 
-  function setupChore(id) {
-    const base = { conversation_id: id, workspace_roots: [root], cwd: root };
+  function setupChore(conversationId) {
+    const conversationBase = {
+      conversation_id: conversationId,
+      workspace_roots: [root],
+      cwd: root,
+    };
     run('track.mjs', {
-      ...base,
+      ...conversationBase,
       hook_event_name: 'beforeSubmitPrompt',
       prompt: '/chore review smoke',
     });
     run('track.mjs', {
-      ...base,
+      ...conversationBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
       tool_input: { path: join(root, '.cursor/skills/scope/SKILL.md') },
     });
     run('track.mjs', {
-      ...base,
+      ...conversationBase,
       hook_event_name: 'preToolUse',
       tool_name: 'ReadFile',
       tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
     });
-    return base;
+    return conversationBase;
   }
 
   function addIgnoredProbe(relPath) {
@@ -63,10 +84,18 @@ export function runReviewGate(smoke) {
     });
   }
 
-  function writeReviewerTranscript(dir, id, verdict) {
-    const childDir = join(dir, id);
+  function collectSnapshotWithoutSmokeIndex(cwd) {
+    return withRealGitIndex(() => collectReviewSnapshot(cwd));
+  }
+
+  function collectDiffWithoutSmokeIndex(cwd, relPath) {
+    return withRealGitIndex(() => collectReviewDiff(cwd, relPath));
+  }
+
+  function writeReviewerTranscript(dir, transcriptId, verdict) {
+    const childDir = join(dir, transcriptId);
     mkdirSync(childDir, { recursive: true });
-    const path = join(childDir, `${id}.jsonl`);
+    const path = join(childDir, `${transcriptId}.jsonl`);
     writeFileSync(
       path,
       `${JSON.stringify({
@@ -87,14 +116,14 @@ export function runReviewGate(smoke) {
     return path;
   }
 
-  function captureReviewer(base, childPath, transcriptsDir) {
+  function captureReviewer(conversationBase, childPath, transcriptsDir) {
     const parentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
     const parentPath = join(transcriptsDir, parentId, `${parentId}.jsonl`);
     mkdirSync(join(transcriptsDir, parentId), { recursive: true });
     return run(
       'track.mjs',
       {
-        ...base,
+        ...conversationBase,
         hook_event_name: 'postToolUse',
         tool_name: 'Task',
         transcript_path: childPath,
@@ -113,20 +142,24 @@ export function runReviewGate(smoke) {
     writeFileSync(trackedPath, 'export const tracked = 1;\n');
     writeFileSync(stagedPath, 'export const staged = 1;\n');
     writeFileSync(deletedPath, 'export const deleted = 1;\n');
-    execFileSync('git', ['init', '-q'], { cwd: gitRoot });
-    execFileSync('git', ['add', '.'], { cwd: gitRoot });
-    execFileSync(
-      'git',
-      ['-c', 'user.name=Smoke', '-c', 'user.email=smoke@example.invalid', 'commit', '-qm', 'init'],
-      { cwd: gitRoot },
-    );
+    execGitWithoutSmokeIndex(gitRoot, ['init', '-q']);
+    execGitWithoutSmokeIndex(gitRoot, ['add', '.']);
+    execGitWithoutSmokeIndex(gitRoot, [
+      '-c',
+      'user.name=Smoke',
+      '-c',
+      'user.email=smoke@example.invalid',
+      'commit',
+      '-qm',
+      'init',
+    ]);
     writeFileSync(trackedPath, 'export const tracked = 2;\n');
     writeFileSync(stagedPath, 'export const staged = 2;\n');
-    execFileSync('git', ['add', 'staged.mjs'], { cwd: gitRoot });
+    execGitWithoutSmokeIndex(gitRoot, ['add', 'staged.mjs']);
     unlinkSync(deletedPath);
     writeFileSync(untrackedPath, 'export const untracked = 1;\n');
 
-    const snapshot = collectReviewSnapshot(gitRoot);
+    const snapshot = collectSnapshotWithoutSmokeIndex(gitRoot);
     assert(
       'snapshot includes staged, unstaged, deleted, and untracked paths',
       snapshot.kind === 'snapshot' &&
@@ -139,11 +172,11 @@ export function runReviewGate(smoke) {
     );
     assert(
       'deleted tracked file is represented by diff',
-      collectReviewDiff(gitRoot, 'deleted.mjs').kind === 'diff',
-      JSON.stringify(collectReviewDiff(gitRoot, 'deleted.mjs')),
+      collectDiffWithoutSmokeIndex(gitRoot, 'deleted.mjs').kind === 'diff',
+      JSON.stringify(collectDiffWithoutSmokeIndex(gitRoot, 'deleted.mjs')),
     );
     writeFileSync(join(gitRoot, 'ignored.md'), '# ignored from review\n');
-    const filtered = collectReviewSnapshot(gitRoot);
+    const filtered = collectSnapshotWithoutSmokeIndex(gitRoot);
     assert(
       'non-code extension is excluded from snapshot',
       filtered.kind === 'snapshot' && !filtered.paths.includes('ignored.md'),
