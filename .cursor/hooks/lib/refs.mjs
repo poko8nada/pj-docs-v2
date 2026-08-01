@@ -12,6 +12,13 @@ const RULES_SKILL = 'rules';
 /** @type {RegExp} `skill/file.md` */
 const REF_ID_RE = /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+\.md$/;
 
+/** reference 命名変更後も既存 conversation state の read.refs を新 ID へ寄せる。 */
+const REF_ID_ALIASES = new Map([
+  ['rules/shared.md', 'rules/conventions.md'],
+  ['rules/html.md', 'rules/markup.md'],
+  ['rules/state.md', 'rules/ui-state.md'],
+]);
+
 /** 弱ゲート: 「rules 配下を1つ以上」の sentinel（required 配列内） */
 export const ANY_RULES_REF = `${RULES_SKILL}/*`;
 
@@ -62,7 +69,7 @@ export function coerceRefId(raw) {
   const id = String(raw ?? '').trim();
   if (!id) return null;
   if (!REF_ID_RE.test(id)) return null;
-  return id;
+  return REF_ID_ALIASES.get(id) ?? id;
 }
 
 /**
@@ -140,7 +147,7 @@ export function missingRefs(readRefs, required) {
   return required.filter((r) => !have.has(r));
 }
 
-/** `rules/shared.md` → `.cursor/skills/rules/references/shared.md` */
+/** `rules/conventions.md` → `.cursor/skills/rules/references/conventions.md` */
 export function refIdToRelPath(refId) {
   if (refId === ANY_RULES_REF) {
     return `${SKILLS_ROOT}/${RULES_SKILL}/references/`;

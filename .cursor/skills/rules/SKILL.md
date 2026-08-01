@@ -7,22 +7,31 @@ description: >-
 
 # rules
 
-Apply matching references, then edit. Reading this file opens `unlock.rules`.
+Choose references by semantic responsibility, not by filename extension. Read the matching references, then edit. Reading this file opens `unlock.rules`.
 
 ## Steps
 
-1. Read **at least one** `references/*` that matches the change. Apply it. Do not summarize in chat.
+1. Identify the responsibilities touched by the change and read every matching `references/*`. Apply them. Do not summarize in chat.
 
-| File            | When                                   |
-| --------------- | -------------------------------------- |
-| `documents.md`  | `.md` / `.mdc` body shape              |
-| `logic.md`      | Pure functions, domain logic, `Result` |
-| `components.md` | UI, Tailwind/CSS, a11y                 |
-| `html.md`       | Document markup                        |
-| `state.md`      | Client state, `use*`                   |
-| `api.md`        | HTTP / fetch boundaries                |
-| `data.md`       | Objects, JSON, persistence / schema    |
-| `shared.md`     | Cross-cutting / default if unsure      |
+| Reference        | Responsibility                         |
+| ---------------- | -------------------------------------- |
+| `documents.md`   | Document prose and structure           |
+| `logic.md`       | Pure functions, domain logic, `Result` |
+| `components.md`  | UI composition and presentation        |
+| `markup.md`      | Semantic web markup                    |
+| `ui-state.md`    | UI interaction state                   |
+| `api.md`         | HTTP / fetch boundaries                |
+| `data.md`        | Objects, JSON, persistence, schema     |
+| `conventions.md` | Cross-cutting conventions              |
+
+## Combining references
+
+Read more than one reference when a change crosses responsibilities:
+
+- A form component: `components` + `markup` + `ui-state`
+- An API-backed feature: `api` + `logic` + `data`
+- A persisted UI flow: `components` + `ui-state` + `logic` + `data`
+- Placement, naming, or test conventions: `conventions` plus the primary responsibility
 
 2. Edit — correct structure and edges for the unit. Keep the environment usable.
 3. Tests — do **not** run `pnpm format` / `lint` / `typecheck` yourself (harness stop + lefthook). On stop `followup_message`, fix those. When tests apply: `pnpm test:run` once after changes; if missing, note in confirm; `N/A` → skip.

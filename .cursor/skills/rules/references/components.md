@@ -1,12 +1,29 @@
 # Components
 
-Apply when writing UI (`.tsx` / `.jsx`) or CSS. Semantic document markup / website HTML manners → also read `html`.
+## Apply when
+
+Use when changing UI composition, presentation, interaction contracts, or styles. Semantic document markup → also read `markup`.
+
+## Owns
+
+- Component composition, public component APIs, presentation, styling, and UI accessibility contracts.
+- Ownership of shared component state and the boundaries between parent and child controls.
+
+## Does not own
+
+- Page outline, landmarks, element semantics, or form markup rules.
+- UI state values or transitions (read `ui-state`); domain logic, network I/O, or persistence.
+
+## Handoff
+
+- Read `markup` for semantic HTML structure.
+- Read `ui-state` for interaction state and `logic`, `api`, or `data` for domain and boundary concerns.
 
 ## Premise
 
 - UI is structure + presentation; keep domain rules out of leaves when possible.
 - Related controls belong together — prefer **compound components** (parent owns shared state/context; children are `Tabs` / `Tabs.List` / `Tabs.Panel` style) over prop-drilling siblings or global UI state.
-- Accessibility is part of the component contract, not a polish pass. Prefer correct HTML (`html`) before ARIA patches.
+- Accessibility is part of the component contract, not a polish pass. Prefer correct HTML (`markup`) before ARIA patches.
 
 ## Placement
 

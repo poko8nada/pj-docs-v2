@@ -38,7 +38,7 @@ Align with Build **Test strategy** (what MVP/Next guarantees). If a slice’s te
 **Required**
 
 - New or changed **domain / pure logic** — include **error paths and edges**, not only the happy path
-- New logic module → colocated New `*.test.ts` / `*.test.tsx` in the same feature folder (`rules` → `shared`)
+- New logic module → colocated New `*.test.ts` / `*.test.tsx` in the same feature folder (`rules` → `conventions`)
 - Prefer testing mappers / error mapping as pure functions; keep I/O at the edge
 - Complex client transitions: extract decision logic to a pure function and unit-test that
 

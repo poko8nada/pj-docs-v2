@@ -1,6 +1,23 @@
 # Documents
 
-Apply when writing or modifying `.md` / `.mdc` body shape. Issue / README substance → `issue` / `readme` skills.
+## Apply when
+
+Use when writing or modifying document prose or structure. Issue / README substance → `issue` / `readme` skills.
+
+## Owns
+
+- Document outline, emphasis, lists, tables, and local cross-references.
+- Placement of local notes and document structure near the feature it describes.
+
+## Does not own
+
+- Goal / Discover / Build or Issue content.
+- README substance, product policy, code conventions, or UI markup.
+
+## Handoff
+
+- Use `issue` or `readme` for owned content in those document types.
+- Use `markup` for semantic HTML and `conventions` for cross-cutting placement or naming.
 
 ## Premise
 

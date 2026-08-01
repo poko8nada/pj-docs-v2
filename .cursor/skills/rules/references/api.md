@@ -1,6 +1,22 @@
 # API
 
-Apply when writing HTTP / fetch boundaries.
+## Apply when
+
+Use when writing HTTP / fetch boundaries.
+
+## Owns
+
+- Request and response transport, status handling, network failures, and transport-to-domain mapping.
+- The boundary contract that prevents raw transport types from leaking into callers.
+
+## Does not own
+
+- Domain rules, persistence mapping, UI composition, or UI interaction state.
+
+## Handoff
+
+- Use `logic` for domain decisions and `data` for persistence or schema mapping.
+- Use `ui-state` and `components` for loading, error, and presentation behavior.
 
 ## Premise
 

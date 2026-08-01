@@ -9,7 +9,7 @@ export function runPhaseCore(smoke) {
     base,
     run,
     assert,
-    trackReadTsRef,
+    trackReadConventionsRef,
     trackReadIssueSkill,
     trackReadScope,
     trackReadAgenda,
@@ -482,7 +482,7 @@ export function runPhaseCore(smoke) {
         String(denyNoRef.agent_message ?? '').includes('rules/references'),
       JSON.stringify(denyNoRef),
     );
-    trackReadTsRef(base);
+    trackReadConventionsRef(base);
     const out2 = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
@@ -525,10 +525,10 @@ export function runPhaseCore(smoke) {
 
   // phase switch / re-entry resets rules + read
   {
-    trackReadTsRef(base);
+    trackReadConventionsRef(base);
     assert(
-      'read.refs records rules/shared.md',
-      loadState(root, id).read.refs?.includes('rules/shared.md'),
+      'read.refs records rules/conventions.md',
+      loadState(root, id).read.refs?.includes('rules/conventions.md'),
       JSON.stringify(loadState(root, id)),
     );
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore typo' });
@@ -551,12 +551,12 @@ export function runPhaseCore(smoke) {
       hook_event_name: 'beforeReadFile',
       file_path: join(root, '.cursor/skills/rules/SKILL.md'),
     });
-    trackReadTsRef(base);
+    trackReadConventionsRef(base);
     assert(
       'chore unlock + ref before re-entry',
       loadState(root, id).unlock.rules === true &&
         loadState(root, id).unlock.scope === true &&
-        loadState(root, id).read.refs?.includes('rules/shared.md') &&
+        loadState(root, id).read.refs?.includes('rules/conventions.md') &&
         loadState(root, id).read.skills?.includes('rules'),
       JSON.stringify(loadState(root, id)),
     );
@@ -604,7 +604,7 @@ export function runPhaseCore(smoke) {
       join(root, '.cursor/hooks/_smoke-review-persist-probe.mjs'),
       'export const smokePersistProbe = 1;\n',
     );
-    trackReadTsRef(persistBase);
+    trackReadConventionsRef(persistBase);
     run('track.mjs', {
       ...persistBase,
       hook_event_name: 'postToolUse',

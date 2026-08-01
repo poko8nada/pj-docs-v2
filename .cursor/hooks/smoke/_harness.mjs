@@ -163,8 +163,8 @@ export function createSmokeCtx() {
     });
   }
 
-  function trackReadTsRef(convBase) {
-    trackRead(convBase, '.cursor/skills/rules/references/shared.md');
+  function trackReadConventionsRef(convBase) {
+    trackRead(convBase, '.cursor/skills/rules/references/conventions.md');
   }
 
   function trackReadIssueSkill(convBase) {
@@ -210,7 +210,7 @@ export function createSmokeCtx() {
     assert,
     clearSticky,
     trackRead,
-    trackReadTsRef,
+    trackReadConventionsRef,
     trackReadIssueSkill,
     trackReadScope,
     trackReadAgenda,

@@ -9,7 +9,7 @@ export function runMentorStub(smoke) {
     assert,
     clearSticky,
     trackRead,
-    trackReadTsRef,
+    trackReadConventionsRef,
     loadState,
     isStubTurnActive,
     lastStubPath,
@@ -38,7 +38,7 @@ export function runMentorStub(smoke) {
 
     trackRead(mentorBase, '.cursor/skills/scope/SKILL.md');
     trackRead(mentorBase, '.cursor/skills/rules/SKILL.md');
-    trackReadTsRef(mentorBase);
+    trackReadConventionsRef(mentorBase);
     assert('mentor unlock.rules', loadState(root, mentorId).unlock.rules === true);
     assert('mentor scope open', loadState(root, mentorId).unlock.scope === true);
 
@@ -94,7 +94,7 @@ export function runMentorStub(smoke) {
     });
     assert('stub active this turn', isStubTurnActive(root, mentorId) === true);
     trackRead(mentorBase, '.cursor/skills/rules/SKILL.md');
-    trackReadTsRef(mentorBase);
+    trackReadConventionsRef(mentorBase);
     const allowCode = run('gate.mjs', {
       ...mentorBase,
       hook_event_name: 'preToolUse',
@@ -111,7 +111,7 @@ export function runMentorStub(smoke) {
     });
     assert('stub cleared next prompt', isStubTurnActive(root, mentorId) === false);
     trackRead(mentorBase, '.cursor/skills/rules/SKILL.md');
-    trackReadTsRef(mentorBase);
+    trackReadConventionsRef(mentorBase);
     const denyAgain = run('gate.mjs', {
       ...mentorBase,
       hook_event_name: 'preToolUse',
@@ -142,7 +142,7 @@ export function runMentorStub(smoke) {
       prompt: 'stay mentor for shell checks',
     });
     trackRead(mentorBase, '.cursor/skills/rules/SKILL.md');
-    trackReadTsRef(mentorBase);
+    trackReadConventionsRef(mentorBase);
     const denyShellAbs = run('gate.mjs', {
       ...mentorBase,
       hook_event_name: 'beforeShellExecution',
