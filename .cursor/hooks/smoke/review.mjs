@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { reviewPassUsedPath } from '../lib/review.mjs';
+import { REVIEW_BINDING_BOUND, REVIEW_BINDING_UNBOUND } from '../lib/state.mjs';
 
 function execGitWithoutSmokeIndex(cwd, gitArgs, options = {}) {
   const env = { ...process.env };
@@ -228,7 +229,7 @@ export function runReviewGate(smoke) {
     assert(
       'commit denies before reviewer PASS',
       beforeTask.permission === 'deny' &&
-        String(beforeTask.agent_message ?? '').includes('No reviewer child transcript ID') &&
+        String(beforeTask.agent_message ?? '').includes('No verified reviewer PASS') &&
         typeof loadState(root, reviewId).review.snapshotHash === 'string',
       JSON.stringify(beforeTask),
     );
@@ -250,7 +251,8 @@ export function runReviewGate(smoke) {
         afterTask.review.snapshotHash === current.hash &&
         afterTask.review.snapshotAt?.endsWith('+09:00') &&
         afterTask.review.snapshotAt?.includes('.') &&
-        afterTask.review.reviewerTranscriptId == null,
+        afterTask.review.reviewerTranscriptId == null &&
+        afterTask.review.binding === REVIEW_BINDING_UNBOUND,
       JSON.stringify({ current, review: afterTask.review }),
     );
     assert(
@@ -275,7 +277,9 @@ export function runReviewGate(smoke) {
     const reboundState = loadState(root, reviewId);
     assert(
       'commit denies when current snapshot changes',
-      changed.permission === 'deny' && reboundState.review.snapshotHash === changedSnapshot.hash,
+      changed.permission === 'deny' &&
+        reboundState.review.snapshotHash === changedSnapshot.hash &&
+        reboundState.review.binding === REVIEW_BINDING_UNBOUND,
       JSON.stringify({ changed, review: reboundState.review }),
     );
 
@@ -301,6 +305,7 @@ export function runReviewGate(smoke) {
     assert(
       'GAPS child ID is captured without storing its path',
       loadState(root, reviewId).review.reviewerTranscriptId === gapsId &&
+        loadState(root, reviewId).review.binding === REVIEW_BINDING_UNBOUND &&
         !JSON.stringify(loadState(root, reviewId).review).includes(transcriptsDir),
       JSON.stringify(loadState(root, reviewId).review),
     );
@@ -319,16 +324,42 @@ export function runReviewGate(smoke) {
       hook_event_name: 'beforeShellExecution',
       command: 'git commit -m test',
     });
-    const cleared = loadState(root, reviewId);
+    const bound = loadState(root, reviewId);
     assert(
-      'PASS for current snapshot clears commit gate',
+      'PASS for current snapshot binds review gate',
       passCommit.permission === 'allow' &&
-        cleared.review.snapshotHash == null &&
-        cleared.review.snapshotAt == null &&
-        cleared.review.reviewerTranscriptId == null,
-      JSON.stringify({ passCommit, review: cleared.review }),
+        bound.review.snapshotHash === changedSnapshot.hash &&
+        bound.review.snapshotAt !== null &&
+        bound.review.binding === REVIEW_BINDING_BOUND,
+      JSON.stringify({ passCommit, review: bound.review }),
     );
     assert('PASS transcript is marked used', existsSync(reviewPassUsedPath(passPath)));
+    const boundRetry = runWithTranscripts('gate.mjs', {
+      ...reviewBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git commit -m test',
+    });
+    assert(
+      'bound review allows a repeated commit check',
+      boundRetry.permission === 'allow' &&
+        loadState(root, reviewId).review.binding === REVIEW_BINDING_BOUND,
+      JSON.stringify(boundRetry),
+    );
+    run('track.mjs', {
+      ...reviewBase,
+      hook_event_name: 'afterShellExecution',
+      command: 'git commit -m test',
+      success: true,
+    });
+    const committed = loadState(root, reviewId);
+    assert(
+      'successful commit clears bound review',
+      committed.review.snapshotHash == null &&
+        committed.review.snapshotAt == null &&
+        committed.review.reviewerTranscriptId == null &&
+        committed.review.binding == null,
+      JSON.stringify(committed.review),
+    );
 
     // reviewer PASS 後に probe を削除しても、現在差分を再計算する
     writeFileSync(probeAbs, 'export const smokeReviewSnapshotProbe = 3;\n');
@@ -401,7 +432,8 @@ export function runReviewGate(smoke) {
     assert(
       'hookless reviewer PASS uses current snapshot fallback',
       currentPassCommit.permission === 'allow' &&
-        loadState(root, fallbackId).review.snapshotHash == null &&
+        loadState(root, fallbackId).review.snapshotHash !== null &&
+        loadState(root, fallbackId).review.binding === REVIEW_BINDING_BOUND &&
         existsSync(reviewPassUsedPath(currentPassPath)),
       JSON.stringify(currentPassCommit),
     );
@@ -423,9 +455,10 @@ export function runReviewGate(smoke) {
     );
     captureReviewer(fallbackBase, capturedPassPath, transcriptsDir);
     assert(
-      'captured PASS is bound before edit',
+      'captured PASS is recorded before edit',
       loadState(root, fallbackId).review.reviewerTranscriptId ===
-        '11111111-1111-4111-8111-111111111111',
+        '11111111-1111-4111-8111-111111111111' &&
+        loadState(root, fallbackId).review.binding === REVIEW_BINDING_UNBOUND,
       JSON.stringify(loadState(root, fallbackId).review),
     );
     writeFileSync(probeAbs, 'export const smokeHooklessFallbackProbe = 2;\n');
@@ -445,6 +478,7 @@ export function runReviewGate(smoke) {
       'captured PASS cannot approve an edit without reviewer retry',
       capturedStaleCommit.permission === 'deny' &&
         editedReview.reviewerTranscriptId == null &&
+        editedReview.binding === REVIEW_BINDING_UNBOUND &&
         !existsSync(reviewPassUsedPath(capturedPassPath)),
       JSON.stringify({ capturedStaleCommit, review: editedReview }),
     );
@@ -576,10 +610,11 @@ export function runReviewGate(smoke) {
     });
     const stopped = loadState(root, stopId);
     assert(
-      'stop clears matching snapshot PASS',
-      stopped.review.snapshotHash == null &&
-        stopped.review.snapshotAt == null &&
-        stopped.review.reviewerTranscriptId == null,
+      'stop binds matching snapshot PASS',
+      stopped.review.snapshotHash !== null &&
+        stopped.review.snapshotAt !== null &&
+        stopped.review.reviewerTranscriptId === 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' &&
+        stopped.review.binding === REVIEW_BINDING_BOUND,
       JSON.stringify(stopped.review),
     );
     assert('stop marks matching PASS used', existsSync(reviewPassUsedPath(childPath)));

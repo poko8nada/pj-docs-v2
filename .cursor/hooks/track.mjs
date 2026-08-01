@@ -8,7 +8,7 @@
  * | Read*              | unlock + read.skills / read.refs            |
  * | postToolUse        | Git snapshot + check.pending + format        |
  * | preToolUse Task         | snapshot を保存して reviewer に差分を注入       |
- * | stop                    | unused PASS 子があれば review clear + used フラグ |
+ * | stop                    | matching PASS を binding に反映 + used フラグ |
  * | afterShellExecution     | git commit 成功 → review/check reset          |
  */
 import { realpathSync } from 'node:fs';
@@ -43,6 +43,8 @@ import {
   normalizeReview,
   normalizeCheck,
   PHASE_DISCUSSION,
+  REVIEW_BINDING_BOUND,
+  REVIEW_BINDING_UNBOUND,
   resetCheck,
   resetReview,
   saveState,
@@ -298,7 +300,8 @@ function maybeRefreshReviewSnapshot(root, payload) {
     if (
       review.snapshotHash !== null ||
       review.snapshotAt !== null ||
-      review.reviewerTranscriptId !== null
+      review.reviewerTranscriptId !== null ||
+      review.binding !== null
     ) {
       clearReview(root, id);
     }
@@ -315,6 +318,7 @@ function maybeRefreshReviewSnapshot(root, payload) {
         ? (review.snapshotAt ?? formatReviewSnapshotAt())
         : formatReviewSnapshotAt(),
       reviewerTranscriptId: sameSnapshot ? review.reviewerTranscriptId : null,
+      binding: sameSnapshot ? review.binding : REVIEW_BINDING_UNBOUND,
     },
   });
 }
@@ -372,6 +376,7 @@ function handlePreToolUseTask(root, payload) {
       snapshotHash: snapshot.hash,
       snapshotAt: formatReviewSnapshotAt(),
       reviewerTranscriptId: null,
+      binding: REVIEW_BINDING_UNBOUND,
     },
   });
   const toolInput = payload.tool_input ?? {};
@@ -411,7 +416,7 @@ function handleAfterShellExecution(root, payload) {
 }
 
 /**
- * ターン終了: unused PASS 子があればこの会話の review を clear し used フラグを付ける。
+ * ターン終了: matching PASS があれば snapshot binding を bound にする。
  * commit 前スキャンは保険として残す。
  */
 function handleStop(root, payload) {
@@ -435,7 +440,10 @@ function handleStop(root, payload) {
   if (!passJsonl) return empty();
 
   markReviewPassUsed(passJsonl);
-  clearReview(root, id);
+  saveState(root, id, {
+    phase: state.phase,
+    review: { ...review, binding: REVIEW_BINDING_BOUND },
+  });
   return empty();
 }
 

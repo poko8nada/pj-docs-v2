@@ -243,11 +243,18 @@ export function statePathRelative(root, id) {
   return `.cursor/hooks/state/*__${sanitizeConversationId(id)}.json`;
 }
 
-/** review は Git snapshot と reviewer transcript の binding。null は未レビュー */
+/** review は Git snapshot と reviewer transcript の binding。 */
+export const REVIEW_BINDING_UNBOUND = 'unbound';
+export const REVIEW_BINDING_BOUND = 'bound';
 
-/** @returns {{ snapshotHash: string | null, snapshotAt: string | null, reviewerTranscriptId: string | null }} */
+/** @returns {{ snapshotHash: string | null, snapshotAt: string | null, reviewerTranscriptId: string | null, binding: 'unbound' | 'bound' | null }} */
 export function defaultReview() {
-  return { snapshotHash: null, snapshotAt: null, reviewerTranscriptId: null };
+  return {
+    snapshotHash: null,
+    snapshotAt: null,
+    reviewerTranscriptId: null,
+    binding: null,
+  };
 }
 
 /** @returns {{ pending: string[] }} */
@@ -282,7 +289,14 @@ export function normalizeReview(review) {
   const reviewerTranscriptId =
     idFromTranscriptPath(review.reviewerTranscriptId) ??
     idFromTranscriptPath(review.reviewerTranscriptPath);
-  return { snapshotHash, snapshotAt, reviewerTranscriptId };
+  const hasSnapshot = snapshotHash !== null || snapshotAt !== null || reviewerTranscriptId !== null;
+  const binding =
+    hasSnapshot && review.binding === REVIEW_BINDING_BOUND
+      ? REVIEW_BINDING_BOUND
+      : hasSnapshot
+        ? REVIEW_BINDING_UNBOUND
+        : null;
+  return { snapshotHash, snapshotAt, reviewerTranscriptId, binding };
 }
 
 /** Read した `.cursor/skills/<name>/SKILL.md` の name（重複なし・ソート） */
@@ -541,7 +555,7 @@ export function hasReviewSnapshot(state) {
   return normalizeReview(state?.review).snapshotHash !== null;
 }
 
-/** review binding をクリア（commit 前クリアや reset 用） */
+/** review binding をクリア（empty snapshot や reset 用） */
 export function clearReview(root, id) {
   const prev = loadState(root, id);
   return saveState(root, id, {

@@ -38,6 +38,8 @@ import {
   isUnlocked,
   loadState,
   normalizeReview,
+  REVIEW_BINDING_BOUND,
+  REVIEW_BINDING_UNBOUND,
   saveState,
   stateDir,
   WORK_PHASES,
@@ -704,7 +706,8 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
       if (
         review.snapshotHash !== null ||
         review.snapshotAt !== null ||
-        review.reviewerTranscriptId !== null
+        review.reviewerTranscriptId !== null ||
+        review.binding !== null
       ) {
         clearReview(root, id);
         state = loadState(root, id);
@@ -720,24 +723,30 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
               ? (review.snapshotAt ?? formatReviewSnapshotAt())
               : formatReviewSnapshotAt(),
             reviewerTranscriptId: sameSnapshot ? review.reviewerTranscriptId : null,
+            binding: sameSnapshot ? review.binding : REVIEW_BINDING_UNBOUND,
           },
         });
         state = loadState(root, id);
       }
       const boundReview = normalizeReview(state.review);
-      const passJsonl = findReviewPassTranscript(
-        root,
-        id,
-        boundReview.reviewerTranscriptId,
-        boundReview.snapshotAt,
-      );
-      if (passJsonl) {
-        markReviewPassUsed(passJsonl);
-        clearReview(root, id);
-        state = loadState(root, id);
+      if (boundReview.binding !== REVIEW_BINDING_BOUND) {
+        const passJsonl = findReviewPassTranscript(
+          root,
+          id,
+          boundReview.reviewerTranscriptId,
+          boundReview.snapshotAt,
+        );
+        if (passJsonl) {
+          markReviewPassUsed(passJsonl);
+          saveState(root, id, {
+            phase: state.phase,
+            review: { ...boundReview, binding: REVIEW_BINDING_BOUND },
+          });
+          state = loadState(root, id);
+        }
       }
       const remainingReview = normalizeReview(state.review);
-      if (remainingReview.snapshotHash !== null) {
+      if (remainingReview.binding !== REVIEW_BINDING_BOUND) {
         return deny(denyReviewMessage(snapshot, remainingReview));
       }
     }

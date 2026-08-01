@@ -1,6 +1,6 @@
 /**
  * Pre-commit reviewer gate — path rules, Task 識別、Git snapshot の Task 注入、
- * commit 時の子 transcript PASS クリア。
+ * commit 前の子 transcript PASS binding。
  */
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -23,7 +23,8 @@ export const REVIEW_DIFF_MAX_TOTAL = 48000;
  * @param {{
  *   snapshotHash: string | null,
  *   snapshotAt: string | null,
- *   reviewerTranscriptId: string | null
+ *   reviewerTranscriptId: string | null,
+ *   binding: 'unbound' | 'bound' | null
  * }} review
  */
 export function denyReviewMessage(snapshot, review) {
@@ -38,10 +39,12 @@ export function denyReviewMessage(snapshot, review) {
     reason = `Current Git snapshot has reviewable changes: ${list}. No reviewer snapshot has been recorded yet.`;
   } else if (review.snapshotHash !== snapshot?.hash) {
     reason = `Current Git snapshot differs from the reviewer snapshot: ${list}.`;
+  } else if (review?.binding === 'bound') {
+    reason = 'The current Git snapshot already has a bound reviewer PASS.';
   } else if (review.reviewerTranscriptId) {
     reason = 'The recorded reviewer transcript does not end with `REVIEW: PASS`.';
   } else {
-    reason = 'No reviewer child transcript ID has been captured yet.';
+    reason = 'No verified reviewer PASS is bound to the current Git snapshot yet.';
   }
   return formatDeny({
     tag: 'gate-review',
