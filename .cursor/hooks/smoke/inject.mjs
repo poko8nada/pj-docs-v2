@@ -50,6 +50,11 @@ export function runInjectGateListing(smoke) {
       ctx.slice(0, 600),
     );
     assert(
+      'inject explains direct reviewer transcript lookup',
+      ctx.includes('exact JSONL'),
+      ctx.slice(0, 600),
+    );
+    assert(
       'inject mentions state file naming',
       ctx.includes('+0900__') && ctx.includes('<conversation_id>'),
       ctx.slice(0, 600),

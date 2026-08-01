@@ -76,6 +76,7 @@ function readGateRules() {
     '',
     '- `review.files` non-empty → `git commit` blocked.',
     '- Clear: `/pre-commit-reviewer` → `REVIEW: PASS` → stop or `git commit`.',
+    '- Reviewer child transcript paths come from hook payloads; commit checks the exact JSONL first.',
     '- `md` / `json` / `yaml` are not tracked in `review.files`.',
     '',
     '## State files',

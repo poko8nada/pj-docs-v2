@@ -22,6 +22,7 @@ import {
   isPreCommitReviewerContext,
   isReviewablePath,
   markReviewPassUsed,
+  reviewerTranscriptPathFromPayload,
 } from './lib/review.mjs';
 import { skillRefIdFromPath } from './lib/refs.mjs';
 import { ISSUE_SKILL_REL } from './lib/issue.mjs';
@@ -297,6 +298,26 @@ function maybeMarkReviewDirty(root, payload) {
   markReviewDirty(root, id, abs);
 }
 
+/** reviewer 子 hook の実 path を親会話の review state に保存する */
+function maybeCaptureReviewerTranscript(root, payload) {
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  if (!isReviewBlocking(state)) return;
+
+  const review = normalizeReview(state.review);
+  const payloadPath =
+    typeof payload.transcript_path === 'string' ? resolve(payload.transcript_path) : null;
+  if (payloadPath && review.reviewerTranscriptPath === payloadPath) return;
+
+  const path = reviewerTranscriptPathFromPayload(root, payload, id);
+  if (!path) return;
+
+  saveState(root, id, {
+    phase: state.phase,
+    review: { ...review, reviewerTranscriptPath: path },
+  });
+}
+
 /** dirty 直後に format のみ。失敗は additional_context（gate / pending は触らない） */
 function maybeFormatOnDirty(root, payload) {
   const id = conversationId(payload);
@@ -373,7 +394,12 @@ function handleStop(root, payload) {
   if (!isReviewBlocking(state)) return empty();
 
   const review = normalizeReview(state.review);
-  const passJsonl = findReviewPassTranscript(root, review.dirtyAt, id);
+  const passJsonl = findReviewPassTranscript(
+    root,
+    review.dirtyAt,
+    id,
+    review.reviewerTranscriptPath,
+  );
   if (!passJsonl) return empty();
 
   markReviewPassUsed(passJsonl);
@@ -387,6 +413,8 @@ async function main() {
   const root = workspaceRoot(payload);
   const event = payload.hook_event_name ?? '';
   const toolName = payload.tool_name ?? '';
+
+  maybeCaptureReviewerTranscript(root, payload);
 
   if (event === 'beforeSubmitPrompt') {
     return handleBeforeSubmitPrompt(root, payload);

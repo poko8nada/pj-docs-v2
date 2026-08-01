@@ -236,11 +236,11 @@ export function statePathRelative(root, id) {
   return `.cursor/hooks/state/*__${sanitizeConversationId(id)}.json`;
 }
 
-/** review は files + dirtyAt。空 files = commit OK */
+/** review は files + dirtyAt + reviewer transcript。空 files = commit OK */
 
-/** @returns {{ files: string[], dirtyAt: string | null }} */
+/** @returns {{ files: string[], dirtyAt: string | null, reviewerTranscriptPath: string | null }} */
 export function defaultReview() {
-  return { files: [], dirtyAt: null };
+  return { files: [], dirtyAt: null, reviewerTranscriptPath: null };
 }
 
 /** @returns {{ pending: string[] }} */
@@ -258,7 +258,7 @@ export function normalizeCheck(check) {
 
 /**
  * 旧 { status } / { required, done } は無視。
- * files + dirtyAt を正規化。
+ * files + dirtyAt + reviewer transcript を正規化。
  */
 export function normalizeReview(review) {
   if (!review || typeof review !== 'object') return defaultReview();
@@ -267,7 +267,12 @@ export function normalizeReview(review) {
     : [];
   const dirtyAt =
     typeof review.dirtyAt === 'string' && review.dirtyAt.trim() ? review.dirtyAt.trim() : null;
-  return { files, dirtyAt };
+  const reviewerTranscriptPath =
+    typeof review.reviewerTranscriptPath === 'string' &&
+    review.reviewerTranscriptPath.trim().endsWith('.jsonl')
+      ? review.reviewerTranscriptPath.trim()
+      : null;
+  return { files, dirtyAt, reviewerTranscriptPath };
 }
 
 /** Read した `.cursor/skills/<name>/SKILL.md` の name（重複なし・ソート） */
@@ -534,6 +539,8 @@ export function markReviewDirty(root, id, filePath) {
   const review = normalizeReview(prev.review);
   if (rel && !review.files.includes(rel)) review.files.push(rel);
   review.dirtyAt = formatJstIso();
+  // 新しい編集では、以前の reviewer の PASS を再利用しない。
+  review.reviewerTranscriptPath = null;
   return saveState(root, id, { phase: prev.phase, review });
 }
 

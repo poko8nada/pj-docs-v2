@@ -694,7 +694,12 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
   // git commit: dirtyAt（欠落時は epoch）以降の unused PASS 子 transcript があれば clear
   if (commandIncludesGitCommit(command) && isReviewBlocking(state)) {
     const review = normalizeReview(state.review);
-    const passJsonl = findReviewPassTranscript(root, review.dirtyAt, id);
+    const passJsonl = findReviewPassTranscript(
+      root,
+      review.dirtyAt,
+      id,
+      review.reviewerTranscriptPath,
+    );
     if (passJsonl) {
       markReviewPassUsed(passJsonl);
       clearReviewFiles(root, id);
@@ -702,7 +707,7 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
     }
     if (isReviewBlocking(state)) {
       const blocked = normalizeReview(state.review);
-      return deny(denyReviewMessage(blocked.files));
+      return deny(denyReviewMessage(blocked.files, blocked.reviewerTranscriptPath));
     }
   }
 

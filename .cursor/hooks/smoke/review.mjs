@@ -11,6 +11,7 @@ export function runReviewGate(smoke) {
     assert,
     trackReadTsRef,
     loadState,
+    saveState,
     buildReviewTaskInjection,
     collectReviewDiff,
     unlinkSync,
@@ -74,6 +75,13 @@ export function runReviewGate(smoke) {
     assert(
       'review blocks git commit',
       denyCommit.permission === 'deny',
+      JSON.stringify(denyCommit),
+    );
+    assert(
+      'review deny explains missing child transcript path',
+      String(denyCommit.agent_message ?? denyCommit.user_message ?? '').includes(
+        'No reviewer child transcript path',
+      ),
       JSON.stringify(denyCommit),
     );
 
@@ -154,18 +162,32 @@ export function runReviewGate(smoke) {
         },
       })}\n`,
     );
-
-    const allowCommit = run(
-      'gate.mjs',
+    const gatePassJsonl = join(transcriptsDir, childId, `${childId}.jsonl`);
+    const parentTranscript = join(transcriptsDir, 'parent', 'parent.jsonl');
+    mkdirSync(join(transcriptsDir, 'parent'), { recursive: true });
+    run(
+      'track.mjs',
       {
         ...reviewBase,
-        hook_event_name: 'beforeShellExecution',
-        command: 'git commit -m test',
+        hook_event_name: 'postToolUse',
+        tool_name: 'Read',
+        transcript_path: gatePassJsonl,
       },
-      { CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir },
+      { CURSOR_TRANSCRIPT_PATH: parentTranscript },
     );
+    const stCaptured = loadState(root, reviewId);
+    assert(
+      'child transcript path is captured in review state',
+      stCaptured.review?.reviewerTranscriptPath === gatePassJsonl,
+      JSON.stringify(stCaptured.review),
+    );
+
+    const allowCommit = run('gate.mjs', {
+      ...reviewBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git commit -m test',
+    });
     const stReviewed = loadState(root, reviewId);
-    const gatePassJsonl = join(transcriptsDir, childId, `${childId}.jsonl`);
     assert(
       'PASS transcript after Task allows commit and clears files',
       allowCommit.permission === 'allow' &&
@@ -398,6 +420,11 @@ export function runReviewGate(smoke) {
 
     // dirtyAt より後の mtime になるよう、dirty 後に PASS transcript を書く
     writeChildJsonl('Looks good.\n\nREVIEW: PASS\n', goodPrompt());
+    const parentTranscript = join(
+      transcriptsDir,
+      '99999999-9999-4999-8999-999999999999',
+      '99999999-9999-4999-8999-999999999999.jsonl',
+    );
 
     const afterPass = run(
       'gate.mjs',
@@ -406,7 +433,7 @@ export function runReviewGate(smoke) {
         hook_event_name: 'beforeShellExecution',
         command: 'git commit -m test',
       },
-      { CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir },
+      { CURSOR_TRANSCRIPT_PATH: parentTranscript },
     );
     const stCleared = loadState(root, passId);
     const passJsonlPath = join(childDir, `${childId}.jsonl`);
@@ -526,6 +553,108 @@ export function runReviewGate(smoke) {
 
     try {
       unlinkSync(join(root, '.cursor/hooks/_smoke-review-pass-probe.mjs'));
+    } catch {
+      // 無ければ無視
+    }
+  }
+
+  // reviewer 再実行: GAPS の child path から新しい PASS の child path へ更新する
+  {
+    const retryId = 'review-retry-path-id';
+    const retryBase = { conversation_id: retryId, workspace_roots: [root], cwd: root };
+    const retryProbe = '.cursor/hooks/_smoke-review-retry-probe.mjs';
+    const transcriptsDir = mkdtempSync(join(smokeTmpRoot, 'transcripts-retry-'));
+    const parentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const parentTranscript = join(transcriptsDir, parentId, `${parentId}.jsonl`);
+    const firstId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const secondId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const firstPath = join(transcriptsDir, firstId, `${firstId}.jsonl`);
+    const secondPath = join(transcriptsDir, secondId, `${secondId}.jsonl`);
+    const prompt = `Full Repository Path: ${resolve(root)}\nDiff: uncommitted changes\n`;
+
+    run('track.mjs', {
+      ...retryBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore review retry path',
+    });
+    writeFileSync(join(root, retryProbe), 'export const smokeReviewRetryProbe = 1;\n');
+    saveState(root, retryId, {
+      phase: 'chore',
+      unlock: { rules: true, scope: true },
+      review: { files: [retryProbe], dirtyAt: null, reviewerTranscriptPath: null },
+    });
+    mkdirSync(join(transcriptsDir, firstId), { recursive: true });
+    writeFileSync(
+      firstPath,
+      `${JSON.stringify({
+        role: 'user',
+        message: { content: [{ type: 'text', text: prompt }] },
+      })}\n${JSON.stringify({
+        role: 'assistant',
+        message: { content: [{ type: 'text', text: 'REVIEW: GAPS\n' }] },
+      })}\n`,
+    );
+    run(
+      'track.mjs',
+      {
+        ...retryBase,
+        hook_event_name: 'postToolUse',
+        tool_name: 'Read',
+        transcript_path: firstPath,
+      },
+      { CURSOR_TRANSCRIPT_PATH: parentTranscript },
+    );
+    assert(
+      'first reviewer child path is captured',
+      loadState(root, retryId).review.reviewerTranscriptPath === firstPath,
+      JSON.stringify(loadState(root, retryId).review),
+    );
+    const denyRetry = run('gate.mjs', {
+      ...retryBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git commit -m test',
+    });
+    assert('GAPS child path still denies commit', denyRetry.permission === 'deny');
+
+    mkdirSync(join(transcriptsDir, secondId), { recursive: true });
+    writeFileSync(
+      secondPath,
+      `${JSON.stringify({
+        role: 'user',
+        message: { content: [{ type: 'text', text: prompt }] },
+      })}\n${JSON.stringify({
+        role: 'assistant',
+        message: { content: [{ type: 'text', text: 'REVIEW: PASS\n' }] },
+      })}\n`,
+    );
+    run(
+      'track.mjs',
+      {
+        ...retryBase,
+        hook_event_name: 'postToolUse',
+        tool_name: 'Read',
+        transcript_path: secondPath,
+      },
+      { CURSOR_TRANSCRIPT_PATH: parentTranscript },
+    );
+    assert(
+      'new reviewer child path replaces GAPS path',
+      loadState(root, retryId).review.reviewerTranscriptPath === secondPath,
+      JSON.stringify(loadState(root, retryId).review),
+    );
+    const allowRetry = run('gate.mjs', {
+      ...retryBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git commit -m test',
+    });
+    assert(
+      'new reviewer PASS clears commit gate',
+      allowRetry.permission === 'allow' && loadState(root, retryId).review.files.length === 0,
+      JSON.stringify({ allowRetry, review: loadState(root, retryId).review }),
+    );
+    assert('new reviewer PASS is marked used', existsSync(reviewPassUsedPath(secondPath)));
+    try {
+      unlinkSync(join(root, retryProbe));
     } catch {
       // 無ければ無視
     }

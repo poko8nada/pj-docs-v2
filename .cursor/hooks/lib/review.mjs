@@ -4,11 +4,10 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { isBootstrapMarkerPath } from './bootstrap.mjs';
 import { formatDeny } from './deny-format.mjs';
-import { isUnderStateDir } from './state.mjs';
+import { idFromTranscriptPath, isUnderStateDir } from './state.mjs';
 
 /** コード＋CSS＋HTMLのみ（md/json/yaml は Issue 下書き等で gate を汚さない） */
 const REVIEWABLE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|css|html)$/i;
@@ -18,12 +17,15 @@ export const REVIEW_DIFF_MAX_PER_FILE = 8000;
 /** 注入全体のソフト上限 */
 export const REVIEW_DIFF_MAX_TOTAL = 48000;
 
-/** @param {string[]} files */
-export function denyReviewMessage(files) {
+/** @param {string[]} files @param {string | null} reviewerTranscriptPath */
+export function denyReviewMessage(files, reviewerTranscriptPath = null) {
   const list = Array.isArray(files) && files.length > 0 ? files.join(', ') : '(none)';
+  const transcriptStatus = reviewerTranscriptPath
+    ? 'The recorded reviewer transcript does not end with `REVIEW: PASS`.'
+    : 'No reviewer child transcript path has been captured yet.';
   return formatDeny({
     tag: 'gate-review',
-    why: `review.files is non-empty (unreviewed): ${list}.`,
+    why: `review.files is non-empty (unreviewed): ${list}. ${transcriptStatus}`,
     next: [
       'Run `/pre-commit-reviewer` (need `REVIEW: PASS` in the child transcript).',
       'Then stop or `git commit` (`git add` order does not matter).',
@@ -207,22 +209,49 @@ export function commandIncludesGitCommit(command) {
   return shellSegments(command).some((seg) => /\bgit\b/.test(seg) && /\bcommit\b/.test(seg));
 }
 
-/** Cursor の projects スラッグ（`/Users/a/_b` → `Users-a-b`。`_` は除去） */
-export function cursorProjectSlug(root) {
-  return resolve(root)
-    .replace(/^[\\/]+/, '')
-    .replace(/_/g, '')
-    .replace(/[:\\/]+/g, '-');
+/**
+ * agent-transcripts 置き場。
+ * 実行時の transcript path から解決する。テストは
+ * CURSOR_GATE_TRANSCRIPTS_DIR で上書きする。
+ */
+export function transcriptRootFromPath(transcriptPath) {
+  if (!transcriptPath || typeof transcriptPath !== 'string') return null;
+  const abs = resolve(transcriptPath);
+  const id = idFromTranscriptPath(abs);
+  if (!id || basename(dirname(abs)) !== id) return null;
+  return dirname(dirname(abs));
+}
+
+export function agentTranscriptsDir() {
+  const override = process.env.CURSOR_GATE_TRANSCRIPTS_DIR;
+  if (override && String(override).trim()) return resolve(String(override).trim());
+  return transcriptRootFromPath(process.env.CURSOR_TRANSCRIPT_PATH);
 }
 
 /**
- * agent-transcripts 置き場。
- * テストは CURSOR_GATE_TRANSCRIPTS_DIR で上書き。
+ * 子 agent の hook payload から reviewer transcript を特定する。
+ * 親 state の id は sticky で解決済みなので、child id と比較して親イベントを除外する。
  */
-export function agentTranscriptsDir(root) {
-  const override = process.env.CURSOR_GATE_TRANSCRIPTS_DIR;
-  if (override && String(override).trim()) return resolve(String(override).trim());
-  return join(homedir(), '.cursor', 'projects', cursorProjectSlug(root), 'agent-transcripts');
+export function reviewerTranscriptPathFromPayload(root, payload, parentId) {
+  const path = transcriptPathFromPath(payload?.transcript_path);
+  const childId = path ? idFromTranscriptPath(path) : null;
+  if (!path || !childId || childId === String(parentId)) return null;
+  if (!existsSync(path)) return null;
+
+  let text;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+  if (!isReviewerTranscriptText(root, text)) return null;
+  return path;
+}
+
+function transcriptPathFromPath(transcriptPath) {
+  if (!transcriptPath || typeof transcriptPath !== 'string') return null;
+  const abs = resolve(transcriptPath);
+  return transcriptRootFromPath(abs) ? abs : null;
 }
 
 /** 本文中の最後の `REVIEW: PASS|GAPS`（大文字化）。無ければ null */
@@ -270,15 +299,24 @@ export function isReviewPassTranscriptText(root, text) {
 }
 
 /**
- * dirtyAt 以降の unused reviewer 子 jsonl のうち **最新 mtime** が PASS ならその path。
- * 親 conversation / used フラグ付きは除外。
+ * state に保存された reviewer transcript を優先して直接確認する。
+ * path が未保存の旧 state / fallback では、runtime transcript root 内を走査する。
  * @returns {string | null}
  */
-export function findReviewPassTranscript(root, dirtyAt, excludeId = null) {
+export function findReviewPassTranscript(
+  root,
+  dirtyAt,
+  excludeId = null,
+  reviewerTranscriptPath = null,
+) {
+  if (reviewerTranscriptPath) {
+    return readPassTranscript(root, reviewerTranscriptPath, excludeId);
+  }
+
   const dirtyMs = reviewDirtySinceMs(dirtyAt);
 
-  const dir = agentTranscriptsDir(root);
-  if (!existsSync(dir)) return null;
+  const dir = agentTranscriptsDir();
+  if (!dir || !existsSync(dir)) return null;
 
   let names;
   try {
@@ -320,6 +358,25 @@ export function findReviewPassTranscript(root, dirtyAt, excludeId = null) {
   if (!latest) return null;
   if (lastReviewVerdict(latest.text) !== 'PASS') return null;
   return latest.jsonl;
+}
+
+function readPassTranscript(root, transcriptPath, excludeId = null) {
+  const jsonl = transcriptPathFromPath(transcriptPath);
+  if (!jsonl) return null;
+
+  const id = idFromTranscriptPath(jsonl);
+  if (excludeId && id === excludeId) return null;
+  if (isReviewPassUsed(jsonl)) return null;
+
+  let text;
+  try {
+    text = readFileSync(jsonl, 'utf8');
+  } catch {
+    return null;
+  }
+  if (!isReviewerTranscriptText(root, text)) return null;
+  if (lastReviewVerdict(text) !== 'PASS') return null;
+  return jsonl;
 }
 
 /** jsonl 隣の使い済みフラグ path（`<id>.jsonl` → `<id>.harness-pass-used`） */
