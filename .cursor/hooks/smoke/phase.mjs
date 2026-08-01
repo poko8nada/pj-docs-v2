@@ -84,7 +84,7 @@ export function runPhaseCore(smoke) {
     assert('locked Write deny', out.permission === 'deny', JSON.stringify(out));
   }
 
-  // 2. root md allow while locked
+  // 2. root md deny while locked
   {
     const out = run('gate.mjs', {
       ...base,
@@ -92,7 +92,7 @@ export function runPhaseCore(smoke) {
       tool_name: 'Write',
       tool_input: { path: join(root, 'README.md') },
     });
-    assert('locked root md allow', out.permission === 'allow', JSON.stringify(out));
+    assert('locked root md deny', out.permission === 'deny', JSON.stringify(out));
   }
 
   // 3. locked nested md deny

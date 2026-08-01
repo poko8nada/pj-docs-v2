@@ -35,6 +35,11 @@ export function runInjectGateListing(smoke) {
       ctx.slice(0, 600),
     );
     assert(
+      'inject states discussion is read-only',
+      ctx.includes('discussion` is read-only'),
+      ctx.slice(0, 600),
+    );
+    assert(
       'inject mentions refs gate',
       ctx.includes('## References') && ctx.includes('read.refs') && ctx.includes('skill/name.md'),
       ctx.slice(0, 600),

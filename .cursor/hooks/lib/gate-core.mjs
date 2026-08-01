@@ -9,7 +9,7 @@
  * | beforeReadFile     | outside-root                                        |
  */
 import { homedir } from 'node:os';
-import { basename, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
+import { basename, isAbsolute, join, normalize, resolve } from 'node:path';
 import {
   isBootstrapActive,
   isBootstrapMarkerPath,
@@ -256,15 +256,6 @@ function fileArgFromToolInput(toolInput) {
     toolInput.target_notebook ??
     undefined
   );
-}
-
-function isRootMarkdown(root, filePath) {
-  if (!filePath) return false;
-  const abs = resolve(isAbsolute(filePath) ? filePath : resolve(root, filePath));
-  const rel = relative(root, abs);
-  if (!rel || rel.startsWith('..') || rel.includes(`..${sep}`)) return false;
-  if (rel.includes(sep) || rel.includes('/')) return false;
-  return /\.md$/i.test(rel);
 }
 
 function expandPath(filePath) {
@@ -805,7 +796,7 @@ export async function handleGate(payload) {
 
   const id = conversationId(payload);
 
-  // scope: rules / mentor / root-md 例外より先（work|chore の編集は unlock.scope 必須）
+  // scope: rules / mentor より先（work|chore の編集は unlock.scope 必須）
   if (WRITE_TOOLS.has(toolName) && inWorkPhase && state.unlock?.scope !== true) {
     return deny(DENY_SCOPE);
   }
@@ -829,6 +820,5 @@ export async function handleGate(payload) {
     return allow();
   }
 
-  if (fileArg && isRootMarkdown(root, String(fileArg))) return allow();
   return deny(denyCodeMessage(state.phase));
 }

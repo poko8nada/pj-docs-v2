@@ -55,6 +55,7 @@ function readGateRules() {
     '',
     '## Edits',
     '',
+    '- `discussion` is read-only: file edits and mutating `git` / `gh` are blocked.',
     '- `/work`: need `unlock.scope` → `unlock.agenda` → `unlock.rules` before edits.',
     '- `/chore`: need `unlock.scope` → `unlock.rules` (`unlock.agenda` stays null).',
     '- Issue writes: `/work` + `issue` skill + matching template (`unlock.issue`; template tracked in `read.refs` as `issue/<template>.md`).',

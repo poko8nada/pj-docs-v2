@@ -22,7 +22,7 @@ Judgment heuristics → `references/judgment.md` (read when orientation is hard)
 
 ## Limits
 
-- No product/harness edits. No mutating `gh`/`git`. No issue create/update.
+- No file edits. No mutating `gh`/`git`. No issue create/update.
 - Do not run `rules` for edits. Do not inventory→slice — that is `agenda`.
 - Do not treat prose Theme as a substitute for reading `scope`.
 - Do not copy other skill bodies — hand off by name.
