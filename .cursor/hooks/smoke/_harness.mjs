@@ -9,6 +9,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  utimesSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -36,7 +37,12 @@ import {
   STATE_TTL_DAYS,
   workspaceRoot,
 } from '../lib/state.mjs';
-import { buildReviewTaskInjection, collectReviewDiff, isReviewablePath } from '../lib/review.mjs';
+import {
+  buildReviewTaskInjection,
+  collectReviewDiff,
+  collectReviewSnapshot,
+  isReviewablePath,
+} from '../lib/review.mjs';
 import { isCheckToolingReady, runFormatLint } from '../lib/check.mjs';
 
 const smokeDir = fileURLToPath(new URL('.', import.meta.url));
@@ -56,6 +62,11 @@ export function smokeProbeAbs(name) {
 
 /** 残った `_smoke-*` probe を消す */
 export function cleanupSmokeProbes() {
+  // ignored probe を smoke 中だけ intent-to-add にした場合も index を戻す
+  spawnSync('git', ['reset', '-q', '--', '.cursor/hooks/_smoke-*'], {
+    cwd: root,
+    stdio: 'ignore',
+  });
   let names;
   try {
     names = readdirSync(hooksDir);
@@ -216,6 +227,7 @@ export function createSmokeCtx() {
     lastStubPath,
     buildReviewTaskInjection,
     collectReviewDiff,
+    collectReviewSnapshot,
     isReviewablePath,
     isCheckToolingReady,
     runFormatLint,
@@ -225,6 +237,7 @@ export function createSmokeCtx() {
     readdirSync,
     readFileSync,
     rmSync,
+    utimesSync,
     unlinkSync,
     writeFileSync,
     join,

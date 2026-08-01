@@ -329,8 +329,10 @@ export function runCheckPending(smoke) {
       JSON.stringify(stFormatFail.check),
     );
     assert(
-      'format-on-dirty failure still marks review.files',
-      stFormatFail.review?.files?.includes(probeRel),
+      'format-on-dirty failure records current reviewer snapshot',
+      typeof stFormatFail.review?.snapshotHash === 'string' &&
+        typeof stFormatFail.review?.snapshotAt === 'string' &&
+        stFormatFail.review?.reviewerTranscriptId == null,
       JSON.stringify(stFormatFail.review),
     );
 

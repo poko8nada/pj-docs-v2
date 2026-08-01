@@ -111,7 +111,7 @@ export function runInjectSticky(smoke) {
         {
           phase: 'chore',
           unlock: { rules: true, issue: null, agenda: null, scope: false },
-          review: { files: [], dirtyAt: null },
+          review: { snapshotHash: null, snapshotAt: null, reviewerTranscriptId: null },
           check: { pending: [] },
           read: { skills: [], refs: [] },
           label: 'prev',
@@ -127,7 +127,7 @@ export function runInjectSticky(smoke) {
         {
           phase: 'discussion',
           unlock: { rules: null, issue: null, agenda: null, scope: false },
-          review: { files: [], dirtyAt: null },
+          review: { snapshotHash: null, snapshotAt: null, reviewerTranscriptId: null },
           check: { pending: [] },
           read: { skills: [], refs: [] },
           label: 'new',

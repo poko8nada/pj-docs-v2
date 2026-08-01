@@ -23,6 +23,7 @@ export function runPhaseCore(smoke) {
     writeFileSync,
     join,
     workspaceRoot,
+    collectReviewSnapshot,
   } = smoke;
   // lib/ 移動後も payload 無しの root fallback がリポジトリ根を指すこと
   assert(
@@ -342,7 +343,14 @@ export function runPhaseCore(smoke) {
       hook_event_name: 'beforeShellExecution',
       command: 'git commit -m msg',
     });
-    assert('phase unlocks git write', outGit.permission === 'allow', JSON.stringify(outGit));
+    const currentSnapshot = collectReviewSnapshot(root);
+    assert(
+      'phase unlocks git write unless reviewable diff is unreviewed',
+      currentSnapshot.kind === 'empty'
+        ? outGit.permission === 'allow'
+        : outGit.permission === 'deny',
+      JSON.stringify({ outGit, currentSnapshot }),
+    );
 
     const outPnpm = run('gate.mjs', {
       ...base,
@@ -571,7 +579,7 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 10b. review.files はフェーズ変更でも残る
+  // 10b. reviewer snapshot はフェーズ変更でも同じ Git 差分を binding する
   {
     const persistId = 'review-persist-id';
     const persistBase = { conversation_id: persistId, workspace_roots: [root], cwd: root };
@@ -603,12 +611,19 @@ export function runPhaseCore(smoke) {
       tool_name: 'Write',
       tool_input: { path: join(root, '.cursor/hooks/_smoke-review-persist-probe.mjs') },
     });
+    const taskOut = run('track.mjs', {
+      ...persistBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Task',
+      tool_input: { subagent_type: 'pre-commit-reviewer', description: 'review persist' },
+    });
+    const snapshotHash = loadState(root, persistId).review.snapshotHash;
     assert(
-      'review files before phase switch',
-      loadState(root, persistId).review.files.includes(
-        '.cursor/hooks/_smoke-review-persist-probe.mjs',
-      ),
-      JSON.stringify(loadState(root, persistId)),
+      'review snapshot before phase switch',
+      typeof snapshotHash === 'string' &&
+        snapshotHash.startsWith('sha256:') &&
+        taskOut.updated_input?.description?.includes('[harness-review]'),
+      JSON.stringify({ taskOut, review: loadState(root, persistId).review }),
     );
     run('track.mjs', {
       ...persistBase,
@@ -617,9 +632,9 @@ export function runPhaseCore(smoke) {
     });
     const stPersist = loadState(root, persistId);
     assert(
-      'review files persist across phase switch',
+      'review snapshot persists across phase switch',
       stPersist.phase === 'work' &&
-        stPersist.review.files.includes('.cursor/hooks/_smoke-review-persist-probe.mjs') &&
+        stPersist.review.snapshotHash === snapshotHash &&
         stPersist.read.refs.length === 0,
       JSON.stringify(stPersist),
     );
@@ -629,10 +644,8 @@ export function runPhaseCore(smoke) {
       prompt: '/discussion clear phase',
     });
     assert(
-      'review files persist into discussion',
-      loadState(root, persistId).review.files.includes(
-        '.cursor/hooks/_smoke-review-persist-probe.mjs',
-      ),
+      'review snapshot persists into discussion',
+      loadState(root, persistId).review.snapshotHash === snapshotHash,
       JSON.stringify(loadState(root, persistId)),
     );
     try {

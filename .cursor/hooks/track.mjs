@@ -6,8 +6,8 @@
  * |--------------------|---------------------------------------------|
  * | beforeSubmitPrompt | phase / bootstrap                           |
  * | Read*              | unlock + read.skills / read.refs            |
- * | postToolUse Write* | review.files + check.pending + format（失敗は context） |
- * | preToolUse Task         | inject review.files（clear はしない）            |
+ * | postToolUse        | Git snapshot + check.pending + format        |
+ * | preToolUse Task         | snapshot を保存して reviewer に差分を注入       |
  * | stop                    | unused PASS 子があれば review clear + used フラグ |
  * | afterShellExecution     | git commit 成功 → review/check reset          |
  */
@@ -17,12 +17,12 @@ import { disableBootstrap, enableBootstrap } from './lib/bootstrap.mjs';
 import { clearStubTurn, enableStubTurn, isMentorActive } from './lib/mentor.mjs';
 import {
   commandIncludesGitCommit,
+  collectReviewSnapshot,
   findReviewPassTranscript,
-  injectReviewFilesIntoTaskInput,
+  injectReviewSnapshotIntoTaskInput,
   isPreCommitReviewerContext,
-  isReviewablePath,
   markReviewPassUsed,
-  reviewerTranscriptPathFromPayload,
+  reviewerTranscriptIdFromPayload,
 } from './lib/review.mjs';
 import { skillRefIdFromPath } from './lib/refs.mjs';
 import { ISSUE_SKILL_REL } from './lib/issue.mjs';
@@ -33,13 +33,13 @@ import {
   conversationId,
   defaultRead,
   findStateFileName,
-  isReviewBlocking,
+  hasReviewSnapshot,
   loadState,
   markCheckPending,
-  markReviewDirty,
   markReadRef,
   markReadSkill,
-  clearReviewFiles,
+  clearReview,
+  formatReviewSnapshotAt,
   normalizeReview,
   normalizeCheck,
   PHASE_DISCUSSION,
@@ -246,7 +246,7 @@ function handleBeforeSubmitPrompt(root, payload) {
   const phase = match[1].toLowerCase();
   const prev = loadState(root, id);
   let unlock;
-  // review.files はフェーズ変更・再入場でも残す（clear は PASS transcript / commit 成功）
+  // reviewer snapshot はフェーズ変更・再入場でも保持し、Git 差分一致を commit 時に再確認する。
   const review = normalizeReview(prev.review);
   // phase 再入場: read はクリア（skills / refs）
   const read = defaultRead();
@@ -284,37 +284,54 @@ function maybeMarkCheckPending(root, payload) {
   markCheckPending(root, id, abs);
 }
 
-function maybeMarkReviewDirty(root, payload) {
+/** 親会話の Git 差分を state に反映し、古い reviewer binding を無効化する */
+function maybeRefreshReviewSnapshot(root, payload) {
   const id = conversationId(payload);
   const state = loadState(root, id);
   if (!WORK_PHASES.has(state.phase) || state.unlock?.rules !== true) return;
 
-  const filePath = filePathFromPayload(payload);
-  if (!filePath || !isReviewablePath(root, String(filePath))) return;
-
-  const abs = resolve(
-    isAbsolute(String(filePath)) ? String(filePath) : resolve(root, String(filePath)),
-  );
-  markReviewDirty(root, id, abs);
-}
-
-/** reviewer 子 hook の実 path を親会話の review state に保存する */
-function maybeCaptureReviewerTranscript(root, payload) {
-  const id = conversationId(payload);
-  const state = loadState(root, id);
-  if (!isReviewBlocking(state)) return;
+  const snapshot = collectReviewSnapshot(root);
+  if (snapshot.kind === 'error') return;
 
   const review = normalizeReview(state.review);
-  const payloadPath =
-    typeof payload.transcript_path === 'string' ? resolve(payload.transcript_path) : null;
-  if (payloadPath && review.reviewerTranscriptPath === payloadPath) return;
-
-  const path = reviewerTranscriptPathFromPayload(root, payload, id);
-  if (!path) return;
+  if (snapshot.kind === 'empty') {
+    if (
+      review.snapshotHash !== null ||
+      review.snapshotAt !== null ||
+      review.reviewerTranscriptId !== null
+    ) {
+      clearReview(root, id);
+    }
+    return;
+  }
+  if (review.snapshotHash === snapshot.hash && review.snapshotAt !== null) return;
+  const sameSnapshot = review.snapshotHash === snapshot.hash;
 
   saveState(root, id, {
     phase: state.phase,
-    review: { ...review, reviewerTranscriptPath: path },
+    review: {
+      snapshotHash: snapshot.hash,
+      snapshotAt: sameSnapshot
+        ? (review.snapshotAt ?? formatReviewSnapshotAt())
+        : formatReviewSnapshotAt(),
+      reviewerTranscriptId: sameSnapshot ? review.reviewerTranscriptId : null,
+    },
+  });
+}
+
+/** reviewer 子 hook の UUID だけを親会話の review state に保存する */
+function maybeCaptureReviewerTranscript(root, payload) {
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  if (!hasReviewSnapshot(state)) return;
+
+  const review = normalizeReview(state.review);
+  const transcriptId = reviewerTranscriptIdFromPayload(root, payload, id);
+  if (!transcriptId || review.reviewerTranscriptId === transcriptId) return;
+
+  saveState(root, id, {
+    phase: state.phase,
+    review: { ...review, reviewerTranscriptId: transcriptId },
   });
 }
 
@@ -344,12 +361,21 @@ function handlePreToolUseTask(root, payload) {
 
   const id = conversationId(payload);
   const state = loadState(root, id);
-  if (!isReviewBlocking(state)) return allow();
+  if (!WORK_PHASES.has(state.phase) || state.unlock?.rules !== true) return allow();
 
-  const files = [...normalizeReview(state.review).files];
+  const snapshot = collectReviewSnapshot(root, { includeEntries: true });
+  if (snapshot.kind !== 'snapshot') return allow();
+
+  saveState(root, id, {
+    phase: state.phase,
+    review: {
+      snapshotHash: snapshot.hash,
+      snapshotAt: formatReviewSnapshotAt(),
+      reviewerTranscriptId: null,
+    },
+  });
   const toolInput = payload.tool_input ?? {};
-  const updatedInput = injectReviewFilesIntoTaskInput(toolInput, root, files);
-  // clear は commit 時の PASS transcript スキャンに任せる（起動時 clear しない）
+  const updatedInput = injectReviewSnapshotIntoTaskInput(toolInput, root, snapshot);
 
   if (updatedInput) {
     return respond({ permission: 'allow', updated_input: updatedInput });
@@ -391,19 +417,25 @@ function handleAfterShellExecution(root, payload) {
 function handleStop(root, payload) {
   const id = conversationId(payload);
   const state = loadState(root, id);
-  if (!isReviewBlocking(state)) return empty();
+  if (!hasReviewSnapshot(state)) return empty();
 
   const review = normalizeReview(state.review);
+  const snapshot = collectReviewSnapshot(root);
+  if (snapshot.kind === 'empty') {
+    clearReview(root, id);
+    return empty();
+  }
+  if (snapshot.kind !== 'snapshot' || review.snapshotHash !== snapshot.hash) return empty();
   const passJsonl = findReviewPassTranscript(
     root,
-    review.dirtyAt,
     id,
-    review.reviewerTranscriptPath,
+    review.reviewerTranscriptId,
+    review.snapshotAt,
   );
   if (!passJsonl) return empty();
 
   markReviewPassUsed(passJsonl);
-  clearReviewFiles(root, id);
+  clearReview(root, id);
   return empty();
 }
 
@@ -414,6 +446,14 @@ async function main() {
   const event = payload.hook_event_name ?? '';
   const toolName = payload.tool_name ?? '';
 
+  const shouldRefreshReview =
+    event === 'beforeSubmitPrompt' ||
+    event === 'afterShellExecution' ||
+    event === 'stop' ||
+    (event === 'postToolUse' && WRITE_TOOLS.has(toolName));
+  if (shouldRefreshReview) {
+    maybeRefreshReviewSnapshot(root, payload);
+  }
   maybeCaptureReviewerTranscript(root, payload);
 
   if (event === 'beforeSubmitPrompt') {
@@ -454,7 +494,6 @@ async function main() {
   }
 
   if (event === 'postToolUse' && WRITE_TOOLS.has(toolName)) {
-    maybeMarkReviewDirty(root, payload);
     maybeMarkCheckPending(root, payload);
     const formatCtx = maybeFormatOnDirty(root, payload);
     if (formatCtx) return respond({ additional_context: formatCtx });

@@ -19,6 +19,7 @@ import { DENY_MENTOR, isMentorCodeBlocked, isMentorDeniedPath } from './mentor.m
 import { logHookIds } from './id-log.mjs';
 import { formatDeny } from './deny-format.mjs';
 import {
+  collectReviewSnapshot,
   commandIncludesGitCommit,
   denyReviewMessage,
   findReviewPassTranscript,
@@ -29,14 +30,15 @@ import { denyRefsMessage, missingRefs, requiredRefsForPath } from './refs.mjs';
 import { commandIncludesGhIssueMutation, denyIssueMessage, isIssueReady } from './issue.mjs';
 import { denyAgendaMessage, isAgendaReady } from './agenda.mjs';
 import {
-  clearReviewFiles,
+  clearReview,
   conversationId,
-  isReviewBlocking,
+  formatReviewSnapshotAt,
   isSpecFlowPhase,
   isUnderStateDir,
   isUnlocked,
   loadState,
   normalizeReview,
+  saveState,
   stateDir,
   WORK_PHASES,
   workspaceRoot,
@@ -691,23 +693,53 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
   const outsideErr = denyOutsidePathsInCommand(root, command);
   if (outsideErr) return deny(outsideErr);
 
-  // git commit: dirtyAt（欠落時は epoch）以降の unused PASS 子 transcript があれば clear
-  if (commandIncludesGitCommit(command) && isReviewBlocking(state)) {
+  // git commit: 現在の Git snapshot と reviewer の対象 snapshot が一致するか確認する
+  if (commandIncludesGitCommit(command)) {
+    const snapshot = collectReviewSnapshot(root);
     const review = normalizeReview(state.review);
-    const passJsonl = findReviewPassTranscript(
-      root,
-      review.dirtyAt,
-      id,
-      review.reviewerTranscriptPath,
-    );
-    if (passJsonl) {
-      markReviewPassUsed(passJsonl);
-      clearReviewFiles(root, id);
-      state = loadState(root, id);
+    if (snapshot.kind === 'error') {
+      return deny(denyReviewMessage(snapshot, review));
     }
-    if (isReviewBlocking(state)) {
-      const blocked = normalizeReview(state.review);
-      return deny(denyReviewMessage(blocked.files, blocked.reviewerTranscriptPath));
+    if (snapshot.kind === 'empty') {
+      if (
+        review.snapshotHash !== null ||
+        review.snapshotAt !== null ||
+        review.reviewerTranscriptId !== null
+      ) {
+        clearReview(root, id);
+        state = loadState(root, id);
+      }
+    } else {
+      if (review.snapshotHash !== snapshot.hash || review.snapshotAt === null) {
+        const sameSnapshot = review.snapshotHash === snapshot.hash;
+        saveState(root, id, {
+          phase: state.phase,
+          review: {
+            snapshotHash: snapshot.hash,
+            snapshotAt: sameSnapshot
+              ? (review.snapshotAt ?? formatReviewSnapshotAt())
+              : formatReviewSnapshotAt(),
+            reviewerTranscriptId: sameSnapshot ? review.reviewerTranscriptId : null,
+          },
+        });
+        state = loadState(root, id);
+      }
+      const boundReview = normalizeReview(state.review);
+      const passJsonl = findReviewPassTranscript(
+        root,
+        id,
+        boundReview.reviewerTranscriptId,
+        boundReview.snapshotAt,
+      );
+      if (passJsonl) {
+        markReviewPassUsed(passJsonl);
+        clearReview(root, id);
+        state = loadState(root, id);
+      }
+      const remainingReview = normalizeReview(state.review);
+      if (remainingReview.snapshotHash !== null) {
+        return deny(denyReviewMessage(snapshot, remainingReview));
+      }
     }
   }
 

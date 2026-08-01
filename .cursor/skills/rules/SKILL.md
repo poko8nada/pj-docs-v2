@@ -28,7 +28,7 @@ Apply matching references, then edit. Reading this file opens `unlock.rules`.
 3. Tests — do **not** run `pnpm format` / `lint` / `typecheck` yourself (harness stop + lefthook). On stop `followup_message`, fix those. When tests apply: `pnpm test:run` once after changes; if missing, note in confirm; `N/A` → skip.
 4. Confirm — list concrete files / symbols changed.
 5. If pending `NOTE:` in changed files: `rg -n 'NOTE:' …` — keep, or delete after user OK (`notes`), or mention if unsure.
-6. Before commit if `review.files` non-empty: `notes` Commit check → `/pre-commit-reviewer`.
+6. Before commit if the current reviewable Git snapshot is not bound to a PASS: `notes` Commit check → `/pre-commit-reviewer`.
    - `REVIEW: PASS` → stop or `git commit` (clears via harness).
    - `REVIEW: GAPS` → show the user. If items match **already agreed** tradeoffs, confirm that exclusion, then re-invoke the reviewer with those items listed as user-accepted (review the rest only). Do not invent PASS. Unagreed gaps → fix or re-agree before another review.
 
