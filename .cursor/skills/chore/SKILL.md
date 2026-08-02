@@ -14,14 +14,14 @@ No Goal / Discover / Build track.
 
 ## Steps
 
-1. If `unlock.scope` is not true → run `scope` (thin Theme OK). State the touch list. Re-dump Theme only if boundaries shifted.
-2. Unclear ask → agree Theme / In / Out via `scope` before editing. Vague “fix stuff” → stop.
+1. If `unlock.scope` is not true, do not start the chore or run `scope` from this phase. Name `/discussion` and wait for the user to confirm the focus with `/scope ok`. State the touch list. Re-dump Theme only if boundaries shifted.
+2. Unclear ask → name `/discussion` and agree Theme / In / Out via `scope` before editing. Vague “fix stuff” → stop.
 3. If the bounded concern needs multiple steps or choices, read `agenda` and `agenda/references/chore.md`; otherwise skip it. Stop for user agreement before editing.
 4. A behavior, capability, user-interaction, data/API contract, or Goal/Discover/Build change is product work → name `/work` (or `/discussion`). Scope creep → stop, restate the touch list, or name `/discussion`.
 5. Before edits → `rules` + matching `rules/references/*`.
 6. Issues only if asked → `issue`.
 
-Edits need `unlock.scope` then `unlock.rules`. Chore agenda planning does not open `unlock.agenda`.
+Edits need user-confirmed `unlock.scope` then `unlock.rules`. Chore agenda planning does not open `unlock.agenda`.
 
 ## Limits
 

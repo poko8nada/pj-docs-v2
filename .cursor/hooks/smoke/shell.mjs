@@ -11,6 +11,11 @@ export function runCdRoot(smoke) {
     run('track.mjs', {
       ...cdBase,
       hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
+    run('track.mjs', {
+      ...cdBase,
+      hook_event_name: 'beforeSubmitPrompt',
       prompt: '/chore cd test',
     });
     run('track.mjs', {

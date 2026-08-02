@@ -35,6 +35,11 @@ export function runCheckPending(smoke) {
     run('track.mjs', {
       ...checkBase,
       hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
+    run('track.mjs', {
+      ...checkBase,
+      hook_event_name: 'beforeSubmitPrompt',
       prompt: '/chore check test',
     });
     run('track.mjs', {
@@ -183,6 +188,11 @@ export function runCheckPending(smoke) {
       run('track.mjs', {
         ...missingCheckBase,
         hook_event_name: 'beforeSubmitPrompt',
+        prompt: '/scope ok',
+      });
+      run('track.mjs', {
+        ...missingCheckBase,
+        hook_event_name: 'beforeSubmitPrompt',
         prompt: '/chore check missing tooling',
       });
       saveState(noDepsRoot, missingCheckId, {
@@ -290,6 +300,11 @@ export function runCheckPending(smoke) {
     clearSticky();
     const formatId = 'check-format-dirty-id';
     const formatBase = { conversation_id: formatId, workspace_roots: [root], cwd: root };
+    run('track.mjs', {
+      ...formatBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
     run('track.mjs', {
       ...formatBase,
       hook_event_name: 'beforeSubmitPrompt',

@@ -102,6 +102,11 @@ export function runStickyContamination(smoke) {
     run('track.mjs', {
       ...withId,
       hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
+    run('track.mjs', {
+      ...withId,
+      hook_event_name: 'beforeSubmitPrompt',
       prompt: '/chore integration',
     });
     let st = loadState(root, realId);

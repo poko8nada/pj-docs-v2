@@ -50,8 +50,10 @@ export function runInjectGateListing(smoke) {
       ctx.slice(0, 600),
     );
     assert(
-      'inject explains direct reviewer transcript lookup',
-      ctx.includes('exact JSONL'),
+      'inject explains prompt-bound reviewer lookup',
+      ctx.includes('unique post-snapshot PASS') &&
+        ctx.includes('sticky state ID') &&
+        ctx.includes('runtime transcript paths'),
       ctx.slice(0, 600),
     );
     assert(

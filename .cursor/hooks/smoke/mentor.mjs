@@ -31,6 +31,11 @@ export function runMentorStub(smoke) {
     run('track.mjs', {
       ...mentorBase,
       hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
+    run('track.mjs', {
+      ...mentorBase,
+      hook_event_name: 'beforeSubmitPrompt',
       prompt: '/chore /mentor',
     });
     assert('mentor on in state', loadState(root, mentorId).mentor === true);
@@ -40,7 +45,7 @@ export function runMentorStub(smoke) {
     trackRead(mentorBase, '.cursor/skills/rules/SKILL.md');
     trackReadConventionsRef(mentorBase);
     assert('mentor unlock.rules', loadState(root, mentorId).unlock.rules === true);
-    assert('mentor scope open', loadState(root, mentorId).unlock.scope === true);
+    assert('mentor scope confirmed', loadState(root, mentorId).unlock.scope === true);
 
     const codePath = join(root, '.cursor/hooks/_mentor-smoke-probe.ts');
     const denyCode = run('gate.mjs', {
@@ -216,6 +221,11 @@ export function runPnpmEarly(smoke) {
       cwd: root,
     };
     clearSticky();
+    run('track.mjs', {
+      ...testBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
     run('track.mjs', {
       ...testBase,
       hook_event_name: 'beforeSubmitPrompt',

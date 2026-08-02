@@ -357,7 +357,7 @@ export function normalizeMentor(value) {
   return value === true;
 }
 
-/** unlock.scope（scope スキル Read で true、/discussion で false） */
+/** unlock.scope（ユーザーの /scope ok で true、/discussion で false） */
 export function normalizeScope(value) {
   return value === true;
 }
