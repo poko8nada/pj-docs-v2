@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run PR Agent
-        # v0.38.0 のリリースコミットに固定する
-        uses: The-PR-Agent/pr-agent@bd09b6cf89c6d6f3d16b159fa7603fa0e7768cf2
+        # v0.41.0-github_actionのdigestに固定する
+        uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           openrouter__key: ${{ secrets.OPENROUTER_API_KEY }}
