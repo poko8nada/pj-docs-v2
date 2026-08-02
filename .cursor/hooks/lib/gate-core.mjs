@@ -66,9 +66,10 @@ const DENY_STATE = formatDeny({
   ],
 });
 
-/** @param {string} phase */
-function denyCodeMessage(phase) {
-  const p = phase || 'discussion';
+/** @param {{ phase?: string, unlock?: { scope?: boolean } }} state */
+function denyCodeMessage(state) {
+  const p = state?.phase || 'discussion';
+  if (!WORK_PHASES.has(p) && state?.unlock?.scope !== true) return DENY_SCOPE;
   if (WORK_PHASES.has(p)) {
     return formatDeny({
       tag: 'gate',
@@ -85,15 +86,16 @@ function denyCodeMessage(phase) {
     why: `Edits blocked (phase=${p}): not in a work phase.`,
     next: [
       'Ask the user to send `/work` or `/chore`.',
-      `Then read \`${SCOPE_SKILL}\` if unlock.scope is false, then \`${RULES_SKILL}\`.`,
+      `After the user handoff, read \`${RULES_SKILL}\` and at least one matching reference.`,
       'Retry the edit only after unlocks are open.',
     ],
   });
 }
 
-/** @param {string} phase */
-function denyShellMessage(phase) {
-  const p = phase || 'discussion';
+/** @param {{ phase?: string, unlock?: { scope?: boolean } }} state */
+function denyShellMessage(state) {
+  const p = state?.phase || 'discussion';
+  if (!WORK_PHASES.has(p) && state?.unlock?.scope !== true) return DENY_SCOPE;
   if (WORK_PHASES.has(p)) {
     return formatDeny({
       tag: 'gate',
@@ -110,7 +112,7 @@ function denyShellMessage(phase) {
     why: `Shell blocked (phase=${p}): discussion allows read-only commands and read-only gh/git only.`,
     next: [
       'Use read-only Shell, or ask the user for `/work`|/chore` for mutating Shell.',
-      `If scope is not confirmed, return to discussion and ask the user for \`/scope ok\`, then read \`${RULES_SKILL}\` for non-allowlisted commands.`,
+      `After the user handoff, read \`${RULES_SKILL}\` for non-allowlisted Shell.`,
     ],
   });
 }
@@ -120,7 +122,7 @@ const DENY_SCOPE = formatDeny({
   why: 'unlock.scope is false (session focus is not user-confirmed).',
   next: [
     `Read \`${SCOPE_SKILL}\` for the focus-confirmation procedure.`,
-    'In discussion, agree Theme with the user and ask the user to send `/scope ok`; set the label after confirmation.',
+    'If needed, return to `/discussion`; agree Theme with the user and ask the user to send `/scope ok`; set the label after confirmation.',
     'Retry the edit only after the user has confirmed the focus and unlock.scope is true.',
   ],
 });
@@ -638,6 +640,11 @@ function isAllowedWithoutCodeUnlock(command, inWorkPhase) {
   });
 }
 
+/** scope 未確認でも許可する read-only / test Shell */
+function isScopeSafeShell(command) {
+  return isPnpmTestShellCommand(command) || isAllowedWithoutCodeUnlock(command, false);
+}
+
 function denyOutsidePathsInCommand(root, command) {
   for (const p of extractPathsFromCommand(command)) {
     const err = checkPathOutsideRoot(root, p);
@@ -697,6 +704,12 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
 
   const outsideErr = denyOutsidePathsInCommand(root, command);
   if (outsideErr) return deny(outsideErr);
+
+  // phase / scope: review / issue / rules より先（変更系 Shell は編集ゲート）
+  if (!isScopeSafeShell(command)) {
+    if (!inWorkPhase) return deny(denyShellMessage(state));
+    if (state.unlock?.scope !== true) return deny(DENY_SCOPE);
+  }
 
   // git commit: 現在の Git snapshot と reviewer の対象 snapshot が一致するか確認する
   if (commandIncludesGitCommit(command)) {
@@ -772,15 +785,6 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
   // pnpm test — work|chore のみ、rules 不要（mentor 下の検証用）
   if (WORK_PHASES.has(state.phase) && isPnpmTestShellCommand(command)) return allow();
 
-  // scope: rules / mentor メッセージより先（allowlist 外の Shell）
-  if (
-    inWorkPhase &&
-    state.unlock?.scope !== true &&
-    !isAllowedWithoutCodeUnlock(command, inWorkPhase)
-  ) {
-    return deny(DENY_SCOPE);
-  }
-
   // agenda: work のみ（chore は unlock.agenda=null で対象外）。scope の次
   if (inWorkPhase && !isAgendaReady(state) && !isAllowedWithoutCodeUnlock(command, inWorkPhase)) {
     return deny(denyAgendaMessage(state));
@@ -798,7 +802,7 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
 
   if (unlocked) return allow();
   if (isAllowedWithoutCodeUnlock(command, inWorkPhase)) return allow();
-  return deny(denyShellMessage(state.phase));
+  return deny(denyShellMessage(state));
 }
 
 export async function handleGate(payload) {
@@ -872,5 +876,5 @@ export async function handleGate(payload) {
     return allow();
   }
 
-  return deny(denyCodeMessage(state.phase));
+  return deny(denyCodeMessage(state));
 }

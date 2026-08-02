@@ -35,6 +35,16 @@ export function runInjectGateListing(smoke) {
       ctx.slice(0, 600),
     );
     assert(
+      'inject has Skill routing',
+      ctx.includes('## Skill routing') &&
+        ctx.includes('| Situation | Route |') &&
+        ctx.includes('User `/work`') &&
+        ctx.includes('User `/chore`') &&
+        ctx.includes('Focus / planning / edit guidance') &&
+        ctx.includes('separate role'),
+      ctx.slice(0, 1000),
+    );
+    assert(
       'inject states discussion is read-only',
       ctx.includes('discussion` is read-only'),
       ctx.slice(0, 600),
