@@ -4,7 +4,7 @@
  *
  * | Event              | Action                                      |
  * |--------------------|---------------------------------------------|
- * | beforeSubmitPrompt | phase / bootstrap                           |
+ * | beforeSubmitPrompt | phase / bootstrap / scope confirmation      |
  * | Read*              | unlock + read.skills / read.refs            |
  * | postToolUse        | Git snapshot + check.pending + format        |
  * | preToolUse Task         | snapshot を保存して reviewer に差分を注入       |
@@ -22,7 +22,6 @@ import {
   injectReviewSnapshotIntoTaskInput,
   isPreCommitReviewerContext,
   markReviewPassUsed,
-  reviewerTranscriptIdFromPayload,
 } from './lib/review.mjs';
 import { skillRefIdFromPath } from './lib/refs.mjs';
 import { ISSUE_SKILL_REL } from './lib/issue.mjs';
@@ -34,6 +33,7 @@ import {
   defaultRead,
   findStateFileName,
   hasReviewSnapshot,
+  idFromTranscriptPath,
   loadState,
   markCheckPending,
   markReadRef,
@@ -45,6 +45,7 @@ import {
   PHASE_DISCUSSION,
   REVIEW_BINDING_BOUND,
   REVIEW_BINDING_UNBOUND,
+  resolveConversationId,
   resetCheck,
   resetReview,
   saveState,
@@ -56,6 +57,7 @@ import {
 } from './lib/state.mjs';
 
 const PHASE_RE = /(?:^|[\s`])\/(discussion|work|chore)(?=[\s`/]|$)/i;
+const SCOPE_OK_RE = /(?:^|[\s`])\/scope\s+ok(?=[\s`/]|$)/i;
 const BOOTSTRAP_OFF_RE = /(?:^|[\s`])\/bootstrap\s+off(?=[\s`/]|$)/i;
 const BOOTSTRAP_ON_RE = /(?:^|[\s`])\/bootstrap(?=[\s`/]|$)/i;
 const MENTOR_OFF_RE = /(?:^|[\s`])\/mentor\s+off(?=[\s`/]|$)/i;
@@ -102,17 +104,6 @@ function isRulesSkill(root, filePath) {
   try {
     const abs = realpathSync(isAbsolute(filePath) ? filePath : resolve(root, filePath));
     const target = realpathSync(join(root, '.cursor/skills/rules/SKILL.md'));
-    return abs === target;
-  } catch {
-    return false;
-  }
-}
-
-function isScopeSkill(root, filePath) {
-  if (!filePath) return false;
-  try {
-    const abs = realpathSync(isAbsolute(filePath) ? filePath : resolve(root, filePath));
-    const target = realpathSync(join(root, '.cursor/skills/scope/SKILL.md'));
     return abs === target;
   } catch {
     return false;
@@ -189,18 +180,6 @@ function maybeUnlockRules(root, payload) {
   }
 }
 
-/** scope スキル Read → どのフェーズでも unlock.scope を開く */
-function maybeOpenScope(root, payload) {
-  const filePath = filePathFromPayload(payload);
-  if (!isScopeSkill(root, String(filePath))) return;
-  const id = conversationId(payload);
-  const prev = loadState(root, id);
-  saveState(root, id, {
-    phase: prev.phase,
-    unlock: { ...prev.unlock, scope: true },
-  });
-}
-
 /** 任意 skill の references 配下 md Read → read.refs（`skill/name.md`） */
 function maybeMarkReadRef(root, payload) {
   const filePath = filePathFromPayload(payload);
@@ -242,11 +221,34 @@ function handleBeforeSubmitPrompt(root, payload) {
     enableStubTurn(root, id);
   }
 
+  if (SCOPE_OK_RE.test(prompt)) {
+    const prev = loadState(root, id);
+    if (prev.phase !== PHASE_DISCUSSION) {
+      return respond({
+        continue: true,
+        user_message:
+          'Scope confirmation is available only in discussion. Use `/discussion`, agree the focus, then send `/scope ok`.',
+      });
+    }
+    saveState(root, id, {
+      phase: prev.phase,
+      unlock: { ...prev.unlock, scope: true },
+    });
+    return respond({ continue: true });
+  }
+
   const match = prompt.match(PHASE_RE);
   if (!match) return respond({ continue: true });
 
   const phase = match[1].toLowerCase();
   const prev = loadState(root, id);
+  if (phase !== PHASE_DISCUSSION && prev.unlock.scope !== true) {
+    return respond({
+      continue: true,
+      user_message:
+        'Session focus is not confirmed. Continue in discussion and ask the user to send `/scope ok` before `/work` or `/chore`.',
+    });
+  }
   let unlock;
   // reviewer snapshot はフェーズ変更・再入場でも保持し、Git 差分一致を commit 時に再確認する。
   const review = normalizeReview(prev.review);
@@ -267,8 +269,15 @@ function handleBeforeSubmitPrompt(root, payload) {
     };
   }
 
-  // mentor はフェーズ変更でも維持。scope は /discussion でのみ閉じる（上で false）
-  saveState(root, id, { phase, unlock, read, review, mentor: prev.mentor });
+  // mentor はフェーズ変更でも維持。scope は /discussion で閉じ、label も同期して消す。
+  saveState(root, id, {
+    phase,
+    unlock,
+    read,
+    review,
+    mentor: prev.mentor,
+    ...(phase === PHASE_DISCUSSION ? { label: '' } : {}),
+  });
   return respond({ continue: true });
 }
 
@@ -320,22 +329,6 @@ function maybeRefreshReviewSnapshot(root, payload) {
       reviewerTranscriptId: sameSnapshot ? review.reviewerTranscriptId : null,
       binding: sameSnapshot ? review.binding : REVIEW_BINDING_UNBOUND,
     },
-  });
-}
-
-/** reviewer 子 hook の UUID だけを親会話の review state に保存する */
-function maybeCaptureReviewerTranscript(root, payload) {
-  const id = conversationId(payload);
-  const state = loadState(root, id);
-  if (!hasReviewSnapshot(state)) return;
-
-  const review = normalizeReview(state.review);
-  const transcriptId = reviewerTranscriptIdFromPayload(root, payload, id);
-  if (!transcriptId || review.reviewerTranscriptId === transcriptId) return;
-
-  saveState(root, id, {
-    phase: state.phase,
-    review: { ...review, reviewerTranscriptId: transcriptId },
   });
 }
 
@@ -420,7 +413,8 @@ function handleAfterShellExecution(root, payload) {
  * commit 前スキャンは保険として残す。
  */
 function handleStop(root, payload) {
-  const id = conversationId(payload);
+  const resolvedConversation = resolveConversationId(payload);
+  const id = resolvedConversation.id;
   const state = loadState(root, id);
   if (!hasReviewSnapshot(state)) return empty();
 
@@ -431,18 +425,15 @@ function handleStop(root, payload) {
     return empty();
   }
   if (snapshot.kind !== 'snapshot' || review.snapshotHash !== snapshot.hash) return empty();
-  const passJsonl = findReviewPassTranscript(
-    root,
-    id,
-    review.reviewerTranscriptId,
-    review.snapshotAt,
-  );
+  if (resolvedConversation.via !== 'sticky.last-prompt-id') return empty();
+  const passJsonl = findReviewPassTranscript(root, id, review.snapshotAt);
   if (!passJsonl) return empty();
 
   markReviewPassUsed(passJsonl);
+  const reviewerTranscriptId = idFromTranscriptPath(passJsonl);
   saveState(root, id, {
     phase: state.phase,
-    review: { ...review, binding: REVIEW_BINDING_BOUND },
+    review: { ...review, reviewerTranscriptId, binding: REVIEW_BINDING_BOUND },
   });
   return empty();
 }
@@ -462,7 +453,6 @@ async function main() {
   if (shouldRefreshReview) {
     maybeRefreshReviewSnapshot(root, payload);
   }
-  maybeCaptureReviewerTranscript(root, payload);
 
   if (event === 'beforeSubmitPrompt') {
     return handleBeforeSubmitPrompt(root, payload);
@@ -495,7 +485,6 @@ async function main() {
     maybeUnlockIssue(root, payload);
     maybeUnlockAgenda(root, payload);
     maybeUnlockRules(root, payload);
-    maybeOpenScope(root, payload);
     maybeMarkReadRef(root, payload);
     if (event === 'postToolUse') return empty();
     return allow();

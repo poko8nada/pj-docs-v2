@@ -1,30 +1,30 @@
 ---
 name: work
 description: >-
-  Hands-on for Goal / Discover / Build: scope if needed → agenda → execute → commit.
+  Hands-on for Goal / Discover / Build: user-confirmed scope → agenda → execute → commit.
   Use when the user invokes /work. Not for session direction (discussion) or harness/meta (chore).
 disable-model-invocation: true
 ---
 
 # work
 
-Execute the focus locked by `scope`. Judgment in Goal / Discover / Build issues; soft output in `findings/`.
+Execute the focus confirmed by the user through `scope`. Judgment in Goal / Discover / Build issues; soft output in `findings/`.
 
 ## Steps
 
 ```text
-scope (if not open) → agenda (inventory → slices → agree) → Execute → Commit
+user-confirmed scope → agenda (context scan → slices → agree) → Execute → Commit
                                                          → Issue update when needed
 ```
 
-1. If `unlock.scope` is not true → run `scope`. Unclear → `scope` or name `/discussion`.
+1. If `unlock.scope` is not true, do not start work or run `scope` from this phase. Name `/discussion` and wait for the user to confirm the focus with `/scope ok`. If the focus is unclear while discussing, use `scope` or name `/discussion`.
 2. Run `agenda` + matching `agenda/references/*` (Goal/Discover or Build). Stop after first agenda dump until user agrees.
 3. Before edits → `rules` + matching `rules/references/*`.
 4. Issue create/update → `issue` + matching template.
 5. Execute agreed slice. Softs only from this phase (or the user) — not from other softs.
 6. Direction change mid-session → name `/discussion`. Meta/harness → name `/chore`.
 
-Edits need `unlock.scope` → `unlock.agenda` → `unlock.rules`. Running a skill unlocks via Read — still **execute** its procedure.
+Edits need user-confirmed `unlock.scope` → `unlock.agenda` → `unlock.rules`. Reading a skill unlocks its gate where specified — still **execute** its procedure.
 
 ## Limits
 

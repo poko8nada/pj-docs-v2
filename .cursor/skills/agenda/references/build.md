@@ -6,7 +6,7 @@ Goal/Discover-only sessions → `goal-discover.md`.
 
 Slice table and fills → parent `agenda/SKILL.md`.
 
-## Inventory sources
+## Context sources
 
 - `[Build]` axes (Roadmap / Test strategy / Deploy) + Links to Goal / Discover
 - Soft comments on Build (and Discover when relevant) + `findings/`

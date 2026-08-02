@@ -1,20 +1,23 @@
 ---
 name: scope
 description: >-
-  Agree Theme / In / Out, set label, open unlock.scope.
-  Use when session focus must be locked or unlock.scope is not open.
-  Prose agreement is not a substitute for reading this file. Close: `/discussion`.
+  Establish a provisional Theme / In / Out and let the user confirm it with `/scope ok`.
+  Use when session focus must be proposed, confirmed, or unlock.scope is not open.
+  Reading this file does not confirm focus. Close: `/discussion`.
 ---
 
 # scope
 
-Lock session focus, set label, open `unlock.scope`.
+Make the session focus explicit so discussion can continue in a shared direction.
+Only the user's `/scope ok` confirms the focus and opens `unlock.scope`; reading this
+file or agreeing in prose does not do so.
 
 ## Steps
 
-1. Agree Theme (add In / Out when boundaries matter). Theme alone is enough when clear.
-2. On reject: revise (do not repeat the same block). One clarifying question at most. Wrong Theme → rewrite Theme first; wrong boundaries → fix In / Out. Topic change → re-agree and update label.
-3. When Theme is stable, set label:
+1. Agree a provisional Theme (add In / Out when boundaries matter). Theme alone is enough when clear.
+2. On reject: revise (do not repeat the same block). One clarifying question at most. Wrong Theme → rewrite Theme first; wrong boundaries → fix In / Out. Topic change → re-agree and update the label only after the next `/scope ok`.
+3. When Theme is stable, ask the user to send `/scope ok`. Do not set the label or treat the focus as confirmed before that command.
+4. After the user sends `/scope ok`, set the label:
 
 ```bash
 node .cursor/skills/scope/scripts/set-label.mjs <label>
@@ -25,7 +28,7 @@ node .cursor/skills/scope/scripts/set-label.mjs <label>
 - Skip while Theme is fuzzy
 - Smoke: `node .cursor/skills/scope/scripts/set-label.smoke.mjs`
 
-4. Reading this file opens `unlock.scope`. Same Theme continuing → do not re-dump every turn. Close is `/discussion` only.
+5. Same Theme continuing → do not re-dump every turn. Continue discussion after confirmation when more decisions are needed. Close is `/discussion` only; it clears `unlock.scope` and `label`.
 
 ## Format
 
@@ -52,4 +55,5 @@ Bad: Theme = Build the todo app; In = Next.js + DnD + auth; Out empty.
 
 ## Limits
 
-- Prose agreement does not open the gate — this file must be read.
+- Prose agreement and reading this file do not open the gate — only the user's `/scope ok` does.
+- The agent must not send or simulate `/scope ok`.

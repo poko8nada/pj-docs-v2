@@ -33,6 +33,7 @@ import {
   clearReview,
   conversationId,
   formatReviewSnapshotAt,
+  idFromTranscriptPath,
   isSpecFlowPhase,
   isUnderStateDir,
   isUnlocked,
@@ -40,6 +41,7 @@ import {
   normalizeReview,
   REVIEW_BINDING_BOUND,
   REVIEW_BINDING_UNBOUND,
+  resolveConversationId,
   saveState,
   stateDir,
   WORK_PHASES,
@@ -108,18 +110,18 @@ function denyShellMessage(phase) {
     why: `Shell blocked (phase=${p}): discussion allows read-only commands and read-only gh/git only.`,
     next: [
       'Use read-only Shell, or ask the user for `/work`|/chore` for mutating Shell.',
-      `After a work phase: open scope if needed, then \`${RULES_SKILL}\` for non-allowlisted commands.`,
+      `If scope is not confirmed, return to discussion and ask the user for \`/scope ok\`, then read \`${RULES_SKILL}\` for non-allowlisted commands.`,
     ],
   });
 }
 
 const DENY_SCOPE = formatDeny({
   tag: 'gate-scope',
-  why: 'unlock.scope is false (session focus is not locked).',
+  why: 'unlock.scope is false (session focus is not user-confirmed).',
   next: [
-    `Read \`${SCOPE_SKILL}\` (opens unlock.scope).`,
-    'Agree Theme with the user; run set-label when stable.',
-    'Retry the edit only after unlock.scope is true.',
+    `Read \`${SCOPE_SKILL}\` for the focus-confirmation procedure.`,
+    'In discussion, agree Theme with the user and ask the user to send `/scope ok`; set the label after confirmation.',
+    'Retry the edit only after the user has confirmed the focus and unlock.scope is true.',
   ],
 });
 
@@ -683,7 +685,8 @@ function isMentorReadonlyShell(command) {
 
 function handleShell(payload, root, state, unlocked, inWorkPhase) {
   const command = String(payload.command ?? payload.tool_input?.command ?? '');
-  const id = conversationId(payload);
+  const resolvedConversation = resolveConversationId(payload);
+  const id = resolvedConversation.id;
 
   if (isShellWriteToState(root, command)) return deny(DENY_STATE);
   if (isShellWriteToBootstrapMarker(root, command)) return deny(DENY_BOOTSTRAP);
@@ -729,18 +732,21 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
         state = loadState(root, id);
       }
       const boundReview = normalizeReview(state.review);
-      if (boundReview.binding !== REVIEW_BINDING_BOUND) {
-        const passJsonl = findReviewPassTranscript(
-          root,
-          id,
-          boundReview.reviewerTranscriptId,
-          boundReview.snapshotAt,
-        );
+      // reviewer の親 identity は sticky state があるイベントだけで確定する。
+      if (
+        boundReview.binding !== REVIEW_BINDING_BOUND &&
+        resolvedConversation.via === 'sticky.last-prompt-id'
+      ) {
+        const passJsonl = findReviewPassTranscript(root, id, boundReview.snapshotAt);
         if (passJsonl) {
           markReviewPassUsed(passJsonl);
           saveState(root, id, {
             phase: state.phase,
-            review: { ...boundReview, binding: REVIEW_BINDING_BOUND },
+            review: {
+              ...boundReview,
+              reviewerTranscriptId: idFromTranscriptPath(passJsonl),
+              binding: REVIEW_BINDING_BOUND,
+            },
           });
           state = loadState(root, id);
         }

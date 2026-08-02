@@ -1,7 +1,7 @@
 /** smoke: review */
 import { execFileSync } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
-import { reviewPassUsedPath } from '../lib/review.mjs';
+import { agentTranscriptsDir, reviewPassUsedPath } from '../lib/review.mjs';
 import { REVIEW_BINDING_BOUND, REVIEW_BINDING_UNBOUND } from '../lib/state.mjs';
 
 function execGitWithoutSmokeIndex(cwd, gitArgs, options = {}) {
@@ -41,6 +41,7 @@ export function runReviewGate(smoke) {
     mkdtempSync,
     utimesSync,
     smokeTmpRoot,
+    clearSticky,
     resolve,
     join,
   } = smoke;
@@ -51,6 +52,11 @@ export function runReviewGate(smoke) {
       workspace_roots: [root],
       cwd: root,
     };
+    run('track.mjs', {
+      ...conversationBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
     run('track.mjs', {
       ...conversationBase,
       hook_event_name: 'beforeSubmitPrompt',
@@ -93,23 +99,55 @@ export function runReviewGate(smoke) {
     return withRealGitIndex(() => collectReviewDiff(cwd, relPath));
   }
 
-  function writeReviewerTranscript(dir, transcriptId, verdict) {
-    const childDir = join(dir, transcriptId);
-    mkdirSync(childDir, { recursive: true });
-    const path = join(childDir, `${transcriptId}.jsonl`);
+  const parentTranscriptId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  function transcriptPath(dir, transcriptId) {
+    return join(dir, transcriptId, `${transcriptId}.jsonl`);
+  }
+
+  function writeParentTranscript(dir, prompt, transcriptId = parentTranscriptId) {
+    const path = transcriptPath(dir, transcriptId);
+    mkdirSync(join(dir, transcriptId), { recursive: true });
     writeFileSync(
       path,
       `${JSON.stringify({
-        role: 'user',
+        role: 'assistant',
         message: {
           content: [
             {
-              type: 'text',
-              text: `Full Repository Path: ${resolve(root)}\nDiff: current Git snapshot\n`,
+              type: 'tool_use',
+              name: 'Subagent',
+              input: { prompt },
             },
           ],
         },
-      })}\n${JSON.stringify({
+      })}\n`,
+    );
+    return path;
+  }
+
+  function writeReviewerTranscript(dir, transcriptId, verdict, prompt, previousPrompt = null) {
+    const childDir = join(dir, transcriptId);
+    mkdirSync(childDir, { recursive: true });
+    const path = join(childDir, `${transcriptId}.jsonl`);
+    const prompts = [previousPrompt, prompt].filter((value) => value);
+    writeFileSync(
+      path,
+      `${prompts
+        .map((text) =>
+          JSON.stringify({
+            role: 'user',
+            message: {
+              content: [
+                {
+                  type: 'text',
+                  text,
+                },
+              ],
+            },
+          }),
+        )
+        .join('\n')}\n${JSON.stringify({
         role: 'assistant',
         message: { content: [{ type: 'text', text: `${verdict}\n` }] },
       })}\n`,
@@ -117,20 +155,16 @@ export function runReviewGate(smoke) {
     return path;
   }
 
-  function captureReviewer(conversationBase, childPath, transcriptsDir) {
-    const parentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-    const parentPath = join(transcriptsDir, parentId, `${parentId}.jsonl`);
-    mkdirSync(join(transcriptsDir, parentId), { recursive: true });
-    return run(
-      'track.mjs',
-      {
-        ...conversationBase,
-        hook_event_name: 'postToolUse',
-        tool_name: 'Task',
-        transcript_path: childPath,
-      },
-      { CURSOR_TRANSCRIPT_PATH: parentPath },
-    );
+  function runWithTranscripts(
+    script,
+    payload,
+    transcriptsDir,
+    runtimeTranscriptId = parentTranscriptId,
+  ) {
+    return run(script, payload, {
+      CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir,
+      CURSOR_TRANSCRIPT_PATH: transcriptPath(transcriptsDir, runtimeTranscriptId),
+    });
   }
 
   // Git snapshot: staged / unstaged / deleted / untracked と拡張子 filter
@@ -188,15 +222,13 @@ export function runReviewGate(smoke) {
 
   // reviewer Task はその時点の Git snapshot を保存し、同じ内容だけを注入する
   {
-    const reviewId = 'review-snapshot-gate-id';
+    const reviewId = 'abababab-abab-4bab-8bab-abababababab';
     const reviewBase = setupChore(reviewId);
     const probe = '.cursor/hooks/_smoke-review-snapshot-probe.mjs';
     const probeAbs = join(root, probe);
     const deletionAnchor = '.cursor/hooks/_smoke-review-deletion-anchor.mjs';
     const deletionAnchorAbs = join(root, deletionAnchor);
     const transcriptsDir = mkdtempSync(join(smokeTmpRoot, 'review-snapshot-tx-'));
-    const runWithTranscripts = (script, payload) =>
-      run(script, payload, { CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir });
     writeFileSync(probeAbs, 'export const smokeReviewSnapshotProbe = 1;\n');
     addIgnoredProbe(probe);
     run('track.mjs', {
@@ -221,11 +253,15 @@ export function runReviewGate(smoke) {
       JSON.stringify(loadState(root, reviewId).review),
     );
 
-    const beforeTask = runWithTranscripts('gate.mjs', {
-      ...reviewBase,
-      hook_event_name: 'beforeShellExecution',
-      command: 'git commit -m test',
-    });
+    const beforeTask = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...reviewBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
     assert(
       'commit denies before reviewer PASS',
       beforeTask.permission === 'deny' &&
@@ -269,11 +305,15 @@ export function runReviewGate(smoke) {
 
     writeFileSync(probeAbs, 'export const smokeReviewSnapshotProbe = 2;\n');
     const changedSnapshot = collectReviewSnapshot(root);
-    const changed = runWithTranscripts('gate.mjs', {
-      ...reviewBase,
-      hook_event_name: 'beforeShellExecution',
-      command: 'git commit -m test',
-    });
+    const changed = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...reviewBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
     const reboundState = loadState(root, reviewId);
     assert(
       'commit denies when current snapshot changes',
@@ -299,31 +339,44 @@ export function runReviewGate(smoke) {
         collectReviewDiff(root, probe).body.includes('smokeReviewSnapshotProbe = 2'),
       JSON.stringify(retryTask),
     );
+    const retryPrompt = retryTask.updated_input?.prompt;
+    writeParentTranscript(transcriptsDir, retryPrompt, reviewId);
     const gapsId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-    const gapsPath = writeReviewerTranscript(transcriptsDir, gapsId, 'REVIEW: GAPS');
-    captureReviewer(reviewBase, gapsPath, transcriptsDir);
+    writeReviewerTranscript(transcriptsDir, gapsId, 'REVIEW: GAPS', retryPrompt);
     assert(
-      'GAPS child ID is captured without storing its path',
-      loadState(root, reviewId).review.reviewerTranscriptId === gapsId &&
+      'GAPS child is not captured before validation',
+      loadState(root, reviewId).review.reviewerTranscriptId == null &&
         loadState(root, reviewId).review.binding === REVIEW_BINDING_UNBOUND &&
         !JSON.stringify(loadState(root, reviewId).review).includes(transcriptsDir),
       JSON.stringify(loadState(root, reviewId).review),
     );
-    const gapsCommit = runWithTranscripts('gate.mjs', {
-      ...reviewBase,
-      hook_event_name: 'beforeShellExecution',
-      command: 'git commit -m test',
-    });
+    const gapsCommit = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...reviewBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
     assert('GAPS child still blocks commit', gapsCommit.permission === 'deny');
 
     const passId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
-    const passPath = writeReviewerTranscript(transcriptsDir, passId, 'REVIEW: PASS');
-    captureReviewer(reviewBase, passPath, transcriptsDir);
-    const passCommit = runWithTranscripts('gate.mjs', {
-      ...reviewBase,
-      hook_event_name: 'beforeShellExecution',
-      command: 'git commit -m test',
-    });
+    const passPath = writeReviewerTranscript(
+      transcriptsDir,
+      passId,
+      'REVIEW: PASS',
+      retryPrompt.replace(/\n/g, '  '),
+    );
+    const passCommit = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...reviewBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
     const bound = loadState(root, reviewId);
     assert(
       'PASS for current snapshot binds review gate',
@@ -334,11 +387,15 @@ export function runReviewGate(smoke) {
       JSON.stringify({ passCommit, review: bound.review }),
     );
     assert('PASS transcript is marked used', existsSync(reviewPassUsedPath(passPath)));
-    const boundRetry = runWithTranscripts('gate.mjs', {
-      ...reviewBase,
-      hook_event_name: 'beforeShellExecution',
-      command: 'git commit -m test',
-    });
+    const boundRetry = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...reviewBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
     assert(
       'bound review allows a repeated commit check',
       boundRetry.permission === 'allow' &&
@@ -377,11 +434,15 @@ export function runReviewGate(smoke) {
     });
     unlinkSync(probeAbs);
     const afterDelete = collectReviewSnapshot(root);
-    const deleteCommit = runWithTranscripts('gate.mjs', {
-      ...reviewBase,
-      hook_event_name: 'beforeShellExecution',
-      command: 'git commit -m test',
-    });
+    const deleteCommit = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...reviewBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
     assert(
       'deleted untracked file is removed from current snapshot',
       afterDelete.kind === 'snapshot' &&
@@ -400,17 +461,15 @@ export function runReviewGate(smoke) {
 
   // 子 hook が発火しなくても fallback は現在 snapshot の時刻以降だけを見る
   {
-    const fallbackId = 'review-hookless-fallback-id';
+    const fallbackId = 'acacacac-acac-4cac-8cac-acacacacacac';
     const fallbackBase = setupChore(fallbackId);
     const probe = '.cursor/hooks/_smoke-review-hookless-fallback-probe.mjs';
     const probeAbs = join(root, probe);
     const transcriptsDir = mkdtempSync(join(smokeTmpRoot, 'review-hookless-tx-'));
-    const runWithTranscripts = (script, payload) =>
-      run(script, payload, { CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir });
 
     writeFileSync(probeAbs, 'export const smokeHooklessFallbackProbe = 1;\n');
     addIgnoredProbe(probe);
-    run('track.mjs', {
+    const currentTask = run('track.mjs', {
       ...fallbackBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Task',
@@ -419,27 +478,36 @@ export function runReviewGate(smoke) {
         description: 'review without child hook',
       },
     });
+    const currentPrompt = currentTask.updated_input?.prompt;
+    writeParentTranscript(transcriptsDir, currentPrompt, fallbackId);
     const currentPassPath = writeReviewerTranscript(
       transcriptsDir,
       'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
       'REVIEW: PASS',
+      currentPrompt,
     );
-    const currentPassCommit = runWithTranscripts('gate.mjs', {
-      ...fallbackBase,
-      hook_event_name: 'beforeShellExecution',
-      command: 'git commit -m test',
-    });
+    const currentPassCommit = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...fallbackBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
     assert(
       'hookless reviewer PASS uses current snapshot fallback',
       currentPassCommit.permission === 'allow' &&
         loadState(root, fallbackId).review.snapshotHash !== null &&
+        loadState(root, fallbackId).review.reviewerTranscriptId ===
+          'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' &&
         loadState(root, fallbackId).review.binding === REVIEW_BINDING_BOUND &&
         existsSync(reviewPassUsedPath(currentPassPath)),
       JSON.stringify(currentPassCommit),
     );
 
     writeFileSync(probeAbs, 'export const smokeHooklessFallbackProbe = 1;\n');
-    run('track.mjs', {
+    const capturedTask = run('track.mjs', {
       ...fallbackBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Task',
@@ -448,16 +516,17 @@ export function runReviewGate(smoke) {
         description: 'review before edit without retry',
       },
     });
+    const capturedPrompt = capturedTask.updated_input?.prompt;
+    writeParentTranscript(transcriptsDir, capturedPrompt, fallbackId);
     const capturedPassPath = writeReviewerTranscript(
       transcriptsDir,
       '11111111-1111-4111-8111-111111111111',
       'REVIEW: PASS',
+      capturedPrompt,
     );
-    captureReviewer(fallbackBase, capturedPassPath, transcriptsDir);
     assert(
-      'captured PASS is recorded before edit',
-      loadState(root, fallbackId).review.reviewerTranscriptId ===
-        '11111111-1111-4111-8111-111111111111' &&
+      'PASS remains unbound before stop or commit validation',
+      loadState(root, fallbackId).review.reviewerTranscriptId == null &&
         loadState(root, fallbackId).review.binding === REVIEW_BINDING_UNBOUND,
       JSON.stringify(loadState(root, fallbackId).review),
     );
@@ -469,11 +538,15 @@ export function runReviewGate(smoke) {
       tool_input: { path: probeAbs },
     });
     const editedReview = loadState(root, fallbackId).review;
-    const capturedStaleCommit = runWithTranscripts('gate.mjs', {
-      ...fallbackBase,
-      hook_event_name: 'beforeShellExecution',
-      command: 'git commit -m test',
-    });
+    const capturedStaleCommit = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...fallbackBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
     assert(
       'captured PASS cannot approve an edit without reviewer retry',
       capturedStaleCommit.permission === 'deny' &&
@@ -484,7 +557,7 @@ export function runReviewGate(smoke) {
     );
 
     writeFileSync(probeAbs, 'export const smokeHooklessFallbackProbe = 2;\n');
-    run('track.mjs', {
+    const staleTask = run('track.mjs', {
       ...fallbackBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Task',
@@ -493,10 +566,13 @@ export function runReviewGate(smoke) {
         description: 'review before stale PASS test',
       },
     });
+    const stalePrompt = staleTask.updated_input?.prompt;
+    writeParentTranscript(transcriptsDir, stalePrompt, fallbackId);
     const stalePassPath = writeReviewerTranscript(
       transcriptsDir,
       'ffffffff-ffff-4fff-8fff-ffffffffffff',
       'REVIEW: PASS',
+      stalePrompt,
     );
     const oldTime = new Date(Date.now() - 5000);
     utimesSync(stalePassPath, oldTime, oldTime);
@@ -507,11 +583,15 @@ export function runReviewGate(smoke) {
       tool_name: 'Write',
       tool_input: { path: probeAbs },
     });
-    const stalePassCommit = runWithTranscripts('gate.mjs', {
-      ...fallbackBase,
-      hook_event_name: 'beforeShellExecution',
-      command: 'git commit -m test',
-    });
+    const stalePassCommit = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...fallbackBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
     assert(
       'stale PASS cannot approve a changed snapshot',
       stalePassCommit.permission === 'deny' &&
@@ -527,12 +607,317 @@ export function runReviewGate(smoke) {
     }
   }
 
+  // 一致候補が複数ある場合は、古い／別 fork の transcript を推測で選ばない
+  {
+    const ambiguousId = 'adadadad-adad-4dad-8dad-adadadadadad';
+    const ambiguousBase = setupChore(ambiguousId);
+    const probe = '.cursor/hooks/_smoke-review-ambiguous-prompt-probe.mjs';
+    const probeAbs = join(root, probe);
+    const transcriptsDir = mkdtempSync(join(smokeTmpRoot, 'review-ambiguous-tx-'));
+    writeFileSync(probeAbs, 'export const smokeAmbiguousPromptProbe = 1;\n');
+    addIgnoredProbe(probe);
+
+    const task = run('track.mjs', {
+      ...ambiguousBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Task',
+      tool_input: {
+        subagent_type: 'pre-commit-reviewer',
+        description: 'review ambiguous candidates',
+      },
+    });
+    const prompt = task.updated_input?.prompt;
+    writeParentTranscript(transcriptsDir, prompt, ambiguousId);
+    const firstPath = writeReviewerTranscript(
+      transcriptsDir,
+      '12121212-1212-4121-8121-121212121212',
+      'REVIEW: PASS',
+      prompt,
+    );
+    const secondPath = writeReviewerTranscript(
+      transcriptsDir,
+      '13131313-1313-4131-8131-131313131313',
+      'REVIEW: PASS',
+      prompt,
+    );
+    const ambiguousCommit = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...ambiguousBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
+    const ambiguousReview = loadState(root, ambiguousId).review;
+    assert(
+      'multiple matching PASS candidates deny without guessing',
+      ambiguousCommit.permission === 'deny' &&
+        ambiguousReview.reviewerTranscriptId == null &&
+        !existsSync(reviewPassUsedPath(firstPath)) &&
+        !existsSync(reviewPassUsedPath(secondPath)),
+      JSON.stringify({ ambiguousCommit, review: ambiguousReview }),
+    );
+    try {
+      unlinkSync(probeAbs);
+      resetIgnoredProbe(probe);
+    } catch {
+      // 無ければ無視
+    }
+  }
+
+  // 複数 fork の候補から、親 prompt に一致する child だけを採用する
+  {
+    const forkId = 'aeaeaeae-aeae-4eae-8eae-aeaeaeaeaeae';
+    const forkBase = setupChore(forkId);
+    const probe = '.cursor/hooks/_smoke-review-fork-probe.mjs';
+    const probeAbs = join(root, probe);
+    const transcriptsDir = mkdtempSync(join(smokeTmpRoot, 'review-fork-tx-'));
+    writeFileSync(probeAbs, 'export const smokeForkProbe = 1;\n');
+    addIgnoredProbe(probe);
+
+    const task = run('track.mjs', {
+      ...forkBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Task',
+      tool_input: {
+        subagent_type: 'pre-commit-reviewer',
+        description: 'review fork matching',
+      },
+    });
+    const prompt = task.updated_input?.prompt;
+    writeParentTranscript(transcriptsDir, prompt, forkId);
+    const unrelatedPath = writeReviewerTranscript(
+      transcriptsDir,
+      '14141414-1414-4141-8141-141414141414',
+      'REVIEW: PASS',
+      `${prompt} from another fork`,
+    );
+    const matchingPath = writeReviewerTranscript(
+      transcriptsDir,
+      '15151515-1515-4151-8151-151515151515',
+      'REVIEW: PASS',
+      prompt.replace(/\s+/g, '  '),
+    );
+    const forkCommit = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...forkBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
+    const forkReview = loadState(root, forkId).review;
+    assert(
+      'nonmatching fork PASS is ignored',
+      forkCommit.permission === 'allow' &&
+        forkReview.reviewerTranscriptId === '15151515-1515-4151-8151-151515151515' &&
+        existsSync(reviewPassUsedPath(matchingPath)) &&
+        !existsSync(reviewPassUsedPath(unrelatedPath)),
+      JSON.stringify({ forkCommit, review: forkReview }),
+    );
+    try {
+      unlinkSync(probeAbs);
+      resetIgnoredProbe(probe);
+    } catch {
+      // 無ければ無視
+    }
+  }
+
+  // runtime path が汚染されても、state の親 ID と prompt を正として binding する
+  {
+    const parentId = '16161616-1616-4161-8161-161616161616';
+    const runtimeId = '17171717-1717-4171-8171-171717171717';
+    const parentBase = setupChore(parentId);
+    const probe = '.cursor/hooks/_smoke-review-state-parent-probe.mjs';
+    const probeAbs = join(root, probe);
+    const derivedHome = mkdtempSync(join(smokeTmpRoot, 'review-state-parent-home-'));
+    const runtimeTranscriptsDir = mkdtempSync(join(smokeTmpRoot, 'review-state-parent-runtime-'));
+    const previousHome = process.env.HOME;
+    const previousOverride = process.env.CURSOR_GATE_TRANSCRIPTS_DIR;
+    process.env.HOME = derivedHome;
+    delete process.env.CURSOR_GATE_TRANSCRIPTS_DIR;
+    const workspaceTranscriptsDir = agentTranscriptsDir(root);
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    if (previousOverride === undefined) delete process.env.CURSOR_GATE_TRANSCRIPTS_DIR;
+    else process.env.CURSOR_GATE_TRANSCRIPTS_DIR = previousOverride;
+    mkdirSync(workspaceTranscriptsDir, { recursive: true });
+    writeFileSync(probeAbs, 'export const smokeStateParentProbe = 1;\n');
+    addIgnoredProbe(probe);
+
+    const task = run('track.mjs', {
+      ...parentBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Task',
+      tool_input: {
+        subagent_type: 'pre-commit-reviewer',
+        description: 'review state parent precedence',
+      },
+    });
+    const prompt = task.updated_input?.prompt;
+    writeParentTranscript(runtimeTranscriptsDir, prompt, parentId);
+    writeParentTranscript(runtimeTranscriptsDir, `${prompt} from another parent`, runtimeId);
+    const passPath = writeReviewerTranscript(
+      runtimeTranscriptsDir,
+      '20202020-2020-4020-8020-202020202020',
+      'REVIEW: PASS',
+      prompt,
+    );
+    const parentCommit = run(
+      'gate.mjs',
+      {
+        ...parentBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      {
+        CURSOR_GATE_TRANSCRIPTS_DIR: '',
+        CURSOR_TRANSCRIPT_PATH: transcriptPath(runtimeTranscriptsDir, runtimeId),
+        HOME: derivedHome,
+      },
+    );
+    const parentReview = loadState(root, parentId).review;
+    assert(
+      'state parent wins over polluted runtime path',
+      parentCommit.permission === 'allow' &&
+        parentReview.reviewerTranscriptId === '20202020-2020-4020-8020-202020202020' &&
+        parentReview.binding === REVIEW_BINDING_BOUND &&
+        existsSync(reviewPassUsedPath(passPath)),
+      JSON.stringify({ parentCommit, review: parentReview }),
+    );
+    try {
+      unlinkSync(probeAbs);
+      resetIgnoredProbe(probe);
+    } catch {
+      // 無ければ無視
+    }
+    rmSync(derivedHome, { recursive: true, force: true });
+    rmSync(runtimeTranscriptsDir, { recursive: true, force: true });
+  }
+
+  // sticky が無いイベントでは payload/env fallback を reviewer の親 identity に使わない
+  {
+    const noStickyId = '18181818-1818-4181-8181-181818181818';
+    const noStickyBase = setupChore(noStickyId);
+    const probe = '.cursor/hooks/_smoke-review-no-sticky-probe.mjs';
+    const probeAbs = join(root, probe);
+    const transcriptsDir = mkdtempSync(join(smokeTmpRoot, 'review-no-sticky-tx-'));
+    writeFileSync(probeAbs, 'export const smokeNoStickyProbe = 1;\n');
+    addIgnoredProbe(probe);
+    clearSticky();
+
+    const task = run('track.mjs', {
+      ...noStickyBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Task',
+      tool_input: {
+        subagent_type: 'pre-commit-reviewer',
+        description: 'review without sticky parent identity',
+      },
+    });
+    const prompt = task.updated_input?.prompt;
+    writeParentTranscript(transcriptsDir, prompt, noStickyId);
+    const passPath = writeReviewerTranscript(
+      transcriptsDir,
+      '19191919-1919-4191-8191-191919191919',
+      'REVIEW: PASS',
+      prompt,
+    );
+    const noStickyCommit = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...noStickyBase,
+        transcript_path: transcriptPath(transcriptsDir, noStickyId),
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
+    const noStickyReview = loadState(root, noStickyId).review;
+    assert(
+      'missing sticky parent identity blocks reviewer binding',
+      noStickyCommit.permission === 'deny' &&
+        noStickyReview.reviewerTranscriptId == null &&
+        noStickyReview.binding === REVIEW_BINDING_UNBOUND &&
+        !existsSync(reviewPassUsedPath(passPath)),
+      JSON.stringify({ noStickyCommit, review: noStickyReview }),
+    );
+    try {
+      unlinkSync(probeAbs);
+      resetIgnoredProbe(probe);
+    } catch {
+      // 無ければ無視
+    }
+  }
+
+  // resume で過去の prompt が残っていても、PASS直前の最新 prompt で binding する
+  {
+    const resumedId = '1a1a1a1a-1a1a-41a1-81a1-1a1a1a1a1a1a';
+    const resumedBase = setupChore(resumedId);
+    const probe = '.cursor/hooks/_smoke-review-resumed-probe.mjs';
+    const probeAbs = join(root, probe);
+    const transcriptsDir = mkdtempSync(join(smokeTmpRoot, 'review-resumed-tx-'));
+    writeFileSync(probeAbs, 'export const smokeResumedProbe = 1;\n');
+    addIgnoredProbe(probe);
+
+    const task = run('track.mjs', {
+      ...resumedBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Task',
+      tool_input: {
+        subagent_type: 'pre-commit-reviewer',
+        description: 'review resumed transcript',
+      },
+    });
+    const prompt = task.updated_input?.prompt;
+    const previousPrompt = `${prompt} from the initial invocation`;
+    writeParentTranscript(transcriptsDir, prompt, resumedId);
+    const passPath = writeReviewerTranscript(
+      transcriptsDir,
+      '1b1b1b1b-1b1b-41b1-81b1-1b1b1b1b1b1b',
+      'REVIEW: PASS',
+      prompt,
+      previousPrompt,
+    );
+    const resumedCommit = runWithTranscripts(
+      'gate.mjs',
+      {
+        ...resumedBase,
+        hook_event_name: 'beforeShellExecution',
+        command: 'git commit -m test',
+      },
+      transcriptsDir,
+    );
+    const resumedReview = loadState(root, resumedId).review;
+    assert(
+      'resumed reviewer uses the latest prompt before PASS',
+      resumedCommit.permission === 'allow' &&
+        resumedReview.reviewerTranscriptId === '1b1b1b1b-1b1b-41b1-81b1-1b1b1b1b1b1b' &&
+        resumedReview.binding === REVIEW_BINDING_BOUND &&
+        existsSync(reviewPassUsedPath(passPath)),
+      JSON.stringify({ resumedCommit, review: resumedReview }),
+    );
+    try {
+      unlinkSync(probeAbs);
+      resetIgnoredProbe(probe);
+    } catch {
+      // 無ければ無視
+    }
+  }
+
   // legacy review.files state は snapshot 未取得として再レビューを要求する
   {
     const legacyProbe = '.cursor/hooks/_smoke-review-legacy-state-probe.mjs';
     const legacyProbeAbs = join(root, legacyProbe);
     writeFileSync(legacyProbeAbs, 'export const smokeLegacyReviewProbe = 1;\n');
     addIgnoredProbe(legacyProbe);
+    run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
     run('track.mjs', {
       ...base,
       hook_event_name: 'beforeSubmitPrompt',
@@ -579,16 +964,14 @@ export function runReviewGate(smoke) {
 
   // stop も current snapshot が一致するときだけ PASS を消費する
   {
-    const stopId = 'review-stop-snapshot-id';
+    const stopId = 'afafafaf-afaf-4faf-8faf-afafafafafaf';
     const stopBase = setupChore(stopId);
     const probe = '.cursor/hooks/_smoke-review-stop-snapshot-probe.mjs';
     const probeAbs = join(root, probe);
     const transcriptsDir = mkdtempSync(join(smokeTmpRoot, 'review-stop-tx-'));
-    const runWithTranscripts = (script, payload) =>
-      run(script, payload, { CURSOR_GATE_TRANSCRIPTS_DIR: transcriptsDir });
     writeFileSync(probeAbs, 'export const smokeReviewStopProbe = 1;\n');
     addIgnoredProbe(probe);
-    run('track.mjs', {
+    const task = run('track.mjs', {
       ...stopBase,
       hook_event_name: 'preToolUse',
       tool_name: 'Task',
@@ -597,17 +980,23 @@ export function runReviewGate(smoke) {
         description: 'review before stop',
       },
     });
+    const prompt = task.updated_input?.prompt;
+    writeParentTranscript(transcriptsDir, prompt, stopId);
     const childPath = writeReviewerTranscript(
       transcriptsDir,
       'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
       'REVIEW: PASS',
+      prompt,
     );
-    captureReviewer(stopBase, childPath, transcriptsDir);
-    runWithTranscripts('track.mjs', {
-      ...stopBase,
-      hook_event_name: 'stop',
-      status: 'completed',
-    });
+    runWithTranscripts(
+      'track.mjs',
+      {
+        ...stopBase,
+        hook_event_name: 'stop',
+        status: 'completed',
+      },
+      transcriptsDir,
+    );
     const stopped = loadState(root, stopId);
     assert(
       'stop binds matching snapshot PASS',

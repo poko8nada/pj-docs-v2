@@ -9,6 +9,7 @@ export function runPhaseCore(smoke) {
     base,
     run,
     assert,
+    clearSticky,
     trackReadConventionsRef,
     trackReadIssueSkill,
     trackReadScope,
@@ -24,6 +25,7 @@ export function runPhaseCore(smoke) {
     join,
     workspaceRoot,
     collectReviewSnapshot,
+    saveState,
   } = smoke;
   // lib/ 移動後も payload 無しの root fallback がリポジトリ根を指すこと
   assert(
@@ -210,7 +212,7 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 6. track phase — 既存 discussion を work に更新（新規ファイルは増やさない）
+  // 6. scope 未確認の /work は phase を変えない
   {
     const nameBefore = findStateFileName(root, id);
     const out = run('track.mjs', {
@@ -220,18 +222,29 @@ export function runPhaseCore(smoke) {
     });
     assert('track-phase continue', out.continue === true, JSON.stringify(out));
     assert(
+      'track-phase asks for scope confirmation',
+      String(out.user_message ?? '').includes('/scope ok'),
+      JSON.stringify(out),
+    );
+    const outChore = run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore go',
+    });
+    assert(
+      'track-chore asks for scope confirmation',
+      String(outChore.user_message ?? '').includes('/scope ok'),
+      JSON.stringify(outChore),
+    );
+    assert(
       'same file after phase',
       findStateFileName(root, id) === nameBefore,
       findStateFileName(root, id),
     );
     const st = readState();
     assert(
-      'phase is work',
-      st.phase === 'work' &&
-        st.unlock.rules === false &&
-        st.unlock.issue === false &&
-        st.unlock.agenda === false &&
-        st.unlock.issueTemplate === undefined,
+      'phase stays discussion',
+      st.phase === 'discussion' && st.unlock.scope === false,
       JSON.stringify(st),
     );
   }
@@ -245,8 +258,8 @@ export function runPhaseCore(smoke) {
       tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert(
-      'phase-only Write deny is gate-scope',
-      out.permission === 'deny' && String(out.agent_message).includes('[gate-scope]'),
+      'phase-only Write deny names discussion phase',
+      out.permission === 'deny' && String(out.agent_message).includes('phase=discussion'),
       JSON.stringify(out),
     );
 
@@ -256,17 +269,99 @@ export function runPhaseCore(smoke) {
       command: 'pnpm install',
     });
     assert(
-      'phase-only pnpm install deny is gate-scope',
+      'phase-only pnpm install names discussion phase',
       outPnpmInstall.permission === 'deny' &&
-        String(outPnpmInstall.agent_message).includes('[gate-scope]'),
+        String(outPnpmInstall.agent_message).includes('phase=discussion'),
       JSON.stringify(outPnpmInstall),
     );
 
     trackReadScope(base);
     assert(
-      'scope Read opens scope',
-      loadState(root, id).unlock.scope === true,
+      'scope Read records skill but stays closed',
+      loadState(root, id).unlock.scope === false &&
+        loadState(root, id).read.skills?.includes('scope'),
       JSON.stringify(loadState(root, id)),
+    );
+
+    const outBeforeScopeOk = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
+    });
+    assert(
+      'scope Read Write deny remains discussion phase',
+      outBeforeScopeOk.permission === 'deny' &&
+        String(outBeforeScopeOk.agent_message).includes('phase=discussion'),
+      JSON.stringify(outBeforeScopeOk),
+    );
+
+    const unconfirmedId = 'unconfirmed-work-id';
+    const unconfirmedBase = { ...base, conversation_id: unconfirmedId };
+    run('track.mjs', {
+      ...unconfirmedBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: 'legacy state setup',
+    });
+    saveState(root, unconfirmedId, {
+      phase: 'work',
+      unlock: { rules: false, issue: false, agenda: false, scope: false },
+    });
+    const outUnconfirmedWork = run('gate.mjs', {
+      ...unconfirmedBase,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
+    });
+    assert(
+      'legacy unconfirmed work state is gate-scope',
+      outUnconfirmedWork.permission === 'deny' &&
+        String(outUnconfirmedWork.agent_message).includes('[gate-scope]') &&
+        String(outUnconfirmedWork.agent_message).includes('/scope ok'),
+      JSON.stringify(outUnconfirmedWork),
+    );
+
+    const outScopeOk = run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
+    assert(
+      'user scope ok opens scope',
+      outScopeOk.continue === true &&
+        loadState(root, id).phase === 'discussion' &&
+        loadState(root, id).unlock.scope === true,
+      JSON.stringify({ outScopeOk, state: loadState(root, id) }),
+    );
+
+    run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/work go',
+    });
+    assert(
+      'confirmed scope permits work phase',
+      loadState(root, id).phase === 'work' &&
+        loadState(root, id).unlock.scope === true &&
+        loadState(root, id).unlock.rules === false &&
+        loadState(root, id).unlock.agenda === false,
+      JSON.stringify(loadState(root, id)),
+    );
+    const workBeforeScopeOk = loadState(root, id);
+    const outScopeOkInWork = run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
+    const workAfterScopeOk = loadState(root, id);
+    assert(
+      'scope ok in work is rejected without changing state',
+      outScopeOkInWork.continue === true &&
+        String(outScopeOkInWork.user_message ?? '').includes('/discussion') &&
+        workAfterScopeOk.phase === workBeforeScopeOk.phase &&
+        workAfterScopeOk.unlock.scope === workBeforeScopeOk.unlock.scope &&
+        workAfterScopeOk.unlock.rules === workBeforeScopeOk.unlock.rules,
+      JSON.stringify({ outScopeOkInWork, workBeforeScopeOk, workAfterScopeOk }),
     );
 
     const outAfterScope = run('gate.mjs', {
@@ -276,7 +371,7 @@ export function runPhaseCore(smoke) {
       tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert(
-      'scope open Write deny is gate-agenda',
+      'confirmed scope Write deny is gate-agenda',
       outAfterScope.permission === 'deny' &&
         String(outAfterScope.agent_message).includes('[gate-agenda]') &&
         !String(outAfterScope.agent_message).includes('[gate-scope]'),
@@ -370,6 +465,36 @@ export function runPhaseCore(smoke) {
         String(outPnpmInstallRules.agent_message).includes('unlock.rules is not true'),
       JSON.stringify(outPnpmInstallRules),
     );
+
+    const choreScopeId = 'scope-ok-in-chore-id';
+    const choreScopeBase = { ...base, conversation_id: choreScopeId };
+    run('track.mjs', {
+      ...choreScopeBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
+    run('track.mjs', {
+      ...choreScopeBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/chore scope rejection',
+    });
+    const choreBeforeScopeOk = loadState(root, choreScopeId);
+    const outScopeOkInChore = run('track.mjs', {
+      ...choreScopeBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
+    const choreAfterScopeOk = loadState(root, choreScopeId);
+    assert(
+      'scope ok in chore is rejected without changing state',
+      outScopeOkInChore.continue === true &&
+        String(outScopeOkInChore.user_message ?? '').includes('/discussion') &&
+        choreAfterScopeOk.phase === choreBeforeScopeOk.phase &&
+        choreAfterScopeOk.unlock.scope === choreBeforeScopeOk.unlock.scope &&
+        choreAfterScopeOk.unlock.rules === choreBeforeScopeOk.unlock.rules,
+      JSON.stringify({ outScopeOkInChore, choreBeforeScopeOk, choreAfterScopeOk }),
+    );
+    clearSticky();
   }
 
   // 7b. issue handshake — skill Read, template Read, then gh issue write
@@ -421,6 +546,7 @@ export function runPhaseCore(smoke) {
 
   // 8. discussion 中の rules スキル実行はフラグを立てない／Write 不可
   {
+    saveState(root, id, { label: 'scope-test' });
     run('track.mjs', {
       ...base,
       hook_event_name: 'beforeSubmitPrompt',
@@ -439,6 +565,7 @@ export function runPhaseCore(smoke) {
       JSON.stringify(st),
     );
     assert('discussion closes scope', st.unlock.scope === false, JSON.stringify(st));
+    assert('discussion clears label', st.label === '', JSON.stringify(st));
     const out2 = run('gate.mjs', {
       ...base,
       hook_event_name: 'preToolUse',
@@ -461,6 +588,7 @@ export function runPhaseCore(smoke) {
 
   // work のあと scope + agenda + rules スキル実行で解禁
   {
+    run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/scope ok' });
     run('track.mjs', { ...base, hook_event_name: 'beforeSubmitPrompt', prompt: '/work go' });
     trackReadScope(base);
     trackReadAgenda(base);
@@ -583,6 +711,11 @@ export function runPhaseCore(smoke) {
   {
     const persistId = 'review-persist-id';
     const persistBase = { conversation_id: persistId, workspace_roots: [root], cwd: root };
+    run('track.mjs', {
+      ...persistBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
     run('track.mjs', {
       ...persistBase,
       hook_event_name: 'beforeSubmitPrompt',
@@ -749,6 +882,7 @@ export function runRulesUnlock(smoke) {
   {
     const readId = 'pretooluse-read-id';
     const readBase = { conversation_id: readId, workspace_roots: [root], cwd: root };
+    run('track.mjs', { ...readBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/scope ok' });
     run('track.mjs', { ...readBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/work go' });
     const out = run('track.mjs', {
       ...readBase,
@@ -769,6 +903,7 @@ export function runRulesUnlock(smoke) {
   {
     const readId = 'pretooluse-readfile-id';
     const readBase = { conversation_id: readId, workspace_roots: [root], cwd: root };
+    run('track.mjs', { ...readBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/scope ok' });
     run('track.mjs', { ...readBase, hook_event_name: 'beforeSubmitPrompt', prompt: '/chore go' });
     run('track.mjs', {
       ...readBase,

@@ -27,6 +27,11 @@ export function runReadRefs(smoke) {
     run('track.mjs', {
       ...refsBase,
       hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
+    run('track.mjs', {
+      ...refsBase,
+      hook_event_name: 'beforeSubmitPrompt',
       prompt: '/chore refs test',
     });
     trackRead(refsBase, '.cursor/skills/scope/SKILL.md');
@@ -151,6 +156,11 @@ export function runIssueHeredoc(smoke) {
       workspace_roots: [root],
       cwd: root,
     };
+    run('track.mjs', {
+      ...heredocBase,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/scope ok',
+    });
     run('track.mjs', {
       ...heredocBase,
       hook_event_name: 'beforeSubmitPrompt',

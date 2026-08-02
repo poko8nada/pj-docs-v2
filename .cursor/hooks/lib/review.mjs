@@ -41,8 +41,6 @@ export function denyReviewMessage(snapshot, review) {
     reason = `Current Git snapshot differs from the reviewer snapshot: ${list}.`;
   } else if (review?.binding === 'bound') {
     reason = 'The current Git snapshot already has a bound reviewer PASS.';
-  } else if (review.reviewerTranscriptId) {
-    reason = 'The recorded reviewer transcript does not end with `REVIEW: PASS`.';
   } else {
     reason = 'No verified reviewer PASS is bound to the current Git snapshot yet.';
   }
@@ -345,11 +343,12 @@ export function commandIncludesGitCommit(command) {
 }
 
 /**
- * agent-transcripts 置き場。
- * 実行時の transcript path から解決する。テストは
- * CURSOR_GATE_TRANSCRIPTS_DIR で上書きする。
+ * agent-transcripts の候補ディレクトリを返す。
+ * workspace からの導出を優先し、runtime transcript path は位置解決の
+ * fallback としてだけ使う。runtime path は親の identity には使わない。
+ * テストは CURSOR_GATE_TRANSCRIPTS_DIR で上書きする。
  */
-export function transcriptRootFromPath(transcriptPath) {
+function transcriptRootFromPath(transcriptPath) {
   if (!transcriptPath || typeof transcriptPath !== 'string') return null;
   const abs = resolve(transcriptPath);
   const id = idFromTranscriptPath(abs);
@@ -357,159 +356,212 @@ export function transcriptRootFromPath(transcriptPath) {
   return dirname(dirname(abs));
 }
 
-export function agentTranscriptsDir() {
+function cursorProjectSlug(root) {
+  return String(root)
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+export function agentTranscriptsDirs(root = null) {
   const override = process.env.CURSOR_GATE_TRANSCRIPTS_DIR;
-  if (override && String(override).trim()) return resolve(String(override).trim());
-  return transcriptRootFromPath(process.env.CURSOR_TRANSCRIPT_PATH);
-}
+  if (override && String(override).trim()) return [resolve(String(override).trim())];
 
-function transcriptPathFromId(transcriptId) {
-  const dir = agentTranscriptsDir();
-  const id = idFromTranscriptPath(transcriptId);
-  if (!dir || !id) return null;
-  return join(dir, id, `${id}.jsonl`);
-}
-
-/**
- * 子 agent の hook payload から reviewer transcript を特定する。
- * 親 state の id は sticky で解決済みなので、child id と比較して親イベントを除外する。
- */
-export function reviewerTranscriptIdFromPayload(root, payload, parentId) {
-  const path = transcriptPathFromPath(payload?.transcript_path);
-  const childId = path ? idFromTranscriptPath(path) : null;
-  if (!path || !childId || childId === String(parentId)) return null;
-  if (!existsSync(path)) return null;
-
-  let text;
-  try {
-    text = readFileSync(path, 'utf8');
-  } catch {
-    return null;
+  const dirs = [];
+  const home = process.env.HOME || '';
+  if (root && home) {
+    dirs.push(join(home, '.cursor', 'projects', cursorProjectSlug(root), 'agent-transcripts'));
   }
-  if (!isReviewerTranscriptText(root, text)) return null;
-  return childId;
+
+  const runtimeDir = transcriptRootFromPath(process.env.CURSOR_TRANSCRIPT_PATH);
+  if (runtimeDir) dirs.push(runtimeDir);
+
+  return [...new Set(dirs)];
 }
 
-function transcriptPathFromPath(transcriptPath) {
-  if (!transcriptPath || typeof transcriptPath !== 'string') return null;
-  const abs = resolve(transcriptPath);
-  return transcriptRootFromPath(abs) ? abs : null;
+export function agentTranscriptsDir(root = null) {
+  return agentTranscriptsDirs(root)[0] ?? null;
 }
 
-/** 本文中の最後の `REVIEW: PASS|GAPS`（大文字化）。無ければ null */
+function transcriptPathFromId(transcriptId, root = null) {
+  const id = idFromTranscriptPath(transcriptId);
+  if (!id) return null;
+  for (const dir of agentTranscriptsDirs(root)) {
+    const path = join(dir, id, `${id}.jsonl`);
+    if (existsSync(path)) return path;
+  }
+  return null;
+}
+
+/** 最後の assistant message にある `REVIEW: PASS|GAPS`（大文字化）。 */
 export function lastReviewVerdict(text) {
-  // JSONL 生文字列では改行が `\n` エスケープのため、先頭 `\b` は使わない
+  const assistantTexts = jsonlRecords(text)
+    .filter((record) => record?.role === 'assistant')
+    .map((record) => textFromContent(record.message?.content))
+    .filter(Boolean);
+  const source = assistantTexts.at(-1) ?? '';
   const re = /REVIEW:\s*(PASS|GAPS)\b/gi;
   let last = null;
   let m;
-  while ((m = re.exec(String(text ?? ''))) !== null) {
+  while ((m = re.exec(source)) !== null) {
     last = m[1].toUpperCase();
   }
   return last;
 }
 
+/** JSONL を parse し、壊れた行を除外して返す。 */
+function jsonlRecords(text) {
+  const records = [];
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      records.push(JSON.parse(line));
+    } catch {
+      // 壊れた行は候補判定に使わず、残りの JSONL を調べる。
+    }
+  }
+  return records;
+}
+
+function textFromContent(content) {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((item) => item && typeof item === 'object' && item.type === 'text')
+      .map((item) => String(item.text ?? ''))
+      .join('\n');
+  }
+  if (content && typeof content === 'object' && typeof content.text === 'string') {
+    return content.text;
+  }
+  return '';
+}
+
 /**
- * 子 transcript がこの workspace の pre-commit reviewer 試行か（verdict は見ない）。
- * - 絶対 path 必須
- * - 署名: `pre-commit-reviewer` / `[harness-review]` / (`Full Repository Path:` + `Diff:`)
+ * 最終 assistant message の直前にある最後の user prompt を返す。
+ * fresh 起動と resume 継続のどちらでも、今回の review 依頼を比較対象にする。
  */
-export function isReviewerTranscriptText(root, text) {
+function lastUserPromptBeforeFinalAssistant(text) {
+  const records = jsonlRecords(text);
+  let finalAssistantIndex = -1;
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    if (records[index]?.role === 'assistant') {
+      finalAssistantIndex = index;
+      break;
+    }
+  }
+  if (finalAssistantIndex < 0) return null;
+
+  for (let index = finalAssistantIndex - 1; index >= 0; index -= 1) {
+    if (records[index]?.role !== 'user') continue;
+    const prompt = textFromContent(records[index].message?.content);
+    if (prompt.trim()) return prompt;
+  }
+  return null;
+}
+
+function normalizePrompt(text) {
   const body = String(text ?? '');
-  const rootAbs = resolve(root);
-  if (!body.includes(rootAbs)) return false;
-
-  const hasType = /\bpre-commit-reviewer\b/i.test(body);
-  const hasHarness = body.includes(REVIEW_INJECT_MARKER);
-  // JSONL 生文字列では `\nDiff:` となり `\bDiff` が失敗するため単語境界は使わない
-  const hasPromptShape = /Full Repository Path:/i.test(body) && /Diff:/i.test(body);
-  return hasType || hasHarness || hasPromptShape;
+  const match = body.match(/<user_query>\s*([\s\S]*?)\s*<\/user_query>/i);
+  return (match ? match[1] : body).replace(/\s+/g, ' ').trim();
 }
 
-/** reviewer 試行かつ最終 verdict が PASS */
-export function isReviewPassTranscriptText(root, text) {
-  return isReviewerTranscriptText(root, text) && lastReviewVerdict(text) === 'PASS';
-}
+function lastSubagentPrompt(text) {
+  const prompts = [];
 
-/**
- * state に保存された reviewer transcript ID を優先して直接確認する。
- * ID が未保存の場合だけ、snapshotAt 以降の runtime transcript を fallback 走査する。
- * @returns {string | null}
- */
-export function findReviewPassTranscript(
-  root,
-  excludeId = null,
-  reviewerTranscriptId = null,
-  snapshotAt = null,
-) {
-  if (reviewerTranscriptId) {
-    const path = transcriptPathFromId(reviewerTranscriptId);
-    return path ? readPassTranscript(root, path, excludeId) : null;
+  function visit(value) {
+    if (!value || typeof value !== 'object') return;
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+
+    const type = String(value.type ?? '').toLowerCase();
+    const name = String(value.name ?? '').toLowerCase();
+    if (type === 'tool_use' && (name === 'subagent' || name === 'task')) {
+      const input = value.input ?? value.tool_input ?? {};
+      const prompt = input.prompt ?? input.description ?? input.task;
+      if (typeof prompt === 'string' && prompt.trim()) prompts.push(prompt);
+    }
+
+    if (String(value.tool_name ?? '').toLowerCase() === 'task') {
+      const input = value.tool_input ?? {};
+      const prompt = input.prompt ?? input.description ?? input.task;
+      if (typeof prompt === 'string' && prompt.trim()) prompts.push(prompt);
+    }
+
+    for (const child of Object.values(value)) visit(child);
   }
 
+  for (const record of jsonlRecords(text)) visit(record);
+  return prompts.at(-1) ?? null;
+}
+
+function readTranscript(path) {
+  if (!path) return null;
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+function parentTranscriptInfo(root, parentId) {
+  const path = transcriptPathFromId(parentId, root);
+  if (!path) return null;
+  const prompt = normalizePrompt(lastSubagentPrompt(readTranscript(path)));
+  if (!prompt) return null;
+  return { path, prompt };
+}
+
+/**
+ * snapshotAt 以降の PASS 候補と、親 transcript の最後の Subagent prompt を
+ * whitespace-normalize して照合する。署名の推測や mtime 順の勝手な選択はせず、
+ * 一意に一致した場合だけ path を返す。
+ */
+export function findReviewPassTranscript(root, parentId = null, snapshotAt = null) {
   const snapshotAtMs = Date.parse(String(snapshotAt ?? ''));
   if (!Number.isFinite(snapshotAtMs)) return null;
 
-  const dir = agentTranscriptsDir();
-  if (!dir || !existsSync(dir)) return null;
+  const parent = parentTranscriptInfo(root, parentId);
+  if (!parent) return null;
 
-  let names;
-  try {
-    names = readdirSync(dir);
-  } catch {
-    return null;
-  }
+  const excludedIds = new Set(
+    [parentId, idFromTranscriptPath(parent.path)].filter((value) => value),
+  );
+  const matches = [];
 
-  /** @type {{ mtimeMs: number, jsonl: string, text: string } | null} */
-  let latest = null;
+  for (const dir of agentTranscriptsDirs(root)) {
+    if (!existsSync(dir)) continue;
 
-  for (const name of names) {
-    if (excludeId && name === excludeId) continue;
-    const jsonl = join(dir, name, `${name}.jsonl`);
-    if (!existsSync(jsonl)) continue;
-    if (isReviewPassUsed(jsonl)) continue;
-
-    let st;
+    let names;
     try {
-      st = statSync(jsonl);
+      names = readdirSync(dir);
     } catch {
       continue;
     }
-    if (st.mtimeMs < snapshotAtMs) continue;
-    let text;
-    try {
-      text = readFileSync(jsonl, 'utf8');
-    } catch {
-      continue;
-    }
-    if (!isReviewerTranscriptText(root, text)) continue;
 
-    if (!latest || st.mtimeMs >= latest.mtimeMs) {
-      latest = { mtimeMs: st.mtimeMs, jsonl, text };
+    for (const name of names) {
+      const jsonl = join(dir, name, `${name}.jsonl`);
+      const candidateId = idFromTranscriptPath(jsonl);
+      if (!candidateId || excludedIds.has(candidateId) || !existsSync(jsonl)) continue;
+      if (isReviewPassUsed(jsonl)) continue;
+
+      let st;
+      try {
+        st = statSync(jsonl);
+      } catch {
+        continue;
+      }
+      if (st.mtimeMs < snapshotAtMs) continue;
+
+      const text = readTranscript(jsonl);
+      if (lastReviewVerdict(text) !== 'PASS') continue;
+      if (normalizePrompt(lastUserPromptBeforeFinalAssistant(text)) !== parent.prompt) continue;
+      matches.push({ jsonl, mtimeMs: st.mtimeMs });
     }
   }
 
-  if (!latest) return null;
-  if (lastReviewVerdict(latest.text) !== 'PASS') return null;
-  return latest.jsonl;
-}
-
-function readPassTranscript(root, transcriptPath, excludeId = null) {
-  const jsonl = transcriptPathFromPath(transcriptPath);
-  if (!jsonl) return null;
-
-  const id = idFromTranscriptPath(jsonl);
-  if (excludeId && id === excludeId) return null;
-  if (isReviewPassUsed(jsonl)) return null;
-
-  let text;
-  try {
-    text = readFileSync(jsonl, 'utf8');
-  } catch {
-    return null;
-  }
-  if (!isReviewerTranscriptText(root, text)) return null;
-  if (lastReviewVerdict(text) !== 'PASS') return null;
-  return jsonl;
+  return matches.length === 1 ? matches[0].jsonl : null;
 }
 
 /** jsonl 隣の使い済みフラグ path（`<id>.jsonl` → `<id>.harness-pass-used`） */
