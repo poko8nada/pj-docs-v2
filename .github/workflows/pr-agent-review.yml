@@ -13,18 +13,152 @@ permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  group: pr-agent-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   review:
     if: ${{ github.event.sender.type != 'Bot' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Run PR Agent
-        # v0.38.0 のリリースコミットに固定する
-        uses: The-PR-Agent/pr-agent@bd09b6cf89c6d6f3d16b159fa7603fa0e7768cf2
+      # モデル選択とfallbackをWorkflowで固定し、mainのTomlを検証経路から外す
+      - name: Run PR Agent — GPT-OSS 120B
+        id: gpt_oss_120b
+        timeout-minutes: 3
+        continue-on-error: true
+        uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          openrouter__key: ${{ secrets.OPENROUTER_API_KEY }}
-          github_action_config.auto_review: 'true'
-          github_action_config.auto_describe: 'false'
-          github_action_config.auto_improve: 'false'
-          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "synchronize"]'
+          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CONFIG__MODEL: 'openrouter/openai/gpt-oss-120b'
+          CONFIG__FALLBACK_MODELS: '[]'
+          CONFIG__AI_TIMEOUT: '60'
+          CONFIG__MAX_MODEL_TOKENS: '32000'
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: '32000'
+          CONFIG__REASONING_EFFORT: 'low'
+          OPENROUTER__REASONING_EFFORT: 'low'
+          CONFIG__PUBLISH_OUTPUT_PROGRESS: 'false'
+          GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
+          GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: 'false'
+          GITHUB_ACTION_CONFIG__AUTO_IMPROVE: 'false'
+          GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
+          PR_REVIEWER__PERSISTENT_COMMENT: 'true'
+          PR_REVIEWER__FINAL_UPDATE_MESSAGE: 'false'
+
+      - name: Run PR Agent — Qwen3 Coder 30B
+        id: qwen3_coder_30b
+        if: ${{ steps.gpt_oss_120b.outcome != 'success' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CONFIG__MODEL: 'openrouter/qwen/qwen3-coder-30b-a3b-instruct'
+          CONFIG__FALLBACK_MODELS: '[]'
+          CONFIG__AI_TIMEOUT: '60'
+          CONFIG__MAX_MODEL_TOKENS: '32000'
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: '32000'
+          CONFIG__REASONING_EFFORT: 'low'
+          OPENROUTER__REASONING_EFFORT: 'none'
+          CONFIG__PUBLISH_OUTPUT_PROGRESS: 'false'
+          GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
+          GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: 'false'
+          GITHUB_ACTION_CONFIG__AUTO_IMPROVE: 'false'
+          GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
+          PR_REVIEWER__PERSISTENT_COMMENT: 'true'
+          PR_REVIEWER__FINAL_UPDATE_MESSAGE: 'false'
+
+      - name: Run PR Agent — Qwen3 235B A22B
+        id: qwen3_235b
+        if: ${{ steps.qwen3_coder_30b.outcome != 'success' }}
+        timeout-minutes: 4
+        continue-on-error: true
+        uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CONFIG__MODEL: 'openrouter/qwen/qwen3-235b-a22b-2507'
+          CONFIG__FALLBACK_MODELS: '[]'
+          CONFIG__AI_TIMEOUT: '60'
+          CONFIG__MAX_MODEL_TOKENS: '32000'
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: '32000'
+          CONFIG__REASONING_EFFORT: 'low'
+          OPENROUTER__REASONING_EFFORT: 'none'
+          CONFIG__PUBLISH_OUTPUT_PROGRESS: 'false'
+          GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
+          GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: 'false'
+          GITHUB_ACTION_CONFIG__AUTO_IMPROVE: 'false'
+          GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
+          PR_REVIEWER__PERSISTENT_COMMENT: 'true'
+          PR_REVIEWER__FINAL_UPDATE_MESSAGE: 'false'
+
+      - name: Run PR Agent — Mistral Small 3.2
+        id: mistral_small_32
+        if: ${{ steps.qwen3_235b.outcome != 'success' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CONFIG__MODEL: 'openrouter/mistralai/mistral-small-3.2-24b-instruct'
+          CONFIG__FALLBACK_MODELS: '[]'
+          CONFIG__AI_TIMEOUT: '60'
+          CONFIG__MAX_MODEL_TOKENS: '32000'
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: '32000'
+          CONFIG__REASONING_EFFORT: 'low'
+          OPENROUTER__REASONING_EFFORT: 'none'
+          CONFIG__PUBLISH_OUTPUT_PROGRESS: 'false'
+          GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
+          GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: 'false'
+          GITHUB_ACTION_CONFIG__AUTO_IMPROVE: 'false'
+          GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
+          PR_REVIEWER__PERSISTENT_COMMENT: 'true'
+          PR_REVIEWER__FINAL_UPDATE_MESSAGE: 'false'
+
+      - name: Run PR Agent — GPT-5.6 Luna fallback
+        id: gpt_56_luna
+        if: ${{ steps.mistral_small_32.outcome != 'success' }}
+        timeout-minutes: 3
+        continue-on-error: true
+        uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CONFIG__MODEL: 'openrouter/openai/gpt-5.6-luna'
+          CONFIG__FALLBACK_MODELS: '[]'
+          CONFIG__AI_TIMEOUT: '60'
+          CONFIG__MAX_MODEL_TOKENS: '32000'
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: '32000'
+          CONFIG__REASONING_EFFORT: 'low'
+          OPENROUTER__REASONING_EFFORT: 'low'
+          CONFIG__PUBLISH_OUTPUT_PROGRESS: 'false'
+          GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
+          GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: 'false'
+          GITHUB_ACTION_CONFIG__AUTO_IMPROVE: 'false'
+          GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
+          PR_REVIEWER__PERSISTENT_COMMENT: 'true'
+          PR_REVIEWER__FINAL_UPDATE_MESSAGE: 'false'
+
+      - name: Fail if all models fail
+        if: ${{ always() }}
+        env:
+          GPT_OSS_OUTCOME: ${{ steps.gpt_oss_120b.outcome }}
+          QWEN3_CODER_OUTCOME: ${{ steps.qwen3_coder_30b.outcome }}
+          QWEN3_235B_OUTCOME: ${{ steps.qwen3_235b.outcome }}
+          MISTRAL_OUTCOME: ${{ steps.mistral_small_32.outcome }}
+          LUNA_OUTCOME: ${{ steps.gpt_56_luna.outcome }}
+        run: |
+          if [[ "$GPT_OSS_OUTCOME" == "success" ||
+                "$QWEN3_CODER_OUTCOME" == "success" ||
+                "$QWEN3_235B_OUTCOME" == "success" ||
+                "$MISTRAL_OUTCOME" == "success" ||
+                "$LUNA_OUTCOME" == "success" ]]; then
+            exit 0
+          fi
+
+          echo "::error::PR-Agent failed or timed out for every configured model."
+          exit 1
