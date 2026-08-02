@@ -1,16 +1,13 @@
 ---
 name: scope
 description: >-
-  Establish a provisional Theme / In / Out and let the user confirm it with `/scope ok`.
-  Use when session focus must be proposed, confirmed, or unlock.scope is not open.
-  Reading this file does not confirm focus. Close: `/discussion`.
+  Proposes and confirms a session Theme / In / Out so discussion and later edits share explicit boundaries. Use when a focus is new, unclear, changing, or not yet user-confirmed. Do not use for task sequencing or file edits; only the user’s `/scope ok` opens unlock.scope. Close: `/discussion`.
 ---
 
 # scope
 
 Make the session focus explicit so discussion can continue in a shared direction.
-Only the user's `/scope ok` confirms the focus and opens `unlock.scope`; reading this
-file or agreeing in prose does not do so.
+Only the user's `/scope ok` confirms the focus and opens `unlock.scope`; reading this file or agreeing in prose does not do so.
 
 ## Steps
 
@@ -29,6 +26,15 @@ node .cursor/skills/scope/scripts/set-label.mjs <label>
 - Smoke: `node .cursor/skills/scope/scripts/set-label.smoke.mjs`
 
 5. Same Theme continuing → do not re-dump every turn. Continue discussion after confirmation when more decisions are needed. Close is `/discussion` only; it clears `unlock.scope` and `label`.
+
+## Produces
+
+- A Theme with optional In / Out boundaries; after user confirmation, `unlock.scope=true` and the session label.
+
+## Handoff
+
+- `discussion` while the focus is being refined.
+- User-owned `/work` or `/chore` after the focus is confirmed.
 
 ## Format
 

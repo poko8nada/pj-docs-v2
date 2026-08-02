@@ -1,8 +1,7 @@
 ---
 name: foundation
 description: >-
-  Soft skill: lock look via disposable Vite HTML workshop in cmux; build to findings/foundation/<slug>.html.
-  Use for Discover Look (or Build re-lock). Commands: scripts/dev.mjs, build.mjs, reset.mjs.
+  Locks visual direction through a disposable Vite/HTML workshop in cmux so a reviewed look can be persisted as a findings artifact. Use for Discover Look or an intentional Build visual re-lock. Do not use for ordinary product implementation or an empty workshop; use the bundled scripts and write the durable result to findings/foundation/.
 ---
 
 # foundation

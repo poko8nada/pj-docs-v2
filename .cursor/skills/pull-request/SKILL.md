@@ -1,6 +1,6 @@
 ---
 name: pull-request
-description: Creates GitHub pull requests with the repository's PR-Agent workflow, checks the OPENROUTER_API_KEY repository secret, and registers it from the local environment when needed. Use when creating or updating a pull request in this repository.
+description: Creates or updates a GitHub pull request and verifies this repository's PR-Agent workflow so completed changes can be reviewed. Use when the user explicitly asks to create or update a pull request in this repository. Do not use for ordinary commits, review-only inspection, or unrequested secret registration.
 ---
 
 # Pull Request

@@ -1,8 +1,7 @@
 ---
 name: grain
 description: >-
-  Soft skill: define/audit/brief surface character via style axes; write findings/grain/.
-  Use mainly on Build surfaces (Discover lightly if needed).
+  Defines, audits, or briefs surface character through style axes so product surfaces share a coherent visual language. Use when a Build surface needs visual direction, a look needs auditing, or an agreed grain needs a new brief. Do not use for product code edits or isolated palette/font selection; write outputs to findings/grain/.
 ---
 
 # grain
