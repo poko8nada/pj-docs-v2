@@ -73,7 +73,7 @@ jobs:
 
       - name: Run PR Agent — Qwen3 235B A22B
         id: qwen3_235b
-        if: ${{ steps.qwen3_coder_30b.outcome != 'success' }}
+        if: ${{ steps.gpt_oss_120b.outcome != 'success' && steps.qwen3_coder_30b.outcome != 'success' }}
         timeout-minutes: 4
         continue-on-error: true
         uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
@@ -97,7 +97,7 @@ jobs:
 
       - name: Run PR Agent — Mistral Small 3.2
         id: mistral_small_32
-        if: ${{ steps.qwen3_235b.outcome != 'success' }}
+        if: ${{ steps.gpt_oss_120b.outcome != 'success' && steps.qwen3_coder_30b.outcome != 'success' && steps.qwen3_235b.outcome != 'success' }}
         timeout-minutes: 3
         continue-on-error: true
         uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
@@ -121,7 +121,7 @@ jobs:
 
       - name: Run PR Agent — GPT-5.6 Luna fallback
         id: gpt_56_luna
-        if: ${{ steps.mistral_small_32.outcome != 'success' }}
+        if: ${{ steps.gpt_oss_120b.outcome != 'success' && steps.qwen3_coder_30b.outcome != 'success' && steps.qwen3_235b.outcome != 'success' && steps.mistral_small_32.outcome != 'success' }}
         timeout-minutes: 3
         continue-on-error: true
         uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
