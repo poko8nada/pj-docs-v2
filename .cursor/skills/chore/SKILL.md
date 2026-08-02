@@ -1,28 +1,31 @@
 ---
 name: chore
 description: >-
-  Small harness/meta/typo edits. Use when the user invokes /chore.
+  Non-product harness, meta, tooling, documentation, and non-functional product-adjacent maintenance work, such as typos, copy, formatting, or behavior-preserving cleanup. Use when the user invokes /chore.
+  For a bounded concern with multiple steps, optionally use the chore agenda.
   Not for Goal/Discover/Build (/work) or session direction (discussion).
 disable-model-invocation: true
 ---
 
 # chore
 
-One bounded concern. No Goal / Discover / Build track.
+One bounded maintenance concern; it may touch product files, be large, and span multiple slices. No product behavior, capability, or contract change.
+No Goal / Discover / Build track.
 
 ## Steps
 
 1. If `unlock.scope` is not true → run `scope` (thin Theme OK). State the touch list. Re-dump Theme only if boundaries shifted.
 2. Unclear ask → agree Theme / In / Out via `scope` before editing. Vague “fix stuff” → stop.
-3. Product work → name `/work` (or `/discussion`). Scope creep → stop, restate touch list, or name `/discussion`.
-4. Before edits → `rules` + matching `rules/references/*`.
-5. Issues only if asked → `issue`.
+3. If the bounded concern needs multiple steps or choices, read `agenda` and `agenda/references/chore.md`; otherwise skip it. Stop for user agreement before editing.
+4. A behavior, capability, user-interaction, data/API contract, or Goal/Discover/Build change is product work → name `/work` (or `/discussion`). Scope creep → stop, restate the touch list, or name `/discussion`.
+5. Before edits → `rules` + matching `rules/references/*`.
+6. Issues only if asked → `issue`.
 
-Edits need `unlock.scope` then `unlock.rules`.
+Edits need `unlock.scope` then `unlock.rules`. Chore agenda planning does not open `unlock.agenda`.
 
 ## Limits
 
-- One concern per sitting.
+- One coherent concern per sitting; use the agenda when it has multiple slices.
 - Do not grow Discover/Build product work here.
 
-Hand off: `scope` / `issue` / `rules`.
+Hand off: `scope` / `agenda` / `issue` / `rules`.

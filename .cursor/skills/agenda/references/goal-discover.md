@@ -6,7 +6,7 @@ Build-stage product work → `build.md` (softs are still allowed there).
 
 Slice table and fills → parent `agenda/SKILL.md`.
 
-## Inventory sources
+## Context sources
 
 - Open `[Goal]` / `[Discover]` bodies (overview + why + agreed)
 - Soft comments (`## soft: …`) and cited `findings/` paths
