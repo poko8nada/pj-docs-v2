@@ -21,144 +21,54 @@ jobs:
   review:
     if: ${{ github.event.sender.type != 'Bot' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      # モデル選択とfallbackをWorkflowで固定し、mainのTomlを検証経路から外す
-      - name: Run PR Agent — GPT-OSS 120B
-        id: gpt_oss_120b
-        timeout-minutes: 3
-        continue-on-error: true
+      # mainのTomlを変更せず、モデル順とレビュー形式をWorkflowで検証する
+      - name: Run PR Agent
+        id: pragent
         uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CONFIG__MODEL: 'openrouter/openai/gpt-oss-120b'
-          CONFIG__FALLBACK_MODELS: '[]'
+          CONFIG__FALLBACK_MODELS: '["openrouter/qwen/qwen3-coder-30b-a3b-instruct", "openrouter/qwen/qwen3-235b-a22b-2507", "openrouter/mistralai/mistral-small-3.2-24b-instruct", "openrouter/openai/gpt-5.6-luna"]'
           CONFIG__AI_TIMEOUT: '60'
           CONFIG__MAX_MODEL_TOKENS: '32000'
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: '32000'
           CONFIG__REASONING_EFFORT: 'low'
           OPENROUTER__REASONING_EFFORT: 'low'
+          CONFIG__RESPONSE_LANGUAGE: 'ja-JP'
           CONFIG__PUBLISH_OUTPUT_PROGRESS: 'false'
           GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
           GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: 'false'
           GITHUB_ACTION_CONFIG__AUTO_IMPROVE: 'false'
           GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
-          PR_REVIEWER__PERSISTENT_COMMENT: 'true'
+          PR_REVIEWER__PERSISTENT_COMMENT: 'false'
           PR_REVIEWER__FINAL_UPDATE_MESSAGE: 'false'
+          PR_REVIEWER__ENABLE_INTRO_TEXT: 'false'
+          PR_REVIEWER__ENABLE_HELP_TEXT: 'false'
+          PR_REVIEWER__REQUIRE_TESTS_REVIEW: 'true'
+          PR_REVIEWER__REQUIRE_SECURITY_REVIEW: 'true'
+          PR_REVIEWER__REQUIRE_ESTIMATE_EFFORT_TO_REVIEW: 'false'
+          PR_REVIEWER__REQUIRE_TICKET_ANALYSIS_REVIEW: 'false'
+          PR_REVIEWER__REQUIRE_CAN_BE_SPLIT_REVIEW: 'false'
+          PR_REVIEWER__REQUIRE_ESTIMATE_CONTRIBUTION_TIME_COST: 'false'
+          PR_REVIEWER__NUM_MAX_FINDINGS: '3'
+          PR_REVIEWER__EXTRA_INSTRUCTIONS: |
+            必ず日本語で回答してください。
+            標準のHTML表形式の導入文、推定工数、一般的なレビューガイドは出力しないでください。
+            次のMarkdown形式で簡潔に出力してください。
 
-      - name: Run PR Agent — Qwen3 Coder 30B
-        id: qwen3_coder_30b
-        if: ${{ steps.gpt_oss_120b.outcome != 'success' }}
-        timeout-minutes: 3
-        continue-on-error: true
-        uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          CONFIG__MODEL: 'openrouter/qwen/qwen3-coder-30b-a3b-instruct'
-          CONFIG__FALLBACK_MODELS: '[]'
-          CONFIG__AI_TIMEOUT: '60'
-          CONFIG__MAX_MODEL_TOKENS: '32000'
-          CONFIG__CUSTOM_MODEL_MAX_TOKENS: '32000'
-          CONFIG__REASONING_EFFORT: 'low'
-          OPENROUTER__REASONING_EFFORT: 'none'
-          CONFIG__PUBLISH_OUTPUT_PROGRESS: 'false'
-          GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
-          GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: 'false'
-          GITHUB_ACTION_CONFIG__AUTO_IMPROVE: 'false'
-          GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
-          PR_REVIEWER__PERSISTENT_COMMENT: 'true'
-          PR_REVIEWER__FINAL_UPDATE_MESSAGE: 'false'
+            ## 結論
+            要対応、または指摘なし
 
-      - name: Run PR Agent — Qwen3 235B A22B
-        id: qwen3_235b
-        if: ${{ steps.gpt_oss_120b.outcome != 'success' && steps.qwen3_coder_30b.outcome != 'success' }}
-        timeout-minutes: 4
-        continue-on-error: true
-        uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          CONFIG__MODEL: 'openrouter/qwen/qwen3-235b-a22b-2507'
-          CONFIG__FALLBACK_MODELS: '[]'
-          CONFIG__AI_TIMEOUT: '60'
-          CONFIG__MAX_MODEL_TOKENS: '32000'
-          CONFIG__CUSTOM_MODEL_MAX_TOKENS: '32000'
-          CONFIG__REASONING_EFFORT: 'low'
-          OPENROUTER__REASONING_EFFORT: 'none'
-          CONFIG__PUBLISH_OUTPUT_PROGRESS: 'false'
-          GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
-          GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: 'false'
-          GITHUB_ACTION_CONFIG__AUTO_IMPROVE: 'false'
-          GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
-          PR_REVIEWER__PERSISTENT_COMMENT: 'true'
-          PR_REVIEWER__FINAL_UPDATE_MESSAGE: 'false'
+            ## 指摘
+            各指摘は次の形式にしてください。
+            ### [P1/P2/P3] 問題の短いタイトル
+            - 場所: `path:line`
+            - 問題:
+            - 根拠:
+            - 修正案:
 
-      - name: Run PR Agent — Mistral Small 3.2
-        id: mistral_small_32
-        if: ${{ steps.gpt_oss_120b.outcome != 'success' && steps.qwen3_coder_30b.outcome != 'success' && steps.qwen3_235b.outcome != 'success' }}
-        timeout-minutes: 3
-        continue-on-error: true
-        uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          CONFIG__MODEL: 'openrouter/mistralai/mistral-small-3.2-24b-instruct'
-          CONFIG__FALLBACK_MODELS: '[]'
-          CONFIG__AI_TIMEOUT: '60'
-          CONFIG__MAX_MODEL_TOKENS: '32000'
-          CONFIG__CUSTOM_MODEL_MAX_TOKENS: '32000'
-          CONFIG__REASONING_EFFORT: 'low'
-          OPENROUTER__REASONING_EFFORT: 'none'
-          CONFIG__PUBLISH_OUTPUT_PROGRESS: 'false'
-          GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
-          GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: 'false'
-          GITHUB_ACTION_CONFIG__AUTO_IMPROVE: 'false'
-          GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
-          PR_REVIEWER__PERSISTENT_COMMENT: 'true'
-          PR_REVIEWER__FINAL_UPDATE_MESSAGE: 'false'
-
-      - name: Run PR Agent — GPT-5.6 Luna fallback
-        id: gpt_56_luna
-        if: ${{ steps.gpt_oss_120b.outcome != 'success' && steps.qwen3_coder_30b.outcome != 'success' && steps.qwen3_235b.outcome != 'success' && steps.mistral_small_32.outcome != 'success' }}
-        timeout-minutes: 3
-        continue-on-error: true
-        uses: docker://pragent/pr-agent@sha256:3121a7b8e3ab497b4df09dea6a444da8f01a474496c8c2f722828512c52fd266
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENROUTER__KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          CONFIG__MODEL: 'openrouter/openai/gpt-5.6-luna'
-          CONFIG__FALLBACK_MODELS: '[]'
-          CONFIG__AI_TIMEOUT: '60'
-          CONFIG__MAX_MODEL_TOKENS: '32000'
-          CONFIG__CUSTOM_MODEL_MAX_TOKENS: '32000'
-          CONFIG__REASONING_EFFORT: 'low'
-          OPENROUTER__REASONING_EFFORT: 'low'
-          CONFIG__PUBLISH_OUTPUT_PROGRESS: 'false'
-          GITHUB_ACTION_CONFIG__AUTO_REVIEW: 'true'
-          GITHUB_ACTION_CONFIG__AUTO_DESCRIBE: 'false'
-          GITHUB_ACTION_CONFIG__AUTO_IMPROVE: 'false'
-          GITHUB_ACTION_CONFIG__PR_ACTIONS: '["opened", "reopened", "ready_for_review", "synchronize"]'
-          PR_REVIEWER__PERSISTENT_COMMENT: 'true'
-          PR_REVIEWER__FINAL_UPDATE_MESSAGE: 'false'
-
-      - name: Fail if all models fail
-        if: ${{ always() }}
-        env:
-          GPT_OSS_OUTCOME: ${{ steps.gpt_oss_120b.outcome }}
-          QWEN3_CODER_OUTCOME: ${{ steps.qwen3_coder_30b.outcome }}
-          QWEN3_235B_OUTCOME: ${{ steps.qwen3_235b.outcome }}
-          MISTRAL_OUTCOME: ${{ steps.mistral_small_32.outcome }}
-          LUNA_OUTCOME: ${{ steps.gpt_56_luna.outcome }}
-        run: |
-          if [[ "$GPT_OSS_OUTCOME" == "success" ||
-                "$QWEN3_CODER_OUTCOME" == "success" ||
-                "$QWEN3_235B_OUTCOME" == "success" ||
-                "$MISTRAL_OUTCOME" == "success" ||
-                "$LUNA_OUTCOME" == "success" ]]; then
-            exit 0
-          fi
-
-          echo "::error::PR-Agent failed or timed out for every configured model."
-          exit 1
+            指摘がない場合は、## 指摘の下に「指摘なし」とだけ書いてください。
+            推測や好みではなく、今回の変更による具体的な問題だけを指摘してください。
