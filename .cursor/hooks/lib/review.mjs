@@ -8,10 +8,10 @@ import { createHash } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { isBootstrapMarkerPath } from './bootstrap.mjs';
 import { formatDeny } from './deny-format.mjs';
-import { idFromTranscriptPath, isUnderStateDir } from './state.mjs';
+import { idFromTranscriptPath, isUnderStateDir, sanitizeConversationId } from './state.mjs';
 
-/** コード＋CSS＋HTMLのみ（md/json/yaml は Issue 下書き等で gate を汚さない） */
-const REVIEWABLE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|css|html)$/i;
+/** commit Skill と同じ reviewable 拡張子（Markdown は対象外）。 */
+const REVIEWABLE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|css|html|json|yaml|yml)$/i;
 
 /** path ごとの diff／新規本文のソフト上限 */
 export const REVIEW_DIFF_MAX_PER_FILE = 8000;
@@ -72,6 +72,123 @@ export function isPreCommitReviewerContext(payload) {
     type === 'reviewer' ||
     /\bpre-commit-reviewer\b|\bpre-commit review\b/i.test(task)
   );
+}
+
+export const REVIEW_SCRIPT_REL = '.cursor/skills/commit/scripts/review.mjs';
+export const COMMIT_SCRIPT_REL = '.cursor/skills/commit/scripts/commit.mjs';
+export const REVIEW_RESULT_REQUIRED = 'review_required';
+export const REVIEW_RESULT_NOT_REQUIRED = 'no_review_required';
+export const REVIEW_REQUIREMENT_REQUIRED = 'required';
+export const REVIEW_REQUIREMENT_NOT_REQUIRED = 'not_required';
+export const REVIEW_REQUIREMENT_UNKNOWN = 'unknown';
+
+/** commit Skillのscript実行をheredoc除去後のShell commandから判定する。 */
+function commandIncludesSkillScript(command, scriptPath) {
+  return shellSegments(command).some((segment) => {
+    const tokens = segment.trim().split(/\s+/).filter(Boolean);
+    let index = 0;
+    while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[index])) index += 1;
+    while (['command', 'time'].includes(tokens[index])) index += 1;
+
+    if (basename(tokens[index] ?? '') === 'pnpm') {
+      index += 1;
+      if (tokens[index] === 'exec') index += 1;
+    }
+    const executable = basename(tokens[index] ?? '');
+    if (executable !== 'node' && executable !== 'nodejs') return false;
+    index += 1;
+
+    while (index < tokens.length) {
+      const token = tokens[index];
+      if (token === '--check' || token === '-c' || token === '-e' || token === '--eval')
+        return false;
+      if (token === '-p' || token === '--print') return false;
+      if (token === '--') {
+        index += 1;
+        const script = tokens[index];
+        return script === scriptPath || script?.endsWith(`/${scriptPath}`);
+      }
+      if (token === '--require' || token === '-r' || token === '--import') {
+        index += 2;
+        continue;
+      }
+      if (token.startsWith('-')) {
+        index += 1;
+        continue;
+      }
+      return token === scriptPath || token.endsWith(`/${scriptPath}`);
+    }
+    return false;
+  });
+}
+
+export function commandIncludesReviewScript(command) {
+  return commandIncludesSkillScript(command, REVIEW_SCRIPT_REL);
+}
+
+export function commandIncludesCommitScript(command) {
+  return commandIncludesSkillScript(command, COMMIT_SCRIPT_REL);
+}
+
+/** review scriptの結果payloadから、reviewer要否だけを取り出す。 */
+export function reviewRequirementFromResult(result) {
+  if (result?.ok !== true) return REVIEW_REQUIREMENT_UNKNOWN;
+  if (result.status === REVIEW_RESULT_REQUIRED) return REVIEW_REQUIREMENT_REQUIRED;
+  if (result.status === REVIEW_RESULT_NOT_REQUIRED) return REVIEW_REQUIREMENT_NOT_REQUIRED;
+  return REVIEW_REQUIREMENT_UNKNOWN;
+}
+
+const REVIEW_RESULT_DIR = '.cursor/skills/commit/scripts/.tmp';
+
+export function reviewResultArtifactPath(root, id) {
+  return join(resolve(root), REVIEW_RESULT_DIR, `${sanitizeConversationId(id)}.result`);
+}
+
+export function readReviewResultArtifact(root, id) {
+  const path = reviewResultArtifactPath(root, id);
+  try {
+    const status = readFileSync(path, 'utf8').trim();
+    const requirement = reviewRequirementFromResult({ ok: true, status });
+    if (requirement === REVIEW_REQUIREMENT_UNKNOWN) {
+      return { ok: false, path, status, requirement, message: 'The review result is invalid.' };
+    }
+    return { ok: true, path, status, requirement };
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return { ok: false, path, missing: true, message: 'The review result is missing.' };
+    }
+    return {
+      ok: false,
+      path,
+      message: `Unable to read the review result: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+export function denyCommitScriptMessage(reason) {
+  const why =
+    {
+      missing_review_start:
+        'The commit script was invoked before the review script was run for this conversation.',
+      missing_result:
+        'The review script result is missing or invalid for the current commit candidate.',
+      reviewer_pass: 'A reviewer PASS has not been verified after the latest review script run.',
+    }[reason] ?? 'The commit review gate is not satisfied.';
+
+  return formatDeny({
+    tag: 'gate-review',
+    why,
+    next: [
+      'Run `node .cursor/skills/commit/scripts/review.mjs`.',
+      'If it returns a reviewer request, invoke that request and require `REVIEW: PASS`.',
+      'Retry `commit.mjs` only after the review result is satisfied.',
+    ],
+    doNot: [
+      'Retry `commit.mjs` unchanged while the review gate is unsatisfied.',
+      'Invoke a reviewer without the generated request.',
+      'Use a raw `git commit` as a review bypass.',
+    ],
+  });
 }
 
 function relPosix(root, filePath) {
