@@ -338,7 +338,7 @@ function reviewPrompt(repo, id) {
   return [
     '[commit-review-artifact]',
     `Review Payload Artifact: ${artifact}`,
-    'Read only the generated artifact as the complete review payload. Do not run Git or inspect unrelated files.',
+    'Read the generated artifact as the complete review payload. If it lists Context Files, read only those exact files. Do not run Git or inspect unrelated files.',
   ].join('\n');
 }
 

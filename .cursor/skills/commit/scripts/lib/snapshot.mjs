@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { resolve } from 'node:path';
+import { isAbsolute, relative, resolve } from 'node:path';
 
 // 設定・実装ファイルをレビュー対象にし、Markdownは対象外として扱う。
 export const REVIEWABLE_EXTENSIONS = Object.freeze([
@@ -16,10 +16,6 @@ export const REVIEWABLE_EXTENSIONS = Object.freeze([
   '.yaml',
   '.yml',
 ]);
-
-// 既存差分はファイル単位、新規ファイルは全体単位で制限し、hashは全stage内容から計算する。
-export const REVIEW_DIFF_MAX_PER_FILE = 10_000;
-export const REVIEW_DIFF_MAX_TOTAL = 60_000;
 
 export function collectStagedSnapshot(root, { includeEntries = true } = {}) {
   const pathsResult = runGit(root, [
@@ -45,7 +41,7 @@ export function collectStagedSnapshot(root, { includeEntries = true } = {}) {
     for (const path of reviewablePaths) {
       const entry = collectStagedEntry(root, path);
       if (!entry.ok) return errorSnapshot(entry.message, paths);
-      entries.push({ path, body: entry.body, isNewFile: entry.isNewFile });
+      entries.push({ path, body: entry.body });
     }
   }
 
@@ -59,44 +55,85 @@ export function collectStagedSnapshot(root, { includeEntries = true } = {}) {
   };
 }
 
-export function buildReviewPayload(root, snapshot, note = null) {
-  if (!snapshot?.ok || snapshot.reviewablePaths.length === 0) {
-    return { payload: null, truncated: false };
+export function buildReviewPayload(root, snapshot, note = null, options = {}) {
+  const selectedPaths = options.reviewablePaths ?? snapshot?.reviewablePaths ?? [];
+  const contextPaths = options.contextPaths ?? [];
+  if (!snapshot?.ok || selectedPaths.length === 0) {
+    return { payload: null, complete: true, missingPaths: [] };
   }
 
   const reviewNote = String(note ?? '').trim();
+  const entriesByPath = new Map((snapshot.entries ?? []).map((entry) => [entry.path, entry]));
+  const entries = selectedPaths.map((path) => entriesByPath.get(path)).filter(Boolean);
+  const missingPaths = selectedPaths.filter((path) => !entriesByPath.has(path));
+  if (missingPaths.length > 0) {
+    return { payload: null, complete: false, missingPaths };
+  }
   const lines = [
     '[commit-review-payload]',
     `Full Repository Path: ${resolve(root)}`,
     'Commit Candidate: staged Git index',
-    'Review only the supplied diff text. Do not run git or inspect unrelated files.',
+    'Review the supplied diff text. Read only explicitly listed Context Files when necessary. Do not run git or inspect unrelated files.',
   ];
-  if (reviewNote) lines.push('', 'Accepted exclusions:', reviewNote);
-  lines.push('', 'Reviewable Files:', ...snapshot.reviewablePaths.map((path) => `- ${path}`), '');
-  let total = lines.join('\n').length;
-  let truncated = total > REVIEW_DIFF_MAX_TOTAL;
-
-  for (const entry of snapshot.entries) {
-    const built = buildEntrySection(entry);
-    if (total + built.section.length > REVIEW_DIFF_MAX_TOTAL) {
-      lines.push(
-        `… [omitted remaining reviewable files; total payload cap ${REVIEW_DIFF_MAX_TOTAL} characters]`,
-        '',
-      );
-      truncated = true;
-      break;
-    }
-    lines.push(built.section);
-    total += built.section.length;
-    truncated ||= built.truncated;
+  if (reviewNote) lines.push('', 'Review notes:', reviewNote);
+  if (contextPaths.length > 0) {
+    lines.push('', 'Context Files:', ...contextPaths.map((path) => `- ${path}`));
   }
+  lines.push('', 'Reviewable Files:', ...selectedPaths.map((path) => `- ${path}`), '');
 
-  return { payload: lines.join('\n'), truncated };
+  for (const entry of entries) lines.push(buildEntrySection(entry));
+
+  return { payload: lines.join('\n'), complete: true, missingPaths: [] };
 }
 
 export function isReviewablePath(path) {
   const normalized = String(path).replaceAll('\\', '/').toLowerCase();
   return REVIEWABLE_EXTENSIONS.some((extension) => normalized.endsWith(extension));
+}
+
+export function validateContextPaths(root, contextPaths = [], stagedPaths = []) {
+  const normalized = [];
+  const staged = new Set(stagedPaths.map(normalizeRepoPath));
+
+  for (const rawPath of contextPaths) {
+    const path = normalizeRepoPath(rawPath);
+    const hasGlobCharacter = ['?', '*', '{', '}', '[', ']'].some((character) =>
+      path.includes(character),
+    );
+    const segments = path.split('/');
+    if (
+      !path ||
+      isAbsolute(path) ||
+      hasGlobCharacter ||
+      segments.some((segment) => segment === '' || segment === '.' || segment === '..')
+    ) {
+      return { ok: false, message: `Context path must be a relative file path: ${rawPath}` };
+    }
+    const absolute = resolve(root, path);
+    const relativePath = relative(resolve(root), absolute).replaceAll('\\', '/');
+    if (!relativePath || relativePath.startsWith('..') || relativePath.includes('/../')) {
+      return { ok: false, message: `Context path is outside the repository: ${rawPath}` };
+    }
+    if (normalized.includes(path)) {
+      return { ok: false, message: `Context path is listed more than once: ${path}` };
+    }
+    if (staged.has(path)) {
+      return { ok: false, message: `Context path is also a staged path: ${path}` };
+    }
+
+    const tracked = runGit(root, ['ls-files', '--error-unmatch', '--', path]);
+    if (!tracked.ok) {
+      return { ok: false, message: `Context path is not a tracked file: ${path}` };
+    }
+    const changed = runGit(root, ['diff', '--name-only', 'HEAD', '--', path]);
+    if (!changed.ok) return changed;
+    if (bufferText(changed.stdout).trim()) {
+      return { ok: false, message: `Context path has uncommitted changes: ${path}` };
+    }
+    normalized.push(path);
+  }
+
+  return { ok: true, paths: normalized };
 }
 
 export function runGit(root, args, { input = null } = {}) {
@@ -128,7 +165,7 @@ function collectStagedEntry(root, path) {
   const result = runGit(root, ['diff', '--cached', '--no-renames', '--binary', 'HEAD', '--', path]);
   if (!result.ok) return result;
   const body = bufferText(result.stdout);
-  return { ok: true, body, isNewFile: /^new file mode /m.test(body) };
+  return { ok: true, body };
 }
 
 function hashStagedSnapshot(paths, diff) {
@@ -138,20 +175,7 @@ function hashStagedSnapshot(paths, diff) {
 }
 
 function buildEntrySection(entry) {
-  const limit = entry.isNewFile ? REVIEW_DIFF_MAX_TOTAL : REVIEW_DIFF_MAX_PER_FILE;
-  const { text, truncated } = truncateText(entry.body, limit, entry.path);
-  const notice = truncated ? '\n[This file section was truncated.]\n' : '';
-  return {
-    section: `### ${entry.path}\n\`\`\`diff\n${text}${notice}\n\`\`\`\n`,
-    truncated,
-  };
-}
-
-function truncateText(text, limit, label) {
-  if (text.length <= limit) return { text, truncated: false };
-  const marker = `\n… [truncated ${text.length - limit} characters from ${label}]\n`;
-  const kept = Math.max(0, limit - marker.length);
-  return { text: `${text.slice(0, kept)}${marker}`, truncated: true };
+  return `### ${entry.path}\n\`\`\`diff\n${entry.body}\n\`\`\`\n`;
 }
 
 function parseNullSeparatedPaths(buffer) {
@@ -172,4 +196,10 @@ function errorSnapshot(message, paths = []) {
 
 function bufferText(value) {
   return Buffer.isBuffer(value) ? value.toString('utf8') : String(value ?? '');
+}
+
+function normalizeRepoPath(path) {
+  return String(path ?? '')
+    .trim()
+    .replaceAll('\\', '/');
 }

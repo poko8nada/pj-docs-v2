@@ -8,6 +8,9 @@ import {
 } from './lib/artifact.mjs';
 import { collectStagedSnapshot, runGit } from './lib/snapshot.mjs';
 import { workspaceRoot } from './lib/workspace.mjs';
+import { normalizeCommitMessage } from './lib/commit-message.mjs';
+
+export { normalizeCommitMessage } from './lib/commit-message.mjs';
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -87,31 +90,6 @@ function parseArgs(argv) {
 function readStdin() {
   // heredocの改行を保持したままcommit messageを受け取る。
   return readFileSync(0, 'utf8');
-}
-
-function normalizeCommitMessage(raw) {
-  const body = String(raw ?? '')
-    .replace(/\r\n?/g, '\n')
-    .replace(/^\s*Co-authored-by:\s*Cursor\s*<?cursoragent@cursor\.com>?\s*$/gim, '')
-    .trim();
-  const match = body.match(
-    /^([^\n]+)\n\nWhy:\n([\s\S]*?)\n\nWhat:\n([\s\S]*?)\n\nVerify:\n([\s\S]*)$/,
-  );
-  if (!match) {
-    throw new Error('Commit message must contain Subject, Why, What, and Verify sections.');
-  }
-
-  const [, subject, why, what, verify] = match;
-  if (subject.length > 72) throw new Error('Commit subject must be 72 characters or fewer.');
-  if (subject.endsWith('.')) throw new Error('Commit subject must not end with a period.');
-  if (!why.trim()) throw new Error('Commit message Why section is empty.');
-  if (!what.trim()) throw new Error('Commit message What section is empty.');
-  if (!verify.trim()) throw new Error('Commit message Verify section is empty.');
-  if (!verify.split('\n').some((line) => line.startsWith('- ') || line.startsWith('N/A:'))) {
-    throw new Error('Commit message Verify section needs a check bullet or N/A reason.');
-  }
-
-  return `${body}\n\nCo-authored-by: Cursor <cursoragent@cursor.com>`;
 }
 
 function emit(value) {

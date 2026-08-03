@@ -1,5 +1,9 @@
 #!/usr/bin/env node
-import { buildReviewPayload, collectStagedSnapshot } from './lib/snapshot.mjs';
+import {
+  buildReviewPayload,
+  collectStagedSnapshot,
+  validateContextPaths,
+} from './lib/snapshot.mjs';
 import {
   removeHashArtifact,
   removeReviewRequestArtifact,
@@ -28,6 +32,23 @@ function main() {
     return;
   }
 
+  const contextValidation = validateContextPaths(root, args.context, snapshot.paths);
+  if (!contextValidation.ok) {
+    emit({ ok: false, status: 'error', message: contextValidation.message });
+    process.exitCode = 1;
+    return;
+  }
+  const contextPaths = contextValidation.paths;
+  if (contextPaths.length > 0 && snapshot.reviewablePaths.length === 0) {
+    emit({
+      ok: false,
+      status: 'error',
+      message: 'Context files require at least one staged reviewable path.',
+    });
+    process.exitCode = 1;
+    return;
+  }
+
   const artifact = writeHashArtifact(root, snapshot.hash);
   if (!artifact.ok) {
     emit({ ok: false, status: 'error', message: artifact.message });
@@ -35,18 +56,19 @@ function main() {
     return;
   }
 
-  const review = buildReviewPayload(root, snapshot, args.note);
-  if (review.truncated) {
+  const review = buildReviewPayload(root, snapshot, args.note, { contextPaths });
+  if (!review.complete) {
     const cleanup = removeHashArtifact(root);
     emit({
       ok: false,
       status: 'error',
       message: cleanup.ok
-        ? 'The staged review payload exceeds its character limit. Split the staged candidate into smaller commits or staged hunks, then run the review script again.'
-        : `The staged review payload exceeds its character limit, and the review hash could not be removed: ${cleanup.message}`,
+        ? `Unable to build a complete review payload. Missing staged diff entries: ${review.missingPaths.join(', ')}.`
+        : `Unable to build a complete review payload, and the review hash could not be removed: ${cleanup.message}`,
       stagedPaths: snapshot.paths,
       reviewablePaths: snapshot.reviewablePaths,
-      truncated: true,
+      contextPaths,
+      missingPaths: review.missingPaths,
     });
     process.exitCode = 1;
     return;
@@ -78,6 +100,7 @@ function main() {
       artifact: artifact.path,
       resultArtifact: resultArtifact.path,
       stagedPaths: snapshot.paths,
+      contextPaths,
     });
     return;
   }
@@ -90,12 +113,13 @@ function main() {
     requestArtifact: requestArtifact.path,
     request: buildReviewRequest(requestArtifact.path),
     reviewablePaths: snapshot.reviewablePaths,
-    truncated: false,
+    contextPaths,
+    complete: true,
   });
 }
 
 function parseArgs(argv) {
-  const args = { root: null, note: null };
+  const args = { root: null, note: null, context: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === '--root') {
@@ -107,6 +131,13 @@ function parseArgs(argv) {
       const note = argv[index + 1];
       if (!note?.trim()) throw new Error('The --note argument must not be empty.');
       args.note = note;
+      index += 1;
+      continue;
+    }
+    if (value === '--context') {
+      const contextPath = argv[index + 1];
+      if (!contextPath?.trim()) throw new Error('The --context argument must not be empty.');
+      args.context.push(contextPath);
       index += 1;
       continue;
     }
@@ -133,7 +164,7 @@ function buildReviewRequest(requestPath) {
     prompt: [
       '[commit-review-artifact]',
       `Review Payload Artifact: ${requestPath}`,
-      'Read only the generated artifact as the complete review payload. Do not run Git or inspect unrelated files.',
+      'Read the generated artifact as the complete review payload. If it lists Context Files, read only those exact files. Do not run Git or inspect unrelated files.',
     ].join('\n'),
     subagent_type: 'pre-commit-reviewer',
   };
