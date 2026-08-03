@@ -2,8 +2,11 @@
 import { buildReviewPayload, collectStagedSnapshot } from './lib/snapshot.mjs';
 import {
   removeHashArtifact,
+  removeReviewRequestArtifact,
   removeReviewResultArtifact,
+  removeStaleReviewArtifacts,
   writeHashArtifact,
+  writeReviewRequestArtifact,
   writeReviewResultArtifact,
 } from './lib/artifact.mjs';
 import { workspaceRoot } from './lib/workspace.mjs';
@@ -34,12 +37,13 @@ function main() {
 
   const review = buildReviewPayload(root, snapshot, args.note);
   if (review.truncated) {
-    removeHashArtifact(root);
+    const cleanup = removeHashArtifact(root);
     emit({
       ok: false,
       status: 'error',
-      message:
-        'The staged review payload exceeds its character limit. Split the staged candidate into smaller commits or staged hunks, then run the review script again.',
+      message: cleanup.ok
+        ? 'The staged review payload exceeds its character limit. Split the staged candidate into smaller commits or staged hunks, then run the review script again.'
+        : `The staged review payload exceeds its character limit, and the review hash could not be removed: ${cleanup.message}`,
       stagedPaths: snapshot.paths,
       reviewablePaths: snapshot.reviewablePaths,
       truncated: true,
@@ -47,9 +51,20 @@ function main() {
     process.exitCode = 1;
     return;
   }
+  const requestArtifact = review.payload
+    ? writeReviewRequestArtifact(root, review.payload)
+    : { ok: true, path: null };
+  if (!requestArtifact.ok) {
+    removeHashArtifact(root);
+    emit({ ok: false, status: 'error', message: requestArtifact.message });
+    process.exitCode = 1;
+    return;
+  }
   const status = review.payload ? 'review_required' : 'no_review_required';
   const resultArtifact = writeReviewResultArtifact(root, status);
   if (!resultArtifact.ok) {
+    removeHashArtifact(root);
+    removeReviewRequestArtifact(root);
     emit({ ok: false, status: 'error', message: resultArtifact.message });
     process.exitCode = 1;
     return;
@@ -72,13 +87,10 @@ function main() {
     status,
     artifact: artifact.path,
     resultArtifact: resultArtifact.path,
-    request: {
-      description: 'Pre-commit review',
-      prompt: review.payload,
-      subagent_type: 'pre-commit-reviewer',
-    },
+    requestArtifact: requestArtifact.path,
+    request: buildReviewRequest(requestArtifact.path),
     reviewablePaths: snapshot.reviewablePaths,
-    truncated: review.truncated,
+    truncated: false,
   });
 }
 
@@ -104,11 +116,27 @@ function parseArgs(argv) {
 }
 
 function clearReviewArtifacts(root) {
+  const stale = removeStaleReviewArtifacts(root);
+  if (!stale.ok) return stale;
   const hash = removeHashArtifact(root);
   if (!hash.ok) return hash;
   const result = removeReviewResultArtifact(root);
   if (!result.ok) return result;
+  const request = removeReviewRequestArtifact(root);
+  if (!request.ok) return request;
   return { ok: true };
+}
+
+function buildReviewRequest(requestPath) {
+  return {
+    description: 'Pre-commit review',
+    prompt: [
+      '[commit-review-artifact]',
+      `Review Payload Artifact: ${requestPath}`,
+      'Read only the generated artifact as the complete review payload. Do not run Git or inspect unrelated files.',
+    ].join('\n'),
+    subagent_type: 'pre-commit-reviewer',
+  };
 }
 
 function emit(value) {

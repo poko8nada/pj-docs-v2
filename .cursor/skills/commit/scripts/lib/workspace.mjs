@@ -33,3 +33,11 @@ export function hashArtifactPath(root) {
 export function reviewResultArtifactPath(root) {
   return resolve(root, '.cursor/skills/commit/scripts/.tmp', `${conversationId()}.result`);
 }
+
+export function reviewRequestArtifactPath(root) {
+  return resolve(root, '.cursor/skills/commit/scripts/.tmp', `${conversationId()}.request`);
+}
+
+export function reviewArtifactDirectoryPath(root) {
+  return resolve(root, '.cursor/skills/commit/scripts/.tmp');
+}

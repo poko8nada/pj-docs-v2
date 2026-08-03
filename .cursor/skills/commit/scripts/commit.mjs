@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import {
   readHashArtifact,
   removeHashArtifact,
+  removeReviewRequestArtifact,
   removeReviewResultArtifact,
 } from './lib/artifact.mjs';
 import { collectStagedSnapshot, runGit } from './lib/snapshot.mjs';
@@ -60,6 +61,8 @@ function cleanupArtifacts(root) {
   if (!hash.ok) errors.push(hash.message);
   const result = removeReviewResultArtifact(root);
   if (!result.ok) errors.push(result.message);
+  const request = removeReviewRequestArtifact(root);
+  if (!request.ok) errors.push(request.message);
   return errors.length === 0 ? { ok: true } : { ok: false, errors };
 }
 

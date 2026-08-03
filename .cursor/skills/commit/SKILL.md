@@ -10,7 +10,7 @@ description: Review staged changes before an explicit commit, or review staged c
 - Read [commit-candidate.md](references/commit-candidate.md) for staged scope and hash semantics.
 - Read [review-payload.md](references/review-payload.md) for the reviewer request contract.
 - Read [commit-message.md](references/commit-message.md) for the required subject, body, and trailer format.
-- Execute [review.mjs](scripts/review.mjs) to create the hash and produce the review result.
+- Execute [review.mjs](scripts/review.mjs) to create hash/result artifacts and the reviewer payload artifact.
 - Execute [commit.mjs](scripts/commit.mjs) with the confirmed message on stdin to verify and commit the staged candidate.
 - Execute [smoke.mjs](scripts/smoke.mjs) to verify the Skill scripts independently from Harness hooks.
 
@@ -33,15 +33,16 @@ description: Review staged changes before an explicit commit, or review staged c
 4. Run the review script from the repository root.
    - Execute `node .cursor/skills/commit/scripts/review.mjs`.
    - If the user has explicitly accepted specific findings from an earlier `REVIEW: GAPS`, rerun it with one `--note "<user-approved exclusion>"` argument. Do not add notes based on the agent's own judgment.
-   - Parse its JSON result; do not rebuild the request manually.
+   - Parse its JSON result; do not rebuild the request manually or create ad hoc temporary files.
    - The script hashes the complete staged candidate and overwrites the Skill-local hash artifact.
-   - `review_required` returns the complete reviewer `request`.
+   - `review_required` writes the complete payload to the returned `requestArtifact` and returns a short reviewer handoff in `request`.
    - `no_review_required` means no staged path matches the reviewable extensions.
+   - The reviewer payload artifact is generated mechanically regardless of payload size; the reviewer handoff contains its path.
    - An error saying the payload exceeds its limit means the candidate must be split before any reviewer or commit invocation.
    - `error` stops the flow.
 5. If a reviewer request is returned, invoke the available reviewer route.
    - Pass the returned `request` object unchanged to `Task` or `functions.Subagent`.
-   - Omit `model`, `resume`, and background execution options.
+   - Omit `model` and background execution options.
    - Do not invoke the reviewer directly without the generated request.
    - `REVIEW: PASS` permits the commit path; `REVIEW: GAPS` stops it until the user accepts specific findings and the review script is rerun with a note.
 6. For review-only, report the review result and finish without running `commit.mjs`.
@@ -53,10 +54,11 @@ description: Review staged changes before an explicit commit, or review staged c
    - Pass the confirmed multiline message with `--message-stdin` and a heredoc.
    - It regenerates the hash from the complete staged candidate.
    - It rejects a missing or different hash, and removes the hash artifact when it runs.
+   - It removes the current request and result artifacts when it runs.
    - It commits only after the staged hash matches.
 9. Verify delivery after a successful script result.
    - Run `git status --short`.
    - Report the commit and any remaining unstaged or staged work.
    - Do not retry a rejected commit unchanged; rerun the review script after correcting the cause.
 
-Each split commit is a new staged candidate and requires a new review-script run. The Skill owns scripts and hashes; Harness monitors script flow and reviewer evidence, but does not inject payloads or create hashes. Do not push, create pull requests, merge, or change product behavior.
+Each split commit is a new staged candidate and requires a new review-script run. Review-only artifacts may remain until the next review, commit, or seven-day stale-artifact cleanup. The Skill owns scripts, payloads, and hashes; Harness monitors script flow and reviewer evidence, but does not inject payloads or create hashes. Do not push, create pull requests, merge, or change product behavior.

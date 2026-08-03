@@ -1,9 +1,18 @@
 #!/usr/bin/env node
 
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { REVIEW_ARTIFACT_MAX_AGE_MS } from './lib/artifact.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REVIEW_SCRIPT = join(SCRIPT_DIR, 'review.mjs');
@@ -19,6 +28,7 @@ function main() {
     ['new file has no per-file truncation', testNewFileLimit],
     ['existing diff fails closed when truncated', testExistingDiffLimit],
     ['total payload fails closed', testTotalLimit],
+    ['stale artifacts are removed across conversation IDs', testStaleArtifacts],
     ['non-reviewable candidate skips reviewer', testNoReviewRequired],
     ['missing hash rejects commit', testMissingHash],
     ['invalid hash rejects commit', testInvalidHash],
@@ -53,8 +63,11 @@ function testReviewRequired(runRoot) {
   assert(result.exitCode === 0, JSON.stringify(result));
   assert(result.status === 'review_required', JSON.stringify(result));
   assert(result.request?.subagent_type === 'pre-commit-reviewer', JSON.stringify(result));
-  assert(result.request.prompt.includes('[commit-review-payload]'), result.request?.prompt);
-  assert(result.request.prompt.includes('src/change.mjs'), result.request?.prompt);
+  assert(result.request.prompt.includes('[commit-review-artifact]'), result.request?.prompt);
+  assert(result.request.prompt.includes(result.requestArtifact), result.request?.prompt);
+  const payload = readArtifact(repo, id, 'request');
+  assert(payload.includes('[commit-review-payload]'), payload);
+  assert(payload.includes('src/change.mjs'), payload);
   assert(readArtifact(repo, id, 'hash').startsWith('sha256:'), result);
   assert(readArtifact(repo, id, 'result') === 'review_required', result);
 }
@@ -65,8 +78,10 @@ function testAcceptedExclusions(runRoot) {
   const result = runReview(repo, id, ['--note', 'Harness verifies PASS before commit.']);
   assert(result.exitCode === 0, JSON.stringify(result));
   assert(
-    result.request.prompt.includes('Accepted exclusions:\nHarness verifies PASS before commit.'),
-    result.request.prompt,
+    readArtifact(repo, id, 'request').includes(
+      'Accepted exclusions:\nHarness verifies PASS before commit.',
+    ),
+    readArtifact(repo, id, 'request'),
   );
 }
 
@@ -80,15 +95,10 @@ function testNewFileLimit(runRoot) {
   const result = runReview(repo, id);
   assert(result.exitCode === 0, JSON.stringify(result));
   assert(result.status === 'review_required', JSON.stringify(result));
-  assert(result.request.prompt.length > 10_000, result.request.prompt.length);
-  assert(
-    !result.request.prompt.includes('[This file section was truncated.]'),
-    result.request.prompt,
-  );
-  assert(
-    result.request.prompt.includes('+// new file content'),
-    'new file content was not included',
-  );
+  const payload = readArtifact(repo, id, 'request');
+  assert(payload.length > 10_000, payload.length);
+  assert(!payload.includes('[This file section was truncated.]'), payload);
+  assert(payload.includes('+// new file content'), 'new file content was not included');
 }
 
 function testExistingDiffLimit(runRoot) {
@@ -105,6 +115,7 @@ function testExistingDiffLimit(runRoot) {
   assert(String(result.message).includes('Split the staged candidate'), JSON.stringify(result));
   assert(!artifactExists(repo, id, 'hash'), JSON.stringify(result));
   assert(!artifactExists(repo, id, 'result'), JSON.stringify(result));
+  assert(!artifactExists(repo, id, 'request'), JSON.stringify(result));
 }
 
 function testTotalLimit(runRoot) {
@@ -124,6 +135,29 @@ function testTotalLimit(runRoot) {
   assert(result.status === 'error' && result.truncated === true, JSON.stringify(result));
   assert(!artifactExists(repo, id, 'hash'), JSON.stringify(result));
   assert(!artifactExists(repo, id, 'result'), JSON.stringify(result));
+  assert(!artifactExists(repo, id, 'request'), JSON.stringify(result));
+}
+
+function testStaleArtifacts(runRoot) {
+  const oldId = 'smoke-stale-artifacts';
+  const currentId = 'smoke-current-artifacts';
+  const repo = createRepo(runRoot, { changedContent: 'export const value = 2;\n' });
+  const oldReview = runReview(repo, oldId);
+  assert(oldReview.status === 'review_required', oldReview);
+
+  const oldTime = new Date(Date.now() - REVIEW_ARTIFACT_MAX_AGE_MS - 1_000);
+  for (const kind of ['hash', 'result', 'request']) {
+    const path = artifactPath(repo, oldId, kind);
+    utimesSync(path, oldTime, oldTime);
+  }
+
+  const currentReview = runReview(repo, currentId);
+  assert(currentReview.exitCode === 0, JSON.stringify(currentReview));
+  assert(currentReview.status === 'review_required', JSON.stringify(currentReview));
+  for (const kind of ['hash', 'result', 'request']) {
+    assert(!artifactExists(repo, oldId, kind), `${oldId}.${kind} was not removed`);
+  }
+  assert(artifactExists(repo, currentId, 'request'), currentReview);
 }
 
 function testNoReviewRequired(runRoot) {
@@ -136,6 +170,7 @@ function testNoReviewRequired(runRoot) {
   assert(result.exitCode === 0, JSON.stringify(result));
   assert(result.status === 'no_review_required', JSON.stringify(result));
   assert(!result.request, JSON.stringify(result));
+  assert(!artifactExists(repo, id, 'request'), JSON.stringify(result));
   assert(readArtifact(repo, id, 'result') === 'no_review_required', result);
 }
 
@@ -244,6 +279,7 @@ function testHashMismatch(runRoot) {
   );
   assert(!artifactExists(repo, id, 'hash'), review);
   assert(!artifactExists(repo, id, 'result'), review);
+  assert(!artifactExists(repo, id, 'request'), review);
 }
 
 function testCommit(runRoot) {
@@ -263,13 +299,13 @@ function testCommit(runRoot) {
   assert(log.includes('Co-authored-by: Cursor <cursoragent@cursor.com>'), log);
   assert(!artifactExists(repo, id, 'hash'), review);
   assert(!artifactExists(repo, id, 'result'), review);
+  assert(!artifactExists(repo, id, 'request'), review);
 }
 
 function testCleanupFailure(runRoot) {
   const id = 'smoke-cleanup-failure';
   const repo = createRepo(runRoot, {
-    stagedFiles: ['README.md'],
-    changedContent: '# cleanup failure\n',
+    changedContent: 'export const value = 2;\n',
   });
   const review = runReview(repo, id);
   const artifactDirectory = join(repo, '.cursor/skills/commit/scripts/.tmp');
@@ -277,13 +313,14 @@ function testCleanupFailure(runRoot) {
 
   try {
     const result = runCommit(repo, id, validCommitMessage('Report cleanup failure'));
-    assert(review.status === 'no_review_required', review);
+    assert(review.status === 'review_required', review);
     assert(result.exitCode === 0, JSON.stringify(result));
     assert(result.status === 'committed', JSON.stringify(result));
     assert(result.cleanup?.ok === false, JSON.stringify(result));
     assert(result.warning?.includes('could not be removed'), JSON.stringify(result));
     assert(artifactExists(repo, id, 'hash'), JSON.stringify(result));
     assert(artifactExists(repo, id, 'result'), JSON.stringify(result));
+    assert(artifactExists(repo, id, 'request'), JSON.stringify(result));
   } finally {
     chmodSync(artifactDirectory, 0o755);
   }
