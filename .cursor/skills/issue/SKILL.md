@@ -1,13 +1,16 @@
 ---
 name: issue
 description: >-
-  Create/update/close [Goal]/[Discover]/[Build] issues and soft: comments pointing at findings/.
-  Use when persisting product-state issues, locking axes, or refreshing soft comments.
+  Persists agreed Goal / Discover / Build decisions and soft results in GitHub so product state and findings remain traceable. Use when creating, updating, or closing those issues or refreshing `## soft: …` comments. Do not use for unresolved discussion, research output, product file edits, or chore-only work unless explicitly requested.
 ---
 
 # issue
 
 Templates, titles, soft comments, and `gh` writes. Callers supply agreement and content.
+
+## Produces
+
+- A created, updated, or closed issue or an in-place `## soft: …` comment pointing to `findings/`.
 
 ## Steps
 
@@ -64,4 +67,6 @@ Fallback: scratch under `.cursor/tmp/`, delete after success.
 - Do not invent product work or re-argue decisions.
 - Soft investigation and product file edits are not this skill.
 
-Hand off: `scope` / soft skills / `rules` as needed.
+## Handoff
+
+- `scope` when session direction is unsettled, soft skills for investigation, and `rules` for product file edits.

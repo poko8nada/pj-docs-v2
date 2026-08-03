@@ -1,13 +1,16 @@
 ---
 name: rules
 description: >-
-  Apply edit guidance via references/ (logic, components, documents, …).
-  Use before gated file edits. Reading this file opens unlock.rules.
+  Applies responsibility-specific edit guidance so agreed changes follow project conventions. Use before gated file edits to select and read matching `references/*`. Do not use for session direction, agenda planning, or read-only inspection; reading it opens unlock.rules but does not replace scope or user agreement.
 ---
 
 # rules
 
 Choose references by semantic responsibility, not by filename extension. Read the matching references, then edit. Reading this file opens `unlock.rules`.
+
+## Produces
+
+- Applicable reference guidance, recorded reads, and `unlock.rules=true` in a work phase.
 
 ## Steps
 
@@ -42,6 +45,10 @@ Read more than one reference when a change crosses responsibilities:
    - `REVIEW: GAPS` → show the user. If items match **already agreed** tradeoffs, confirm that exclusion, then re-invoke the reviewer with those items listed as user-accepted (review the rest only). Do not invent PASS. Unagreed gaps → fix or re-agree before another review.
 
 Phase re-entry clears progress — run this skill and refs again.
+
+## Handoff
+
+Caller executes the agreed slice after the matching references are read; hand off to `notes` for NOTE lifecycle or `/pre-commit-reviewer` before commit when required.
 
 ## Limits
 

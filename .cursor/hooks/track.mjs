@@ -242,13 +242,6 @@ function handleBeforeSubmitPrompt(root, payload) {
 
   const phase = match[1].toLowerCase();
   const prev = loadState(root, id);
-  if (phase !== PHASE_DISCUSSION && prev.unlock.scope !== true) {
-    return respond({
-      continue: true,
-      user_message:
-        'Session focus is not confirmed. Continue in discussion and ask the user to send `/scope ok` before `/work` or `/chore`.',
-    });
-  }
   let unlock;
   // reviewer snapshot はフェーズ変更・再入場でも保持し、Git 差分一致を commit 時に再確認する。
   const review = normalizeReview(prev.review);

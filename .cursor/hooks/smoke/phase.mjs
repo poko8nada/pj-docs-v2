@@ -212,7 +212,7 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 6. scope 未確認の /work は phase を変えない
+  // 6. scope 未確認でも user の /work /chore は phase を変える
   {
     const nameBefore = findStateFileName(root, id);
     const out = run('track.mjs', {
@@ -222,34 +222,57 @@ export function runPhaseCore(smoke) {
     });
     assert('track-phase continue', out.continue === true, JSON.stringify(out));
     assert(
-      'track-phase asks for scope confirmation',
-      String(out.user_message ?? '').includes('/scope ok'),
-      JSON.stringify(out),
+      'track-phase permits user handoff before scope',
+      findStateFileName(root, id) === nameBefore &&
+        loadState(root, id).phase === 'work' &&
+        loadState(root, id).unlock.scope === false &&
+        loadState(root, id).unlock.rules === false,
+      JSON.stringify(loadState(root, id)),
     );
-    const outChore = run('track.mjs', {
+
+    const outWrite = run('gate.mjs', {
       ...base,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
+    });
+    assert(
+      'scope remains the edit gate after work handoff',
+      outWrite.permission === 'deny' &&
+        String(outWrite.agent_message).includes('[gate-scope]') &&
+        String(outWrite.agent_message).includes('/scope ok'),
+      JSON.stringify(outWrite),
+    );
+
+    run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: '/discussion reset after work handoff',
+    });
+
+    const choreId = 'chore-before-scope-id';
+    const choreBase = { ...base, conversation_id: choreId };
+    const choreOut = run('track.mjs', {
+      ...choreBase,
       hook_event_name: 'beforeSubmitPrompt',
       prompt: '/chore go',
     });
     assert(
-      'track-chore asks for scope confirmation',
-      String(outChore.user_message ?? '').includes('/scope ok'),
-      JSON.stringify(outChore),
+      'track-chore permits user handoff before scope',
+      choreOut.continue === true &&
+        loadState(root, choreId).phase === 'chore' &&
+        loadState(root, choreId).unlock.scope === false,
+      JSON.stringify({ choreOut, state: loadState(root, choreId) }),
     );
-    assert(
-      'same file after phase',
-      findStateFileName(root, id) === nameBefore,
-      findStateFileName(root, id),
-    );
-    const st = readState();
-    assert(
-      'phase stays discussion',
-      st.phase === 'discussion' && st.unlock.scope === false,
-      JSON.stringify(st),
-    );
+
+    run('track.mjs', {
+      ...base,
+      hook_event_name: 'beforeSubmitPrompt',
+      prompt: 'restore main discussion identity',
+    });
   }
 
-  // 7. still deny Write after phase only — scope before rules; gh issue write needs handshake; git writes unlock
+  // 7. discussion scope が未確認なら、phase handoff より scope を先に案内する
   {
     const out = run('gate.mjs', {
       ...base,
@@ -258,8 +281,10 @@ export function runPhaseCore(smoke) {
       tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert(
-      'phase-only Write deny names discussion phase',
-      out.permission === 'deny' && String(out.agent_message).includes('phase=discussion'),
+      'discussion Write deny prioritizes scope',
+      out.permission === 'deny' &&
+        String(out.agent_message).includes('[gate-scope]') &&
+        String(out.agent_message).includes('/scope ok'),
       JSON.stringify(out),
     );
 
@@ -269,9 +294,10 @@ export function runPhaseCore(smoke) {
       command: 'pnpm install',
     });
     assert(
-      'phase-only pnpm install names discussion phase',
+      'discussion Shell deny prioritizes scope',
       outPnpmInstall.permission === 'deny' &&
-        String(outPnpmInstall.agent_message).includes('phase=discussion'),
+        String(outPnpmInstall.agent_message).includes('[gate-scope]') &&
+        String(outPnpmInstall.agent_message).includes('/scope ok'),
       JSON.stringify(outPnpmInstall),
     );
 
@@ -290,9 +316,10 @@ export function runPhaseCore(smoke) {
       tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
     });
     assert(
-      'scope Read Write deny remains discussion phase',
+      'scope Read Write deny remains scope-first',
       outBeforeScopeOk.permission === 'deny' &&
-        String(outBeforeScopeOk.agent_message).includes('phase=discussion'),
+        String(outBeforeScopeOk.agent_message).includes('[gate-scope]') &&
+        String(outBeforeScopeOk.agent_message).includes('/scope ok'),
       JSON.stringify(outBeforeScopeOk),
     );
 
@@ -320,6 +347,30 @@ export function runPhaseCore(smoke) {
         String(outUnconfirmedWork.agent_message).includes('/scope ok'),
       JSON.stringify(outUnconfirmedWork),
     );
+    const outUnconfirmedIssue = run('gate.mjs', {
+      ...unconfirmedBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'gh issue create --title pending --body pending',
+    });
+    assert(
+      'scope precedes issue deny before confirmation',
+      outUnconfirmedIssue.permission === 'deny' &&
+        String(outUnconfirmedIssue.agent_message).includes('[gate-scope]') &&
+        !String(outUnconfirmedIssue.agent_message).includes('[gate-issue]'),
+      JSON.stringify(outUnconfirmedIssue),
+    );
+    const outUnconfirmedCommit = run('gate.mjs', {
+      ...unconfirmedBase,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git commit -m pending',
+    });
+    assert(
+      'scope precedes review deny before confirmation',
+      outUnconfirmedCommit.permission === 'deny' &&
+        String(outUnconfirmedCommit.agent_message).includes('[gate-scope]') &&
+        !String(outUnconfirmedCommit.agent_message).includes('[gate-review]'),
+      JSON.stringify(outUnconfirmedCommit),
+    );
 
     const outScopeOk = run('track.mjs', {
       ...base,
@@ -332,6 +383,45 @@ export function runPhaseCore(smoke) {
         loadState(root, id).phase === 'discussion' &&
         loadState(root, id).unlock.scope === true,
       JSON.stringify({ outScopeOk, state: loadState(root, id) }),
+    );
+
+    const outAfterScopeOkInDiscussion = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'preToolUse',
+      tool_name: 'Write',
+      tool_input: { path: join(root, '.cursor/hooks/_smoke-foo.ts') },
+    });
+    assert(
+      'confirmed discussion can suggest phase handoff',
+      outAfterScopeOkInDiscussion.permission === 'deny' &&
+        !String(outAfterScopeOkInDiscussion.agent_message).includes('[gate-scope]') &&
+        String(outAfterScopeOkInDiscussion.agent_message).includes('/work') &&
+        String(outAfterScopeOkInDiscussion.agent_message).includes('/chore'),
+      JSON.stringify(outAfterScopeOkInDiscussion),
+    );
+    const discussionIssue = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'gh issue create --title pending --body pending',
+    });
+    assert(
+      'discussion phase precedes issue deny',
+      discussionIssue.permission === 'deny' &&
+        String(discussionIssue.agent_message).includes('phase=discussion') &&
+        !String(discussionIssue.agent_message).includes('[gate-issue]'),
+      JSON.stringify(discussionIssue),
+    );
+    const discussionCommit = run('gate.mjs', {
+      ...base,
+      hook_event_name: 'beforeShellExecution',
+      command: 'git commit -m pending',
+    });
+    assert(
+      'discussion phase precedes review deny',
+      discussionCommit.permission === 'deny' &&
+        String(discussionCommit.agent_message).includes('phase=discussion') &&
+        !String(discussionCommit.agent_message).includes('[gate-review]'),
+      JSON.stringify(discussionCommit),
     );
 
     run('track.mjs', {

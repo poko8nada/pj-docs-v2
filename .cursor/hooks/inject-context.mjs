@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * sessionStart で Cursor 特有の短い context を additional_context として注入する。
- * 対象: Special rules（Shell / Web）+ Gate rules（いずれも Markdown 構造）。
+ * 対象: Special rules（Shell / Web）+ Gate rules + Skill routing（いずれも Markdown 構造）。
  * state ファイルはここでは作らない（TTL 掃除のみ）。作成は初回ユーザー発話（beforeSubmitPrompt）。
  * sticky（last-prompt-id）は更新しない — 書き込みは track の beforeSubmitPrompt のみ。
  */
@@ -49,15 +49,15 @@ function readGateRules() {
     '- Default phase is `discussion`.',
     '- On change intent: stay in discussion, agree a provisional focus, then ask the user to send `/scope ok`. Reading `scope` does not confirm it.',
     '- `/scope ok` is the user’s confirmation; set the label after confirmation. `/discussion` clears `unlock.scope` and `label`.',
-    '- Hands-on is user-controlled: the user invokes `/work` or `/chore` only after scope is confirmed. Agents must not move phases automatically.',
+    '- Hands-on is user-controlled: the user invokes `/work` or `/chore`; phase handoff does not confirm scope. Agents must not move phases automatically.',
     '- Phase re-entry clears `read.skills` / `read.refs`. `unlock.scope` stays open until `/discussion`.',
     '- Broken harness → user `/bootstrap`.',
     '',
     '## Edits',
     '',
     '- `discussion` is read-only: file edits and mutating `git` / `gh` are blocked.',
-    '- `/work`: need user-confirmed `unlock.scope` → `unlock.agenda` → `unlock.rules` before edits.',
-    '- `/chore`: need user-confirmed `unlock.scope` → `unlock.rules` (`unlock.agenda` stays null; chore agenda planning is optional).',
+    '- `/work`: user handoff → `unlock.agenda` → `unlock.rules`; `unlock.scope` is required before edits.',
+    '- `/chore`: user handoff → optional chore agenda → `unlock.rules`; `unlock.scope` is required before edits.',
     '- Issue writes: `/work` + `issue` skill + matching template (`unlock.issue`; template tracked in `read.refs` as `issue/<template>.md`).',
     '',
     '## Mentor',
@@ -86,11 +86,27 @@ function readGateRules() {
   ].join('\n');
 }
 
+/** 状況から最初に読む Skill だけを短く示す。本文は各 Skill に残す */
+function readSkillRouting() {
+  return [
+    '| Situation | Route |',
+    '| --- | --- |',
+    '| New or changed intent | `discussion` → `scope` → user `/scope ok` |',
+    '| User `/work` | `work` → `agenda` → `rules` before edits |',
+    '| User `/chore` | `chore` → optional chore `agenda` → `rules` before edits |',
+    '| Focus / planning / edit guidance | `scope` / `agenda` / `rules`; each has a separate role |',
+    '| Persist product state | `issue` in `/work`; use `pull-request` only for an explicit PR request |',
+    '| NOTE / human-centered coding | `notes` / user-enabled `mentor`; do not self-invoke phases |',
+    '| Blocked tool | Follow the deny message’s highest-priority missing condition; do not skip ahead |',
+  ].join('\n');
+}
+
 /** SECTION_DEFS が injected context の唯一の source of truth */
 function buildSectionDefs() {
   return [
     { id: 'special', title: 'Special rules', level: 2, source: readSpecialRules },
     { id: 'gate-rules', title: 'Gate rules', level: 2, source: readGateRules },
+    { id: 'skill-routing', title: 'Skill routing', level: 2, source: readSkillRouting },
   ];
 }
 

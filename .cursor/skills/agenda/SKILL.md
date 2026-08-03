@@ -1,14 +1,16 @@
 ---
 name: agenda
 description: >-
-  Build a session agenda: context scan → slices/tasks → user agreement before execution.
-  Use when drafting or revising what to do next in Goal / Discover / Build, or when a chore needs multiple steps.
+  Builds an agreed context scan and slice/task plan so execution proceeds in verifiable units. Use when Goal / Discover / Build work needs sequencing or a chore has multiple steps or choices. Do not use for session focus, direct small edits, or edit guidance; it plans but does not edit.
 ---
 
 # agenda
 
-Context scan → slice/task table → agree → then execute. Does not set session direction
-(`scope`) and does not edit files (`rules`).
+Context scan → slice/task table → agree → then execute. Does not set session direction (`scope`) and does not edit files (`rules`).
+
+## Produces
+
+- An agreed slice/task table with work, validation, and observable surface for each row.
 
 ## Steps
 
@@ -54,4 +56,6 @@ Optional: `prerequisite: …` inside Includes.
 - Do not treat the Build issue as a durable slice list — slices stay in chat.
 - Chore mode does not create Goal / Discover / Build work, write Issues, or open a new gate.
 
-Hand off: caller (`work` / `chore` / softs / `issue` / `rules` as needed).
+## Handoff
+
+Caller (`work` / `chore` / soft skills / `issue` / `rules` as needed).

@@ -1,8 +1,7 @@
 ---
 name: feasibility
 description: >-
-  Soft skill: research tech topics with Official / Practice / Failure sources; write findings/feasibility/.
-  Use before locking Stack or Build tech choices, or whenever memory is insufficient.
+  Researches uncertain technology choices using Official / Practice / Failure sources so Stack, API, or version decisions are evidence-backed. Use before locking a Stack or Build technology choice, or when a specific version/API claim needs verification. Do not use for general product research or memory-only conclusions; write cited results to findings/feasibility/.
 ---
 
 # feasibility

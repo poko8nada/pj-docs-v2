@@ -1,8 +1,7 @@
 ---
 name: inventory
 description: >-
-  Soft skill: full Build file/module inventory under findings/inventory/.
-  Use when the product tree must be listed before coding. Not a session fragment or slice schedule.
+  Builds a complete New / Edit / Delete file and module inventory for a Build so implementation has an explicit surface. Use when the whole Build/MVP tree must be reconciled before coding. Do not use for a single slice, session planning, or a task agenda; write the inventory to findings/inventory/.
 ---
 
 # inventory
