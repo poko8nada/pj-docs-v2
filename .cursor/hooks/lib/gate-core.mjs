@@ -19,20 +19,20 @@ import { DENY_MENTOR, isMentorCodeBlocked, isMentorDeniedPath } from './mentor.m
 import { logHookIds } from './id-log.mjs';
 import { formatDeny } from './deny-format.mjs';
 import {
-  collectReviewSnapshot,
-  commandIncludesGitCommit,
-  denyReviewMessage,
+  commandIncludesCommitScript,
+  denyCommitScriptMessage,
   findReviewPassTranscript,
   isReviewablePath,
   markReviewPassUsed,
+  readReviewResultArtifact,
+  REVIEW_REQUIREMENT_NOT_REQUIRED,
+  REVIEW_REQUIREMENT_REQUIRED,
 } from './review.mjs';
 import { denyRefsMessage, missingRefs, requiredRefsForPath } from './refs.mjs';
 import { commandIncludesGhIssueMutation, denyIssueMessage, isIssueReady } from './issue.mjs';
 import { denyAgendaMessage, isAgendaReady } from './agenda.mjs';
 import {
-  clearReview,
   conversationId,
-  formatReviewSnapshotAt,
   idFromTranscriptPath,
   isSpecFlowPhase,
   isUnderStateDir,
@@ -40,7 +40,6 @@ import {
   loadState,
   normalizeReview,
   REVIEW_BINDING_BOUND,
-  REVIEW_BINDING_UNBOUND,
   resolveConversationId,
   saveState,
   stateDir,
@@ -690,6 +689,36 @@ function isMentorReadonlyShell(command) {
   return isAllowedWithoutCodeUnlock(command, false);
 }
 
+function verifyCommitScriptReview(root, state, id, resolvedConversation) {
+  const review = normalizeReview(state.review);
+  if (!review.reviewStartedAt) return denyCommitScriptMessage('missing_review_start');
+
+  const result = readReviewResultArtifact(root, id);
+  if (!result.ok) return denyCommitScriptMessage('missing_result');
+  if (result.requirement === REVIEW_REQUIREMENT_NOT_REQUIRED) return null;
+  if (result.requirement !== REVIEW_REQUIREMENT_REQUIRED) {
+    return denyCommitScriptMessage('missing_result');
+  }
+  if (review.binding === REVIEW_BINDING_BOUND) return null;
+  if (resolvedConversation.via !== 'sticky.last-prompt-id') {
+    return denyCommitScriptMessage('reviewer_pass');
+  }
+
+  const passJsonl = findReviewPassTranscript(root, id, review.reviewStartedAt);
+  if (!passJsonl) return denyCommitScriptMessage('reviewer_pass');
+
+  markReviewPassUsed(passJsonl);
+  saveState(root, id, {
+    phase: state.phase,
+    review: {
+      ...review,
+      reviewerTranscriptId: idFromTranscriptPath(passJsonl),
+      binding: REVIEW_BINDING_BOUND,
+    },
+  });
+  return null;
+}
+
 function handleShell(payload, root, state, unlocked, inWorkPhase) {
   const command = String(payload.command ?? payload.tool_input?.command ?? '');
   const resolvedConversation = resolveConversationId(payload);
@@ -711,64 +740,9 @@ function handleShell(payload, root, state, unlocked, inWorkPhase) {
     if (state.unlock?.scope !== true) return deny(DENY_SCOPE);
   }
 
-  // git commit: 現在の Git snapshot と reviewer の対象 snapshot が一致するか確認する
-  if (commandIncludesGitCommit(command)) {
-    const snapshot = collectReviewSnapshot(root);
-    const review = normalizeReview(state.review);
-    if (snapshot.kind === 'error') {
-      return deny(denyReviewMessage(snapshot, review));
-    }
-    if (snapshot.kind === 'empty') {
-      if (
-        review.snapshotHash !== null ||
-        review.snapshotAt !== null ||
-        review.reviewerTranscriptId !== null ||
-        review.binding !== null
-      ) {
-        clearReview(root, id);
-        state = loadState(root, id);
-      }
-    } else {
-      if (review.snapshotHash !== snapshot.hash || review.snapshotAt === null) {
-        const sameSnapshot = review.snapshotHash === snapshot.hash;
-        saveState(root, id, {
-          phase: state.phase,
-          review: {
-            snapshotHash: snapshot.hash,
-            snapshotAt: sameSnapshot
-              ? (review.snapshotAt ?? formatReviewSnapshotAt())
-              : formatReviewSnapshotAt(),
-            reviewerTranscriptId: sameSnapshot ? review.reviewerTranscriptId : null,
-            binding: sameSnapshot ? review.binding : REVIEW_BINDING_UNBOUND,
-          },
-        });
-        state = loadState(root, id);
-      }
-      const boundReview = normalizeReview(state.review);
-      // reviewer の親 identity は sticky state があるイベントだけで確定する。
-      if (
-        boundReview.binding !== REVIEW_BINDING_BOUND &&
-        resolvedConversation.via === 'sticky.last-prompt-id'
-      ) {
-        const passJsonl = findReviewPassTranscript(root, id, boundReview.snapshotAt);
-        if (passJsonl) {
-          markReviewPassUsed(passJsonl);
-          saveState(root, id, {
-            phase: state.phase,
-            review: {
-              ...boundReview,
-              reviewerTranscriptId: idFromTranscriptPath(passJsonl),
-              binding: REVIEW_BINDING_BOUND,
-            },
-          });
-          state = loadState(root, id);
-        }
-      }
-      const remainingReview = normalizeReview(state.review);
-      if (remainingReview.binding !== REVIEW_BINDING_BOUND) {
-        return deny(denyReviewMessage(snapshot, remainingReview));
-      }
-    }
+  if (commandIncludesCommitScript(command)) {
+    const reviewError = verifyCommitScriptReview(root, state, id, resolvedConversation);
+    if (reviewError) return deny(reviewError);
   }
 
   if (

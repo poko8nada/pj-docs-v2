@@ -38,12 +38,7 @@ import {
   STATE_TTL_DAYS,
   workspaceRoot,
 } from '../lib/state.mjs';
-import {
-  buildReviewTaskInjection,
-  collectReviewDiff,
-  collectReviewSnapshot,
-  isReviewablePath,
-} from '../lib/review.mjs';
+import { isReviewablePath } from '../lib/review.mjs';
 import { isCheckToolingReady, runFormatLint } from '../lib/check.mjs';
 
 const smokeDir = fileURLToPath(new URL('.', import.meta.url));
@@ -236,9 +231,6 @@ export function createSmokeCtx() {
     clearStubTurn,
     isStubTurnActive,
     lastStubPath,
-    buildReviewTaskInjection,
-    collectReviewDiff,
-    collectReviewSnapshot,
     isReviewablePath,
     isCheckToolingReady,
     runFormatLint,
