@@ -58,4 +58,4 @@ Optional: `prerequisite: …` inside Includes.
 
 ## Handoff
 
-Caller (`work` / `chore` / soft skills / `issue` / `rules` as needed).
+Return the agreed slice/task table to the caller; execution remains outside this skill.
