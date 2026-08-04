@@ -39,16 +39,8 @@ Read more than one reference when a change crosses responsibilities:
 2. Edit — correct structure and edges for the unit. Keep the environment usable.
 3. Tests — do **not** run `pnpm format` / `lint` / `typecheck` yourself (harness stop + lefthook). On stop `followup_message`, fix those. When tests apply: `pnpm test:run` once after changes; if missing, note in confirm; `N/A` → skip.
 4. Confirm — list concrete files / symbols changed.
-5. If pending `NOTE:` in changed files: `rg -n 'NOTE:' …` — keep, or delete after user OK (`notes`), or mention if unsure.
-6. Before commit if the current reviewable Git snapshot is not bound to a PASS: `notes` Commit check → `/pre-commit-reviewer`.
-   - `REVIEW: PASS` → stop binds the matching snapshot; successful `git commit` clears it via the harness.
-   - `REVIEW: GAPS` → show the user. If items match **already agreed** tradeoffs, confirm that exclusion, then re-invoke the reviewer with those items listed as user-accepted (review the rest only). Do not invent PASS. Unagreed gaps → fix or re-agree before another review.
 
 Phase re-entry clears progress — run this skill and refs again.
-
-## Handoff
-
-Caller executes the agreed slice after the matching references are read; hand off to `notes` for NOTE lifecycle or `/pre-commit-reviewer` before commit when required.
 
 ## Limits
 

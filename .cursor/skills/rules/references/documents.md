@@ -35,3 +35,4 @@ Use when writing or modifying document prose or structure. Issue / README substa
 - Structural labels (`**Default:**`, `**Exit:**`, `**Harness:**`) — preserve structure with headings (or an equivalent outline), not bold lead-ins.
 - When cleaning label-bold, do not strip other emphasis; remove decoration, keep sparse signals.
 - Tables — small/medium width, **total cell characters per row < 100**. For multi-row content, use headings or nested bullet points. If a table is in a provided template, follow the template but keep it compact.
+- Keep prose lines intact; do not insert awkward line breaks inside a sentence or list item. Break lines at paragraph or Markdown-structure boundaries.

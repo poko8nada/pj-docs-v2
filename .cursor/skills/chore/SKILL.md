@@ -18,6 +18,11 @@ No Goal / Discover / Build track.
 4. A behavior, capability, user-interaction, data/API contract, or Goal/Discover/Build change is product work → name `/work` (or `/discussion`). Scope creep → stop, restate the touch list, or name `/discussion`.
 5. Before edits → `rules` + matching `rules/references/*`.
 6. Issues only if asked → `issue`.
+7. Delivery is user-directed:
+   - User asks to commit → hand off to `notes`, then `commit`.
+   - User asks for review only → hand off to `commit` in review-only mode.
+   - No delivery request → finish without triggering either skill.
+   - Do not copy the `notes` or `commit` procedures into this phase.
 
 Edits need `unlock.scope` then `unlock.rules`. Chore agenda planning does not open `unlock.agenda`.
 
@@ -29,6 +34,7 @@ Edits need `unlock.scope` then `unlock.rules`. Chore agenda planning does not op
 
 - `discussion` / `scope` when focus or boundaries need confirmation.
 - `agenda` for multi-step chores, `rules` before edits, and `issue` only when explicitly requested.
+- `notes` → `commit` when the user explicitly requests delivery.
 
 ## Limits
 
