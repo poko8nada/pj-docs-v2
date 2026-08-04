@@ -1,15 +1,21 @@
 const CURSOR_TRAILER = 'Co-authored-by: Cursor <cursoragent@cursor.com>';
 
 // UnitとIntent統合で同じメッセージ正規化契約を共有する。
-export function normalizeCommitMessage(raw, { allowUnit = true } = {}) {
+export function normalizeCommitMessage(raw, options = {}) {
+  return parseCommitMessage(raw, options).message;
+}
+
+// commit前に構造エラーとスタイル警告を分離して返す。
+export function parseCommitMessage(raw, { allowUnit = true } = {}) {
   const body = String(raw ?? '')
     .replace(/\r\n?/g, '\n')
     .replace(/^\s*Co-authored-by:\s*Cursor\s*<?cursoragent@cursor\.com>?\s*$/gim, '')
     .trim();
   const firstLine = body.split('\n', 1)[0] ?? '';
+  const warnings = [];
   if (isUnitCommitSubject(firstLine)) {
     if (!allowUnit) throw new Error('Intent integration requires a Why/What/Verify message.');
-    validateSubject(firstLine);
+    validateSubject(firstLine, warnings);
     if (
       body
         .split('\n')
@@ -18,7 +24,10 @@ export function normalizeCommitMessage(raw, { allowUnit = true } = {}) {
     ) {
       throw new Error('Unit commit messages must contain one subject line only.');
     }
-    return `${firstLine}\n\n${CURSOR_TRAILER}`;
+    return {
+      message: `${firstLine}\n\n${CURSOR_TRAILER}`,
+      warnings,
+    };
   }
 
   const match = body.match(
@@ -29,7 +38,7 @@ export function normalizeCommitMessage(raw, { allowUnit = true } = {}) {
   }
 
   const [, subject, why, what, verify] = match;
-  validateSubject(subject);
+  validateSubject(subject, warnings);
   if (!why.trim()) throw new Error('Commit message Why section is empty.');
   if (!what.trim()) throw new Error('Commit message What section is empty.');
   if (!verify.trim()) throw new Error('Commit message Verify section is empty.');
@@ -37,7 +46,10 @@ export function normalizeCommitMessage(raw, { allowUnit = true } = {}) {
     throw new Error('Commit message Verify section needs a check bullet or N/A reason.');
   }
 
-  return `${body}\n\n${CURSOR_TRAILER}`;
+  return {
+    message: `${body}\n\n${CURSOR_TRAILER}`,
+    warnings,
+  };
 }
 
 export function isUnitCommitSubject(subject) {
@@ -47,7 +59,9 @@ export function isUnitCommitSubject(subject) {
   );
 }
 
-function validateSubject(subject) {
-  if (subject.length > 72) throw new Error('Commit subject must be 72 characters or fewer.');
+function validateSubject(subject, warnings) {
+  if (subject.length > 72) {
+    warnings.push('Commit subject is longer than the recommended 72 characters.');
+  }
   if (subject.endsWith('.')) throw new Error('Commit subject must not end with a period.');
 }

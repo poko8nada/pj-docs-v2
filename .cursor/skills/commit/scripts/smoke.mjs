@@ -27,6 +27,7 @@ function main() {
   const runRoot = mkdtempSync(join(TMP_ROOT, 'smoke-'));
   const tests = [
     ['review creates a complete payload artifact', testReviewRequired],
+    ['review blocks on local check warnings and errors', testReviewChecksFailure],
     ['review includes explicit context files', testReviewContext],
     ['review notes are included in the artifact', testReviewNotes],
     ['large existing and new files are not truncated', testReviewFullDiff],
@@ -42,12 +43,14 @@ function main() {
     ['missing hash rejects commit', testMissingHash],
     ['invalid hash rejects commit', testInvalidHash],
     ['invalid commit message rejects commit', testInvalidCommitMessage],
+    ['message correction reuses review artifacts', testMessageRetry],
     ['unit commit message is accepted', testUnitCommit],
     ['intent integration preserves the final tree', testIntentIntegration],
     ['batch intent integration creates one commit per Intent', testBatchIntentIntegration],
     ['intent manifest validation rejects invalid input', testIntentManifestValidation],
     ['intent integration rejects unsafe history operations', testIntentIntegrationFailures],
     ['hash mismatch rejects commit', testHashMismatch],
+    ['hook failure retries only for an unchanged candidate', testHookFailureRetry],
     ['verified candidate commits and cleans artifacts', testCommit],
     ['cleanup failure is reported separately', testCleanupFailure],
   ];
@@ -73,7 +76,10 @@ function main() {
 // review_requiredが完全なpayload artifactとhashを作ることを確認する。
 function testReviewRequired(runRoot) {
   const id = 'smoke-review-required';
-  const repo = createRepo(runRoot, { changedContent: 'export const value = 2;\n' });
+  const repo = createRepo(runRoot, {
+    changedContent: 'export const value = 2;\n',
+    packageScripts: passingCheckScripts(),
+  });
   const result = runReview(repo, id);
 
   assert(result.exitCode === 0, JSON.stringify(result));
@@ -89,6 +95,35 @@ function testReviewRequired(runRoot) {
   assert(!payload.includes('truncated'), payload);
   assert(readArtifact(repo, id, 'hash').startsWith('sha256:'), result);
   assert(readArtifact(repo, id, 'result') === 'review_required', result);
+  assert(
+    result.checks
+      ?.filter((check) => check.paths.length > 0)
+      .every((check) => check.status === 'passed'),
+    JSON.stringify(result),
+  );
+}
+
+// warning/errorを検出したcandidateではreviewerを起動せずartifactも作らないことを確認する。
+function testReviewChecksFailure(runRoot) {
+  const id = 'smoke-review-checks-failure';
+  const repo = createRepo(runRoot, {
+    changedContent: 'export const value = 2;\n',
+    packageScripts: {
+      ...passingCheckScripts(),
+      lint: "printf 'warning from lint\\n'; exit 1",
+    },
+  });
+  const result = runReview(repo, id);
+
+  assert(result.exitCode !== 0, JSON.stringify(result));
+  assert(result.status === 'checks_failed', JSON.stringify(result));
+  const lint = result.checks?.find((check) => check.name === 'lint');
+  assert(lint?.status === 'failed', JSON.stringify(result));
+  assert(lint.warnings.length > 0, JSON.stringify(result));
+  assert(lint.errors.length > 0, JSON.stringify(result));
+  assert(!artifactExists(repo, id, 'hash'), JSON.stringify(result));
+  assert(!artifactExists(repo, id, 'result'), JSON.stringify(result));
+  assert(!artifactExists(repo, id, 'request'), JSON.stringify(result));
 }
 
 // Contextはpayloadに一覧だけ入り、diff対象にはならないことを確認する。
@@ -410,7 +445,7 @@ function testInvalidHash(runRoot) {
   assert(String(result.message).includes('stored hash is invalid'), JSON.stringify(result));
 }
 
-// Why/What/VerifyとUnit subjectの各不正形式をcommit前に拒否することを確認する。
+// Why/What/VerifyとUnit subjectの各構造エラーをcommit前に拒否することを確認する。
 function testInvalidCommitMessage(runRoot) {
   const messages = [
     ['missing-sections', 'not a structured commit message'],
@@ -421,21 +456,6 @@ function testInvalidCommitMessage(runRoot) {
         '',
         'Why:',
         '',
-        '',
-        'What:',
-        'Some change.',
-        '',
-        'Verify:',
-        '- smoke',
-      ].join('\n'),
-    ],
-    [
-      'long-subject',
-      [
-        'x'.repeat(73),
-        '',
-        'Why:',
-        'Some reason.',
         '',
         'What:',
         'Some change.',
@@ -473,8 +493,52 @@ function testInvalidCommitMessage(runRoot) {
     assert(review.status === 'no_review_required', review);
     assert(result.exitCode !== 0, JSON.stringify(result));
     assert(result.status === 'rejected', JSON.stringify(result));
-    assert(result.cleanup?.ok === true, JSON.stringify(result));
+    assert(result.retryable === true, JSON.stringify(result));
+    assert(result.retryReason === 'message_validation', JSON.stringify(result));
+    assert(result.artifacts?.preserved === true, JSON.stringify(result));
+    assert(artifactExists(repo, id, 'hash'), JSON.stringify(result));
+    assert(artifactExists(repo, id, 'result'), JSON.stringify(result));
   }
+}
+
+// messageだけを修正した再commitではreviewを再実行せず、長いsubjectはwarningとして通すことを確認する。
+function testMessageRetry(runRoot) {
+  const id = 'smoke-message-retry';
+  const repo = createRepo(runRoot, {
+    changedContent: 'export const value = 2;\n',
+  });
+  const review = runReview(repo, id);
+  const invalid = runCommit(repo, id, 'invalid message');
+
+  assert(review.status === 'review_required', review);
+  assert(invalid.exitCode !== 0, JSON.stringify(invalid));
+  assert(invalid.retryable === true, JSON.stringify(invalid));
+  assert(artifactExists(repo, id, 'hash'), JSON.stringify(invalid));
+  assert(artifactExists(repo, id, 'result'), JSON.stringify(invalid));
+  assert(artifactExists(repo, id, 'request'), JSON.stringify(invalid));
+
+  const longMessage = [
+    'x'.repeat(73),
+    '',
+    'Why:',
+    'Some reason.',
+    '',
+    'What:',
+    'Some change.',
+    '',
+    'Verify:',
+    '- smoke',
+  ].join('\n');
+  const retried = runCommit(repo, id, longMessage);
+  assert(retried.exitCode === 0, JSON.stringify(retried));
+  assert(retried.status === 'committed', JSON.stringify(retried));
+  assert(
+    retried.warnings?.some((warning) => warning.includes('recommended 72')),
+    JSON.stringify(retried),
+  );
+  assert(!artifactExists(repo, id, 'hash'), JSON.stringify(retried));
+  assert(!artifactExists(repo, id, 'result'), JSON.stringify(retried));
+  assert(!artifactExists(repo, id, 'request'), JSON.stringify(retried));
 }
 
 // no_review_requiredのUnitが機械的なUnit subjectでcommitできることを確認する。
@@ -819,6 +883,63 @@ function testHashMismatch(runRoot) {
   assert(!artifactExists(repo, id, 'request'), review);
 }
 
+// hook失敗時はstaged hashが同じ場合だけartifactを保持し、index変更時は再レビューを要求する。
+function testHookFailureRetry(runRoot) {
+  const unchangedId = 'smoke-hook-failure-unchanged';
+  const unchangedRepo = createRepo(runRoot, {
+    changedContent: 'export const value = 2;\n',
+  });
+  const unchangedReview = runReview(unchangedRepo, unchangedId);
+  writeGitHook(unchangedRepo, 'pre-commit', '#!/bin/sh\nexit 1\n');
+
+  const unchangedFailure = runCommit(
+    unchangedRepo,
+    unchangedId,
+    validCommitMessage('Retry unchanged hook failure'),
+  );
+  assert(unchangedFailure.exitCode !== 0, JSON.stringify(unchangedFailure));
+  assert(unchangedFailure.retryable === true, JSON.stringify(unchangedFailure));
+  assert(
+    unchangedFailure.retryReason === 'commit_failed_unchanged_candidate',
+    JSON.stringify(unchangedFailure),
+  );
+  assert(artifactExists(unchangedRepo, unchangedId, 'hash'), unchangedReview);
+  assert(artifactExists(unchangedRepo, unchangedId, 'result'), unchangedReview);
+  assert(artifactExists(unchangedRepo, unchangedId, 'request'), unchangedReview);
+
+  rmSync(join(unchangedRepo, '.git/hooks/pre-commit'));
+  const unchangedRetry = runCommit(
+    unchangedRepo,
+    unchangedId,
+    validCommitMessage('Retry unchanged hook failure'),
+  );
+  assert(unchangedRetry.exitCode === 0, JSON.stringify(unchangedRetry));
+  assert(unchangedRetry.status === 'committed', JSON.stringify(unchangedRetry));
+
+  const changedId = 'smoke-hook-failure-changed';
+  const changedRepo = createRepo(runRoot, {
+    changedContent: 'export const value = 2;\n',
+  });
+  const changedReview = runReview(changedRepo, changedId);
+  writeGitHook(
+    changedRepo,
+    'pre-commit',
+    '#!/bin/sh\nprintf "export const value = 3;\\n" > src/change.mjs\ngit add -- src/change.mjs\nexit 1\n',
+  );
+
+  const changedFailure = runCommit(
+    changedRepo,
+    changedId,
+    validCommitMessage('Reject changed hook candidate'),
+  );
+  assert(changedFailure.exitCode !== 0, JSON.stringify(changedFailure));
+  assert(changedFailure.retryable === false, JSON.stringify(changedFailure));
+  assert(changedFailure.retryReason === 'candidate_changed', JSON.stringify(changedFailure));
+  assert(!artifactExists(changedRepo, changedId, 'hash'), changedReview);
+  assert(!artifactExists(changedRepo, changedId, 'result'), changedReview);
+  assert(!artifactExists(changedRepo, changedId, 'request'), changedReview);
+}
+
 // Why/What/Verify形式のIntent messageで検証済みcandidateをcommitできることを確認する。
 function testCommit(runRoot) {
   const id = 'smoke-commit';
@@ -866,12 +987,18 @@ function testCleanupFailure(runRoot) {
 }
 
 // 各テストが互いのGit状態やartifactを共有しないよう、独立したfixture repoを作る。
-function createRepo(runRoot, { stagedFiles = ['src/change.mjs'], changedContent = null } = {}) {
+function createRepo(
+  runRoot,
+  { stagedFiles = ['src/change.mjs'], changedContent = null, packageScripts = null } = {},
+) {
   const repo = mkdtempSync(join(runRoot, 'repo-'));
   mkdirSync(join(repo, 'src'), { recursive: true });
   writeFileSync(join(repo, 'src/change.mjs'), 'export const value = 1;\n');
   writeFileSync(join(repo, 'src/context.mjs'), 'export const context = true;\n');
   writeFileSync(join(repo, 'README.md'), '# smoke\n');
+  if (packageScripts) {
+    writeFileSync(join(repo, 'package.json'), `${JSON.stringify({ scripts: packageScripts })}\n`);
+  }
   runGit(repo, ['init', '-q']);
   runGit(repo, ['config', 'user.name', 'Commit Skill Smoke']);
   runGit(repo, ['config', 'user.email', 'commit-skill-smoke@example.invalid']);
@@ -886,6 +1013,15 @@ function createRepo(runRoot, { stagedFiles = ['src/change.mjs'], changedContent 
   }
   for (const path of stagedFiles) runGit(repo, ['add', '--', path]);
   return repo;
+}
+
+// review前checkを再現するfixtureへ、3つの品質checkを通す最小scriptを与える。
+function passingCheckScripts() {
+  return {
+    'format:check': 'true',
+    lint: 'true',
+    'typecheck:staged': 'true',
+  };
 }
 
 // integrate.mjsの検証対象になるlinearなUnit履歴を、指定件数だけ作る。

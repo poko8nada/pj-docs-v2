@@ -108,9 +108,12 @@ Pass the row's agreed Context paths as repeated `--context <path>` arguments and
 
 - `review_required` returns a short reviewer handoff and writes the complete payload to `requestArtifact`.
 - `no_review_required` means no staged path in this row matches the reviewable extensions.
+- `checks_failed` means the staged candidate produced a formatter, linter, or typecheck error or warning. Do not invoke the reviewer; fix the candidate and run `review.mjs` again.
 - `error` stops the row.
 
 Context paths are read-only reviewer context. They must be exact paths from the agreed plan, must be clean and outside the staged candidate, and are not included in the hash, line count, review scope, or commit.
+
+Before writing review artifacts, `review.mjs` expands the staged index into an isolated temporary candidate workspace and runs the same staged-path checks as `lefthook`: `format:check`, `lint`, and `typecheck:staged` where their file extensions apply. A non-zero exit or warning blocks the reviewer. These checks run again after every `REVIEW: GAPS` correction because the candidate has changed.
 
 When `request` is returned, pass that object unchanged to the available `Task` or `functions.Subagent` reviewer route. Do not invoke the reviewer directly, add a model, or pass an ad hoc prompt.
 
@@ -141,7 +144,7 @@ MESSAGE
 
 For a single complete Intent row, pass its full Why/What/Verify message instead.
 
-`commit.mjs` regenerates the hash from the complete current staged candidate, rejects a missing or different hash, appends the Cursor trailer, and removes the current hash, result, and request artifacts. A Unit commit is provisional; a single Intent commit already uses its final message but is still recorded for the final integration manifest. After a successful row commit, restage only the next row and repeat this step. Never reuse a review artifact or verdict across rows.
+`commit.mjs` regenerates the hash from the complete current staged candidate and rejects a missing or different hash. A structurally invalid message is a retryable rejection: the current hash, result, and request artifacts remain, so correcting only the message does not require a new review. A subject longer than 72 characters is reported as a warning rather than rejected. If `git commit` fails and the staged hash is unchanged, the same artifacts remain for a retry; if the hook changed the staged hash, all artifacts are removed and the row requires a fresh review. On success, the script appends the Cursor trailer and removes the current artifacts. A Unit commit is provisional; a single Intent commit already uses its final message but is still recorded for the final integration manifest. After a successful row commit, restage only the next row and repeat this step. Never reuse a review artifact or verdict across rows.
 
 ### 6. Review-only completion
 
@@ -174,4 +177,4 @@ Report the final Intent commits, their source row commits, and remaining staged 
 
 ## Artifact lifecycle
 
-Each review run removes stale `.hash`, `.result`, and `.request` artifacts older than seven days by mtime, then replaces the current conversation's artifacts. Review-only artifacts may remain until the next review, commit, or stale-artifact cleanup. A commit run removes the current artifacts after checking the staged hash.
+Each review run removes stale `.hash`, `.result`, and `.request` artifacts older than seven days by mtime, then replaces the current conversation's artifacts. Review-only artifacts may remain until the next review, commit, or stale-artifact cleanup. A message-validation failure or a commit-hook failure with an unchanged staged hash preserves the current artifacts for retry. A commit run removes the current artifacts after a successful commit or after detecting a changed candidate.

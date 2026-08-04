@@ -8,27 +8,51 @@ import {
 } from './lib/artifact.mjs';
 import { collectStagedSnapshot, runGit } from './lib/snapshot.mjs';
 import { workspaceRoot } from './lib/workspace.mjs';
-import { normalizeCommitMessage } from '../../lib/commit-message.mjs';
+import { parseCommitMessage } from '../../lib/commit-message.mjs';
 
 export { normalizeCommitMessage } from '../../lib/commit-message.mjs';
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const root = workspaceRoot(args.root);
+  if (!args.messageStdin) {
+    emit({
+      ok: false,
+      status: 'error',
+      message: 'Use --message-stdin for the formatted commit message.',
+    });
+    process.exitCode = 1;
+    return;
+  }
+
+  let parsedMessage;
+  try {
+    parsedMessage = parseCommitMessage(readStdin());
+  } catch (error) {
+    // messageだけの修正で再レビューを要求しないため、既存artifactを保持する。
+    emit({
+      ok: false,
+      status: 'rejected',
+      message: errorMessage(error),
+      retryable: true,
+      retryReason: 'message_validation',
+      artifacts: { preserved: true },
+    });
+    process.exitCode = 1;
+    return;
+  }
+
   let outcome;
+  let storedHash = null;
 
   try {
-    if (!args.messageStdin)
-      throw new Error('Use --message-stdin for the formatted commit message.');
-
     const stored = readHashArtifact(root);
     if (!stored.ok) {
       throw new Error(
         stored.missing ? 'Review hash is missing. Run the review script first.' : stored.message,
       );
     }
-
-    const message = normalizeCommitMessage(readStdin());
+    storedHash = stored.hash;
 
     const snapshot = collectStagedSnapshot(root, { includeEntries: false });
     if (!snapshot.ok) throw new Error(snapshot.message);
@@ -36,12 +60,39 @@ function main() {
       throw new Error('The staged commit candidate changed. Run the review script again.');
     }
 
-    const commit = runGit(root, ['commit', '-F', '-'], { input: `${message}\n` });
+    const commit = runGit(root, ['commit', '-F', '-'], { input: `${parsedMessage.message}\n` });
     if (!commit.ok) throw new Error(commit.message);
 
-    outcome = { ok: true, status: 'committed', subject: message.split('\n', 1)[0] };
+    outcome = {
+      ok: true,
+      status: 'committed',
+      subject: parsedMessage.message.split('\n', 1)[0],
+      warnings: parsedMessage.warnings,
+    };
   } catch (error) {
     outcome = { ok: false, status: 'rejected', message: errorMessage(error) };
+  }
+
+  if (storedHash) {
+    // commit hookの失敗後にindexが同じなら、review済みcandidateとしてretryを許可する。
+    const current = collectStagedSnapshot(root, { includeEntries: false });
+    if (current.ok && current.hash === storedHash && outcome.ok !== true) {
+      emit({
+        ...outcome,
+        retryable: true,
+        retryReason: 'commit_failed_unchanged_candidate',
+        artifacts: { preserved: true },
+      });
+      process.exitCode = 1;
+      return;
+    }
+    if (current.ok && current.hash !== storedHash && outcome.ok !== true) {
+      outcome = {
+        ...outcome,
+        retryable: false,
+        retryReason: 'candidate_changed',
+      };
+    }
   }
 
   const cleanup = cleanupArtifacts(root);

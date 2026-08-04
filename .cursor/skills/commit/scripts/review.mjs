@@ -13,6 +13,7 @@ import {
   writeReviewRequestArtifact,
   writeReviewResultArtifact,
 } from './lib/artifact.mjs';
+import { runLocalChecks } from './lib/checks.mjs';
 import { workspaceRoot } from './lib/workspace.mjs';
 
 function main() {
@@ -44,6 +45,23 @@ function main() {
       ok: false,
       status: 'error',
       message: 'Context files require at least one staged reviewable path.',
+    });
+    process.exitCode = 1;
+    return;
+  }
+
+  const localChecks = runLocalChecks(root, snapshot.paths);
+  if (!localChecks.ok) {
+    // reviewerを起動する前に、commit hookと同じ品質ゲートをcandidateへ適用する。
+    emit({
+      ok: false,
+      status: 'checks_failed',
+      message:
+        'Local format, lint, or typecheck reported errors or warnings. Fix them before review.',
+      checks: localChecks.checks,
+      stagedPaths: snapshot.paths,
+      reviewablePaths: snapshot.reviewablePaths,
+      contextPaths,
     });
     process.exitCode = 1;
     return;
@@ -101,6 +119,7 @@ function main() {
       resultArtifact: resultArtifact.path,
       stagedPaths: snapshot.paths,
       contextPaths,
+      checks: localChecks.checks,
     });
     return;
   }
@@ -114,6 +133,7 @@ function main() {
     request: buildReviewRequest(requestArtifact.path),
     reviewablePaths: snapshot.reviewablePaths,
     contextPaths,
+    checks: localChecks.checks,
     complete: true,
   });
 }

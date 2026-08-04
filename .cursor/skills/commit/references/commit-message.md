@@ -16,8 +16,7 @@ Example:
 unit-review-evidence-review-evidence-unit-1: connect review evidence
 ```
 
-The subject must be English, contain no trailing period, and stay within
-72 characters. Do not add `Why`, `What`, or `Verify` to a Unit message.
+The subject must be English and contain no trailing period. Keep it within the recommended 72 characters; `commit.mjs` reports longer subjects as a warning instead of rejecting an otherwise valid message. Do not add `Why`, `What`, or `Verify` to a Unit message.
 `commit.mjs` appends the Cursor trailer automatically.
 
 ## Intent integration commit
@@ -46,5 +45,4 @@ The commit script appends exactly one trailer after either form:
 Co-authored-by: Cursor <cursoragent@cursor.com>
 ```
 
-Do not add that trailer manually. The script removes an existing identical
-Cursor trailer before appending one.
+Do not add that trailer manually. The script removes an existing identical Cursor trailer before appending one.
