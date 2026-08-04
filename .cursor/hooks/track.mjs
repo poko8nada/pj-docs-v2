@@ -6,22 +6,18 @@
  * |--------------------|---------------------------------------------|
  * | beforeSubmitPrompt | phase / bootstrap / scope confirmation      |
  * | Read*              | unlock + read.skills / read.refs            |
- * | postToolUse        | Git snapshot + check.pending + format        |
- * | preToolUse Task         | snapshot を保存して reviewer に差分を注入       |
- * | stop                    | matching PASS を binding に反映 + used フラグ |
- * | afterShellExecution     | git commit 成功 → review/check reset          |
+ * | postToolUse        | check.pending + format                         |
+ * | beforeShellExecution | review script の開始時刻を記録               |
+ * | afterShellExecution  | commit script 成功 → review reset             |
  */
 import { realpathSync } from 'node:fs';
 import { relative, isAbsolute, join, resolve } from 'node:path';
 import { disableBootstrap, enableBootstrap } from './lib/bootstrap.mjs';
 import { clearStubTurn, enableStubTurn, isMentorActive } from './lib/mentor.mjs';
 import {
+  commandIncludesCommitScript,
   commandIncludesGitCommit,
-  collectReviewSnapshot,
-  findReviewPassTranscript,
-  injectReviewSnapshotIntoTaskInput,
-  isPreCommitReviewerContext,
-  markReviewPassUsed,
+  commandIncludesReviewScript,
 } from './lib/review.mjs';
 import { skillRefIdFromPath } from './lib/refs.mjs';
 import { ISSUE_SKILL_REL } from './lib/issue.mjs';
@@ -32,20 +28,14 @@ import {
   conversationId,
   defaultRead,
   findStateFileName,
-  hasReviewSnapshot,
-  idFromTranscriptPath,
   loadState,
   markCheckPending,
   markReadRef,
   markReadSkill,
-  clearReview,
-  formatReviewSnapshotAt,
+  formatReviewStartedAt,
   normalizeReview,
   normalizeCheck,
   PHASE_DISCUSSION,
-  REVIEW_BINDING_BOUND,
-  REVIEW_BINDING_UNBOUND,
-  resolveConversationId,
   resetCheck,
   resetReview,
   saveState,
@@ -243,7 +233,7 @@ function handleBeforeSubmitPrompt(root, payload) {
   const phase = match[1].toLowerCase();
   const prev = loadState(root, id);
   let unlock;
-  // reviewer snapshot はフェーズ変更・再入場でも保持し、Git 差分一致を commit 時に再確認する。
+  // review開始時刻とtranscript bindingはフェーズ変更・再入場でも保持する。
   const review = normalizeReview(prev.review);
   // phase 再入場: read はクリア（skills / refs）
   const read = defaultRead();
@@ -288,43 +278,6 @@ function maybeMarkCheckPending(root, payload) {
   markCheckPending(root, id, abs);
 }
 
-/** 親会話の Git 差分を state に反映し、古い reviewer binding を無効化する */
-function maybeRefreshReviewSnapshot(root, payload) {
-  const id = conversationId(payload);
-  const state = loadState(root, id);
-  if (!WORK_PHASES.has(state.phase) || state.unlock?.rules !== true) return;
-
-  const snapshot = collectReviewSnapshot(root);
-  if (snapshot.kind === 'error') return;
-
-  const review = normalizeReview(state.review);
-  if (snapshot.kind === 'empty') {
-    if (
-      review.snapshotHash !== null ||
-      review.snapshotAt !== null ||
-      review.reviewerTranscriptId !== null ||
-      review.binding !== null
-    ) {
-      clearReview(root, id);
-    }
-    return;
-  }
-  if (review.snapshotHash === snapshot.hash && review.snapshotAt !== null) return;
-  const sameSnapshot = review.snapshotHash === snapshot.hash;
-
-  saveState(root, id, {
-    phase: state.phase,
-    review: {
-      snapshotHash: snapshot.hash,
-      snapshotAt: sameSnapshot
-        ? (review.snapshotAt ?? formatReviewSnapshotAt())
-        : formatReviewSnapshotAt(),
-      reviewerTranscriptId: sameSnapshot ? review.reviewerTranscriptId : null,
-      binding: sameSnapshot ? review.binding : REVIEW_BINDING_UNBOUND,
-    },
-  });
-}
-
 /** dirty 直後に format のみ。失敗は additional_context（gate / pending は触らない） */
 function maybeFormatOnDirty(root, payload) {
   const id = conversationId(payload);
@@ -346,34 +299,6 @@ function maybeFormatOnDirty(root, payload) {
   return ctx || null;
 }
 
-function handlePreToolUseTask(root, payload) {
-  if (!isPreCommitReviewerContext(payload)) return allow();
-
-  const id = conversationId(payload);
-  const state = loadState(root, id);
-  if (!WORK_PHASES.has(state.phase) || state.unlock?.rules !== true) return allow();
-
-  const snapshot = collectReviewSnapshot(root, { includeEntries: true });
-  if (snapshot.kind !== 'snapshot') return allow();
-
-  saveState(root, id, {
-    phase: state.phase,
-    review: {
-      snapshotHash: snapshot.hash,
-      snapshotAt: formatReviewSnapshotAt(),
-      reviewerTranscriptId: null,
-      binding: REVIEW_BINDING_UNBOUND,
-    },
-  });
-  const toolInput = payload.tool_input ?? {};
-  const updatedInput = injectReviewSnapshotIntoTaskInput(toolInput, root, snapshot);
-
-  if (updatedInput) {
-    return respond({ permission: 'allow', updated_input: updatedInput });
-  }
-  return allow();
-}
-
 function shellCommand(payload) {
   return String(payload.command ?? payload.tool_input?.command ?? '');
 }
@@ -385,10 +310,34 @@ function shellSucceeded(payload) {
   return true;
 }
 
-/** 成功した git commit だけ review/check クリア（試行時点では reset しない） */
+/** review scriptの実行開始だけをstateへ記録する。hash/resultはscript側のartifactで管理する。 */
+function handleBeforeShellExecution(root, payload) {
+  const command = shellCommand(payload);
+  if (!commandIncludesReviewScript(command)) return empty();
+
+  const id = conversationId(payload);
+  const state = loadState(root, id);
+  saveState(root, id, {
+    phase: state.phase,
+    review: {
+      reviewStartedAt: formatReviewStartedAt(),
+      reviewerTranscriptId: null,
+      binding: null,
+    },
+  });
+  return empty();
+}
+
+/** commit script成功時はreviewをresetし、raw git commit時は既存のcheck resetだけを行う。 */
 function handleAfterShellExecution(root, payload) {
   const command = shellCommand(payload);
   if (!shellSucceeded(payload)) return empty();
+
+  if (commandIncludesCommitScript(command)) {
+    const id = conversationId(payload);
+    resetReview(root, id);
+    return empty();
+  }
 
   if (!commandIncludesGitCommit(command)) return empty();
 
@@ -396,38 +345,7 @@ function handleAfterShellExecution(root, payload) {
   const state = loadState(root, id);
   const hadCheck = normalizeCheck(state.check).pending.length > 0;
 
-  resetReview(root, id);
   if (hadCheck) resetCheck(root, id);
-  return empty();
-}
-
-/**
- * ターン終了: matching PASS があれば snapshot binding を bound にする。
- * commit 前スキャンは保険として残す。
- */
-function handleStop(root, payload) {
-  const resolvedConversation = resolveConversationId(payload);
-  const id = resolvedConversation.id;
-  const state = loadState(root, id);
-  if (!hasReviewSnapshot(state)) return empty();
-
-  const review = normalizeReview(state.review);
-  const snapshot = collectReviewSnapshot(root);
-  if (snapshot.kind === 'empty') {
-    clearReview(root, id);
-    return empty();
-  }
-  if (snapshot.kind !== 'snapshot' || review.snapshotHash !== snapshot.hash) return empty();
-  if (resolvedConversation.via !== 'sticky.last-prompt-id') return empty();
-  const passJsonl = findReviewPassTranscript(root, id, review.snapshotAt);
-  if (!passJsonl) return empty();
-
-  markReviewPassUsed(passJsonl);
-  const reviewerTranscriptId = idFromTranscriptPath(passJsonl);
-  saveState(root, id, {
-    phase: state.phase,
-    review: { ...review, reviewerTranscriptId, binding: REVIEW_BINDING_BOUND },
-  });
   return empty();
 }
 
@@ -438,34 +356,16 @@ async function main() {
   const event = payload.hook_event_name ?? '';
   const toolName = payload.tool_name ?? '';
 
-  const shouldRefreshReview =
-    event === 'beforeSubmitPrompt' ||
-    event === 'afterShellExecution' ||
-    event === 'stop' ||
-    (event === 'postToolUse' && WRITE_TOOLS.has(toolName));
-  if (shouldRefreshReview) {
-    maybeRefreshReviewSnapshot(root, payload);
-  }
-
   if (event === 'beforeSubmitPrompt') {
     return handleBeforeSubmitPrompt(root, payload);
-  }
-
-  if (event === 'stop') {
-    return handleStop(root, payload);
   }
 
   if (event === 'afterShellExecution') {
     return handleAfterShellExecution(root, payload);
   }
 
-  // beforeShellExecution: commit 試行では reset しない（空コミットすり抜け防止）
   if (event === 'beforeShellExecution') {
-    return empty();
-  }
-
-  if (event === 'preToolUse' && toolName === 'Task') {
-    return handlePreToolUseTask(root, payload);
+    return handleBeforeShellExecution(root, payload);
   }
 
   const isReadTool = toolName === 'Read' || toolName === 'ReadFile';

@@ -46,11 +46,6 @@
         "failClosed": false
       },
       {
-        "command": "node .cursor/hooks/track.mjs",
-        "matcher": "Task",
-        "failClosed": false
-      },
-      {
         "command": "node .cursor/hooks/gate.mjs",
         "matcher": "Write|StrReplace|Delete|EditNotebook",
         "failClosed": true

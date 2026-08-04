@@ -56,14 +56,14 @@ export function runInjectGateListing(smoke) {
     );
     assert(
       'inject mentions review',
-      ctx.includes('## Review') && ctx.includes('/pre-commit-reviewer'),
+      ctx.includes('## Review') && ctx.includes('REVIEW: PASS'),
       ctx.slice(0, 600),
     );
     assert(
-      'inject explains prompt-bound reviewer lookup',
-      ctx.includes('unique post-snapshot PASS') &&
-        ctx.includes('sticky state ID') &&
-        ctx.includes('runtime transcript paths'),
+      'inject explains commit Skill review flow',
+      ctx.includes('commit/scripts/review.mjs') &&
+        ctx.includes('commit/scripts/commit.mjs') &&
+        ctx.includes('no_review_required'),
       ctx.slice(0, 600),
     );
     assert(
@@ -123,7 +123,7 @@ export function runInjectSticky(smoke) {
         {
           phase: 'chore',
           unlock: { rules: true, issue: null, agenda: null, scope: false },
-          review: { snapshotHash: null, snapshotAt: null, reviewerTranscriptId: null },
+          review: { reviewStartedAt: null, reviewerTranscriptId: null, binding: null },
           check: { pending: [] },
           read: { skills: [], refs: [] },
           label: 'prev',
@@ -139,7 +139,7 @@ export function runInjectSticky(smoke) {
         {
           phase: 'discussion',
           unlock: { rules: null, issue: null, agenda: null, scope: false },
-          review: { snapshotHash: null, snapshotAt: null, reviewerTranscriptId: null },
+          review: { reviewStartedAt: null, reviewerTranscriptId: null, binding: null },
           check: { pending: [] },
           read: { skills: [], refs: [] },
           label: 'new',

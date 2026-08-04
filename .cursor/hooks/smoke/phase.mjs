@@ -20,11 +20,8 @@ export function runPhaseCore(smoke) {
     findStateFileName,
     loadState,
     onSessionStart,
-    unlinkSync,
-    writeFileSync,
     join,
     workspaceRoot,
-    collectReviewSnapshot,
     saveState,
   } = smoke;
   // lib/ 移動後も payload 無しの root fallback がリポジトリ根を指すこと
@@ -528,13 +525,10 @@ export function runPhaseCore(smoke) {
       hook_event_name: 'beforeShellExecution',
       command: 'git commit -m msg',
     });
-    const currentSnapshot = collectReviewSnapshot(root);
     assert(
-      'phase unlocks git write unless reviewable diff is unreviewed',
-      currentSnapshot.kind === 'empty'
-        ? outGit.permission === 'allow'
-        : outGit.permission === 'deny',
-      JSON.stringify({ outGit, currentSnapshot }),
+      'raw git commit is not controlled by the review gate',
+      outGit.permission === 'allow',
+      JSON.stringify(outGit),
     );
 
     const outPnpm = run('gate.mjs', {
@@ -797,85 +791,50 @@ export function runPhaseCore(smoke) {
     );
   }
 
-  // 10b. reviewer snapshot はフェーズ変更でも同じ Git 差分を binding する
+  // review bindingはphase変更・再入場でも保持し、readだけをクリアする。
   {
-    const persistId = 'review-persist-id';
+    const persistId = 'review-phase-persist-id';
     const persistBase = { conversation_id: persistId, workspace_roots: [root], cwd: root };
+    const reviewStartedAt = '2026-08-03T15:49:13.204+09:00';
+    const reviewerTranscriptId = '20000000-0000-4000-8000-000000000051';
+    saveState(root, persistId, {
+      phase: 'chore',
+      unlock: { rules: true, issue: null, agenda: null, scope: true },
+      read: { skills: ['rules'], refs: ['rules/conventions.md'] },
+      review: { reviewStartedAt, reviewerTranscriptId, binding: 'bound' },
+    });
+
     run('track.mjs', {
       ...persistBase,
       hook_event_name: 'beforeSubmitPrompt',
-      prompt: '/scope ok',
+      prompt: '/work review persist',
     });
-    run('track.mjs', {
-      ...persistBase,
-      hook_event_name: 'beforeSubmitPrompt',
-      prompt: '/chore review persist',
-    });
-    run('track.mjs', {
-      ...persistBase,
-      hook_event_name: 'preToolUse',
-      tool_name: 'ReadFile',
-      tool_input: { path: join(root, '.cursor/skills/scope/SKILL.md') },
-    });
-    run('track.mjs', {
-      ...persistBase,
-      hook_event_name: 'preToolUse',
-      tool_name: 'ReadFile',
-      tool_input: { path: join(root, '.cursor/skills/rules/SKILL.md') },
-    });
-    writeFileSync(
-      join(root, '.cursor/hooks/_smoke-review-persist-probe.mjs'),
-      'export const smokePersistProbe = 1;\n',
-    );
-    trackReadConventionsRef(persistBase);
-    run('track.mjs', {
-      ...persistBase,
-      hook_event_name: 'postToolUse',
-      tool_name: 'Write',
-      tool_input: { path: join(root, '.cursor/hooks/_smoke-review-persist-probe.mjs') },
-    });
-    const taskOut = run('track.mjs', {
-      ...persistBase,
-      hook_event_name: 'preToolUse',
-      tool_name: 'Task',
-      tool_input: { subagent_type: 'pre-commit-reviewer', description: 'review persist' },
-    });
-    const snapshotHash = loadState(root, persistId).review.snapshotHash;
+    const afterWork = loadState(root, persistId);
     assert(
-      'review snapshot before phase switch',
-      typeof snapshotHash === 'string' &&
-        snapshotHash.startsWith('sha256:') &&
-        taskOut.updated_input?.description?.includes('[harness-review]'),
-      JSON.stringify({ taskOut, review: loadState(root, persistId).review }),
+      'review binding persists across phase switch',
+      afterWork.phase === 'work' &&
+        afterWork.review.reviewStartedAt === reviewStartedAt &&
+        afterWork.review.reviewerTranscriptId === reviewerTranscriptId &&
+        afterWork.review.binding === 'bound' &&
+        afterWork.read.skills.length === 0 &&
+        afterWork.read.refs.length === 0,
+      JSON.stringify(afterWork),
     );
-    run('track.mjs', {
-      ...persistBase,
-      hook_event_name: 'beforeSubmitPrompt',
-      prompt: '/work after review dirty',
-    });
-    const stPersist = loadState(root, persistId);
-    assert(
-      'review snapshot persists across phase switch',
-      stPersist.phase === 'work' &&
-        stPersist.review.snapshotHash === snapshotHash &&
-        stPersist.read.refs.length === 0,
-      JSON.stringify(stPersist),
-    );
+
     run('track.mjs', {
       ...persistBase,
       hook_event_name: 'beforeSubmitPrompt',
       prompt: '/discussion clear phase',
     });
+    const afterDiscussion = loadState(root, persistId);
     assert(
-      'review snapshot persists into discussion',
-      loadState(root, persistId).review.snapshotHash === snapshotHash,
-      JSON.stringify(loadState(root, persistId)),
+      'review binding persists into discussion',
+      afterDiscussion.phase === 'discussion' &&
+        afterDiscussion.review.reviewStartedAt === reviewStartedAt &&
+        afterDiscussion.review.reviewerTranscriptId === reviewerTranscriptId &&
+        afterDiscussion.review.binding === 'bound',
+      JSON.stringify(afterDiscussion),
     );
-    try {
-      unlinkSync(join(root, '.cursor/hooks/_smoke-review-persist-probe.mjs'));
-    } catch {
-      // 無ければ無視
-    }
   }
 }
 

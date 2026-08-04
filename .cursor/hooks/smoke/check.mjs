@@ -344,13 +344,12 @@ export function runCheckPending(smoke) {
       JSON.stringify(stFormatFail.check),
     );
     assert(
-      'format-on-dirty failure records current reviewer snapshot',
-      typeof stFormatFail.review?.snapshotHash === 'string' &&
-        typeof stFormatFail.review?.snapshotAt === 'string' &&
-        stFormatFail.review?.reviewerTranscriptId == null,
+      'format-on-dirty failure does not update review metadata',
+      stFormatFail.review?.reviewStartedAt === null &&
+        stFormatFail.review?.reviewerTranscriptId === null &&
+        stFormatFail.review?.binding === null,
       JSON.stringify(stFormatFail.review),
     );
-
     try {
       unlinkSync(probeAbs);
     } catch {
