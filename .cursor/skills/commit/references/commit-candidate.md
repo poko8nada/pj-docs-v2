@@ -1,6 +1,6 @@
 # Commit candidate
 
-The staged Git index is the candidate for exactly one Unit commit.
+The staged Git index is the candidate for exactly one Intent row commit.
 
 Stage only the files inside the user-confirmed scope before running
 `scripts/review.mjs`. Do not let the scripts discover an implicit scope from
@@ -14,15 +14,16 @@ The current reviewable extensions are `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`,
 `.cjs`, `.css`, `.html`, `.json`, `.yaml`, and `.yml`. Markdown is intentionally
 outside the review set.
 
-The Skill's review split target is 1,200 Git diff lines
-(`additions + deletions`) for a Unit containing multiple files. The Skill owns
-the target comparison and splitting decision. A single file, including a new
-file, may exceed the target because a file is indivisible.
+The Skill's initial review split target is 1,000 Git diff lines
+(`additions + deletions`) for a row containing multiple files. After a
+`REVIEW: GAPS` correction, the row may reach 1,200 lines. The Skill owns the
+target comparison and splitting decision. A single file, including a new file,
+may exceed the applicable target because a file is indivisible.
 
 The measurement script does not modify the index, choose boundaries, build a
 payload, invoke a reviewer, or commit. It validates that the plan covers every
 staged path exactly once and reports additions and deletions for reviewable
-Units.
+Intent rows or Units.
 
 The review script writes the complete diff for the current staged candidate to
 an artifact. It never truncates or omits a file. If a complete artifact cannot
@@ -40,4 +41,5 @@ The commit script regenerates the hash from the current staged index. It
 rejects a missing or different value, commits the staged candidate on a match,
 and removes the current review artifacts after execution.
 
-Each Unit is a new staged candidate and requires a new review-script run.
+Each Intent row or Unit is a new staged candidate and requires a new
+review-script run.

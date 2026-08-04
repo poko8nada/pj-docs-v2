@@ -5,7 +5,7 @@ description: Review staged changes before an explicit commit, or review staged c
 
 # commit
 
-This Skill owns the staged-candidate plan, Unit boundaries, review request, review notes, hash artifacts, and Unit commit. Harness owns gate enforcement and reviewer evidence verification. The reviewer owns review findings and the final `REVIEW: PASS` or `REVIEW: GAPS` verdict. Do not make Harness inject payload content or make the reviewer create a commit.
+This Skill owns the staged-candidate plan, Intent boundaries, Unit boundaries, review request, review notes, hash artifacts, provisional commits, and final Intent integration. Harness owns gate enforcement and reviewer evidence verification. The reviewer owns review findings and the final `REVIEW: PASS` or `REVIEW: GAPS` verdict. Do not make Harness inject payload content or make the reviewer create a commit.
 
 ## Resources
 
@@ -21,15 +21,15 @@ Use these scripts from the repository root:
 - `node .cursor/skills/commit/scripts/measure.mjs --plan-stdin`
 - `node .cursor/skills/commit/scripts/review.mjs [--context <path> ...] [--note "<agreed context>"]`
 - `node .cursor/skills/commit/scripts/commit.mjs --message-stdin`
-- `node .cursor/skills/commit/scripts/integrate.mjs --base <commit> --commits <sha1,sha2,...> --message-stdin`
+- `node .cursor/skills/commit/scripts/integrate.mjs --base <commit> --manifest-stdin`
 - `node .cursor/skills/commit/scripts/smoke.mjs`
 
 ## Procedure
 
 ### 1. Confirm the delivery intent
 
-- A commit request continues through review and Unit commit.
-- A review-only request continues through every planned Unit review and stops before `commit.mjs`.
+- A commit request continues through review, source-row commits, and final Intent integration.
+- A review-only request continues through every planned row review and stops before `commit.mjs`.
 - An unclear request stops for clarification.
 
 Do not run a reviewer or commit script before the plan is agreed.
@@ -59,10 +59,11 @@ Never use `git add .` or another broad add. Stop if the staged candidate is empt
 Classify every staged path in the user-confirmed range exactly once:
 
 1. create coarse Intents from one-sentence Intent and Behavior pairs;
-2. classify each Unit as `required` or `no_review_required`;
-3. assign each Unit a unique `<intent-slug>-unit-N` ID;
-4. choose any necessary exact, tracked, clean Context files for each reviewable Unit;
-5. list Paths, Context, `Lines: pending`, and optional Note.
+2. classify each Intent row as `required` or `no_review_required`;
+3. keep one complete Intent row without a `Units:` section when it does not need splitting;
+4. add a `Units:` section with unique `<intent-slug>-unit-N` IDs only when an Intent needs two or more review rows;
+5. choose any necessary exact, tracked, clean Context files for each reviewable row;
+6. list Paths, Context, `Lines: pending`, and optional Note.
 
 Show the complete structured bullet plan in chat before any reviewer or commit invocation. Do not add a `Group` field; Intent is the Group identifier. Discuss the plan with the user and wait for explicit agreement.
 
@@ -78,49 +79,59 @@ node .cursor/skills/commit/scripts/measure.mjs --plan-stdin <<'PLAN'
 PLAN
 ```
 
-The script must only read the staged candidate, validate path coverage and Context files, and report Git diff lines as `additions + deletions` for `required` Units. It must not modify the index, split files, choose logical boundaries, create artifacts, invoke a reviewer, or commit.
+The script must only read the staged candidate, validate path coverage and Context files, and report Git diff lines as `additions + deletions` for `required` rows. It must not modify the index, split files, choose logical boundaries, create artifacts, invoke a reviewer, or commit.
 
-Copy each returned `changedLines` total into the plan's `Lines` field and show the complete measured plan in chat. The Skill compares required multi-file Units with the 1,200-line target:
+Copy each returned `changedLines` total into the plan's `Lines` field and show the complete measured plan in chat. The Skill applies phased limits to each required multi-file row:
 
-- If a multi-file Unit exceeds 1,200 lines, split it into child Units at file boundaries, preserving the Intent and Behavior where possible.
-- If a single file, including a new file, exceeds 1,200 lines, keep it as one Unit. Do not split hunks or duplicate the path.
+- The initial plan targets at most 1,000 Git diff lines.
+- After a `REVIEW: GAPS` correction, up to 1,200 Git diff lines is acceptable.
+- If a multi-file row exceeds the applicable limit, split it into child Units at file boundaries, preserving the Intent and Behavior where possible.
+- If a single file, including a new file, exceeds the applicable limit, keep it as one row. Do not split hunks or duplicate the path.
 - If a diff is binary or cannot be measured, stop and ask the user how to proceed.
-- Keep `no_review_required` Units without a line count.
+- Keep `no_review_required` rows without a line count.
 
 For every refinement, rerun measurement for the complete plan. If a split makes a child's Intent or Behavior unclear, obtain the user's agreement for the reason and place it in that Unit's Note. Then pass the Note to the reviewer through one `--note` argument. Notes may also record user-accepted findings or other agreed constraints; they are never proof of review completion.
 
-Proceed to Unit review only after all rows are within the target or are an explicit single-file exception, and the user has agreed to the measured plan.
+Proceed to row review only after all rows are within the target or are an explicit single-file exception, and the user has agreed to the measured plan.
 
-### 5. Review and commit one Unit at a time
+### 5. Review and commit one plan row at a time
 
-Before changing the index, stop if a planned path also has unstaged changes; separating that state requires user direction. For each Unit:
+Before changing the index, stop if a planned path also has unstaged changes; separating that state requires user direction. For each Intent row or Unit:
 
 ```sh
 git restore --staged -- <all-planned-paths>
-git add -- <paths-for-one-unit>
-node .cursor/skills/commit/scripts/review.mjs [--context <path> ...] [--note "<Unit Note>"]
+git add -- <paths-for-one-row>
+node .cursor/skills/commit/scripts/review.mjs [--context <path> ...] [--note "<row Note>"]
 ```
 
-Pass the Unit's agreed Context paths as repeated `--context <path>` arguments and parse the JSON result. Do not rebuild the request or create a temporary payload manually.
+Pass the row's agreed Context paths as repeated `--context <path>` arguments and parse the JSON result. Do not rebuild the request or create a temporary payload manually.
 
 - `review_required` returns a short reviewer handoff and writes the complete payload to `requestArtifact`.
-- `no_review_required` means no staged path in this Unit matches the reviewable extensions.
-- `error` stops the Unit.
+- `no_review_required` means no staged path in this row matches the reviewable extensions.
+- `error` stops the row.
 
 Context paths are read-only reviewer context. They must be exact paths from the agreed plan, must be clean and outside the staged candidate, and are not included in the hash, line count, review scope, or commit.
 
 When `request` is returned, pass that object unchanged to the available `Task` or `functions.Subagent` reviewer route. Do not invoke the reviewer directly, add a model, or pass an ad hoc prompt.
 
-- `REVIEW: PASS` permits the Unit commit.
-- `REVIEW: GAPS` stops the Unit. Do not commit unchanged. Ask the user to accept specific findings or to request a code correction. If the user accepts a finding or supplies agreed context, rerun `review.mjs` with that context in `--note`; rerun `measure.mjs` first if the Note or Paths changed.
+- `REVIEW: PASS` permits the row commit.
+- `REVIEW: GAPS` stops the row. Do not commit unchanged. Ask the user to accept specific findings or to request a code correction. If the user accepts a finding or supplies agreed context, rerun `review.mjs` with that context in `--note`; rerun `measure.mjs` first if the Note or Paths changed.
 
-For a commit request after `REVIEW: PASS` or `no_review_required`, prepare the one-line Unit subject from the Intent:
+Commit message language follows the boundary between provisional history and final history:
+
+- Unit subjects remain the English mechanical format below.
+- Intent integration subjects remain short English imperatives.
+- The prose values under `Why`, `What`, and `Verify` in every final Intent message must be Japanese.
+- Fixed labels, paths, SHAs, branch names, commands, and test names remain unchanged as technical literals.
+- Existing source commit subjects remain unchanged when they are referenced for traceability.
+
+For a commit request after `REVIEW: PASS` or `no_review_required`, use the message format for the row:
 
 ```text
 unit-<intent-slug>-<unit-id>: <short Intent summary>
 ```
 
-Confirm the subject, then pass it to the commit script:
+Use the one-line format only for a Unit row. For a single complete Intent row, prepare the full Intent integration message from `commit-message.md`. Confirm the selected message, then pass it to the commit script:
 
 ```sh
 node .cursor/skills/commit/scripts/commit.mjs --message-stdin <<'MESSAGE'
@@ -128,27 +139,28 @@ unit-<intent-slug>-<unit-id>: <short Intent summary>
 MESSAGE
 ```
 
-`commit.mjs` regenerates the hash from the complete current staged candidate, rejects a missing or different hash, appends the Cursor trailer, and removes the current hash, result, and request artifacts. After a successful Unit commit, restage only the next Unit and repeat this step. Never reuse a review artifact or verdict across Units.
+For a single complete Intent row, pass its full Why/What/Verify message instead.
+
+`commit.mjs` regenerates the hash from the complete current staged candidate, rejects a missing or different hash, appends the Cursor trailer, and removes the current hash, result, and request artifacts. A Unit commit is provisional; a single Intent commit already uses its final message but is still recorded for the final integration manifest. After a successful row commit, restage only the next row and repeat this step. Never reuse a review artifact or verdict across rows.
 
 ### 6. Review-only completion
 
-For a review-only request, report each Unit's `REVIEW: PASS`, `REVIEW: GAPS`, or `no_review_required` result and stop. Do not run `commit.mjs`, rewrite history, or leave a new commit.
+For a review-only request, report each row's `REVIEW: PASS`, `REVIEW: GAPS`, or `no_review_required` result and stop. Do not run `commit.mjs`, rewrite history, or leave a new commit.
 
-### 7. Optional Intent integration
+### 7. Integrate all Intents after every row is complete
 
-Unit commits are the normal review and commit boundary. Only when the user explicitly asks for history integration may the Skill prepare an Intent-level Why/What/Verify message. Record the base commit and each resulting Unit commit while processing the plan. Before any history rewrite, verify that every Unit has a fresh passing or no-review result and confirm the exact range with the user:
+A commit request is complete only after every planned row has a fresh passing or no-review result, every row has been committed, and the provisional history has been integrated. Record the base commit and each row commit while processing the plan. Build one manifest group per Intent: use `mode: "unit"` with all provisional Unit commits, or `mode: "intent"` with the one direct Intent commit. Keep groups in commit order:
 
 ```sh
 git log --oneline --reverse <base-commit>..HEAD
 node .cursor/skills/commit/scripts/integrate.mjs \
   --base <base-commit> \
-  --commits <unit-commit-1>,<unit-commit-2> \
-  --message-stdin <<'MESSAGE'
-<Intent Why/What/Verify message>
-MESSAGE
+  --manifest-stdin <<'MANIFEST'
+{"groups":[{"intent":"<Intent>","mode":"unit","commits":["<unit-commit-1>","<unit-commit-2>"],"message":"<Intent Why/What/Verify message>"}]}
+MANIFEST
 ```
 
-`integrate.mjs` requires a clean worktree, a contiguous range containing only linear Unit commits, and the current HEAD at the end of that range. It temporarily combines the range, creates the Intent commit, and verifies that the final tree is identical. If the tree differs, it stops and reports the recovery state; start a new review candidate rather than accepting the integration. Do not silently integrate Unit commits during the normal loop.
+Include every Intent in the manifest, including a single-row Intent. `integrate.mjs` requires a clean worktree, a contiguous range of linear source commits, the current HEAD at the end of that range, and a valid final message for each Intent. It reconstructs one final commit per Intent and verifies that the final tree is identical. If a hook, tree check, or recovery fails, stop and report the state; do not accept the integration silently.
 
 ### 8. Verify delivery
 
@@ -158,7 +170,7 @@ After the final requested operation:
 git status --short
 ```
 
-Report the Unit commits, any optional integration result, and remaining staged or unstaged work. Do not push, create pull requests, merge, alter unrelated Harness state, or modify the unrelated `check` flow.
+Report the final Intent commits, their source row commits, and remaining staged or unstaged work. Do not push, create pull requests, merge, alter unrelated Harness state, or modify the unrelated `check` flow.
 
 ## Artifact lifecycle
 

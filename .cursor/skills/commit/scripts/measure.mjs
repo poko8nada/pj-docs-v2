@@ -12,6 +12,7 @@ const REQUIRED_REVIEW = 'required';
 const OPTIONAL_REVIEW = 'no_review_required';
 const OPTIONAL_REVIEW_ALIASES = new Set([OPTIONAL_REVIEW, 'not-required']);
 
+// CLIの入力を計画解析、候補検証、Git差分計測の順に通す。
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const root = workspaceRoot(args.root);
@@ -31,33 +32,71 @@ function main() {
 }
 
 export function parsePlan(raw) {
+  // インデント付き箇条書きを、単一Intent行または複数Unit行へ正規化する。
   const intents = [];
   const rows = [];
   const units = new Set();
   const intentNames = new Set();
   let currentIntent = null;
-  let currentUnit = null;
+  let currentEntry = null;
   let readingPaths = false;
   let readingContext = false;
+  let listIndent = null;
 
-  const flushUnit = () => {
-    if (!currentUnit) return;
-    if (!currentUnit.review) throw new Error(`Unit "${currentUnit.unit}" is missing Review.`);
-    if (currentUnit.paths.length === 0) {
-      throw new Error(`Unit "${currentUnit.unit}" must contain at least one path.`);
+  // 次のフィールドを読む前に、Paths/Contextのリスト状態を解除する。
+  const stopReading = () => {
+    readingPaths = false;
+    readingContext = false;
+    listIndent = null;
+  };
+
+  // Unitsを持たないIntentの直接記述へ切り替え、共有の行データを作る。
+  const startDirectEntry = (line) => {
+    requireIntent(currentIntent, line);
+    if (currentIntent.mode === 'units') {
+      throw new Error(`Intent "${currentIntent.intent}" cannot mix direct fields with Units.`);
     }
+    currentIntent.mode = 'intent';
+    if (!currentEntry) currentEntry = createEntry(null);
+    return currentEntry;
+  };
+
+  // 現在の行を検証済みの測定対象へ確定する。
+  const flushEntry = () => {
+    if (!currentEntry) return;
+    validateEntry(currentIntent, currentEntry);
     rows.push({
       intent: currentIntent.intent,
       behavior: currentIntent.behavior,
-      unit: currentUnit.unit,
-      review: currentUnit.review,
-      paths: currentUnit.paths,
-      context: currentUnit.context,
-      note: currentUnit.note,
+      unit: currentEntry.unit,
+      commit: currentEntry.unit ? 'unit' : 'intent',
+      review: currentEntry.review,
+      paths: currentEntry.paths,
+      context: currentEntry.context,
+      note: currentEntry.note,
     });
-    currentUnit = null;
+    if (currentEntry.unit) currentIntent.units.push(currentEntry.unit);
+    currentEntry = null;
   };
 
+  // Intent境界で直前の行を確定し、構造上の必須項目を検証する。
+  const flushIntent = () => {
+    if (!currentIntent) return;
+    flushEntry();
+    if (!currentIntent.behavior) {
+      throw new Error(`Intent "${currentIntent.intent}" is missing Behavior.`);
+    }
+    if (currentIntent.mode === 'units' && currentIntent.units.length === 0) {
+      throw new Error(`Intent "${currentIntent.intent}" has no Units.`);
+    }
+    if (!currentIntent.mode) {
+      throw new Error(`Intent "${currentIntent.intent}" must define Paths or Units.`);
+    }
+    currentIntent = null;
+    stopReading();
+  };
+
+  // Markdownの見た目ではなく、規定したインデントだけを構造として扱う。
   const lines = String(raw ?? '')
     .replace(/\r\n?/g, '\n')
     .split('\n');
@@ -69,15 +108,13 @@ export function parsePlan(raw) {
     const content = match[2].trim();
 
     if (indent === 0 && content.startsWith('Intent:')) {
-      flushUnit();
+      flushIntent();
       const intent = content.slice('Intent:'.length).trim();
       if (!intent) throw new Error('Intent must not be empty.');
       if (intentNames.has(intent)) throw new Error(`Duplicate Intent: ${intent}`);
       intentNames.add(intent);
-      currentIntent = { intent, behavior: null, units: [] };
+      currentIntent = { intent, behavior: null, mode: null, units: [] };
       intents.push(currentIntent);
-      readingPaths = false;
-      readingContext = false;
       continue;
     }
 
@@ -86,24 +123,26 @@ export function parsePlan(raw) {
       const behavior = content.slice('Behavior:'.length).trim();
       if (!behavior) throw new Error(`Behavior for "${currentIntent.intent}" is empty.`);
       currentIntent.behavior = behavior;
-      readingPaths = false;
-      readingContext = false;
+      stopReading();
       continue;
     }
 
     if (indent === 2 && content === 'Units:') {
       requireIntent(currentIntent, line);
-      readingPaths = false;
-      readingContext = false;
+      if (currentIntent.mode === 'intent' || currentEntry) {
+        throw new Error(`Intent "${currentIntent.intent}" cannot mix direct fields with Units.`);
+      }
+      currentIntent.mode = 'units';
+      stopReading();
       continue;
     }
 
     if (indent === 4 && content.startsWith('Unit:')) {
       requireIntent(currentIntent, line);
-      flushUnit();
-      if (!currentIntent.behavior) {
-        throw new Error(`Intent "${currentIntent.intent}" is missing Behavior.`);
+      if (currentIntent.mode !== 'units') {
+        throw new Error(`Intent "${currentIntent.intent}" requires Units: before Unit.`);
       }
+      flushEntry();
       const unit = content.slice('Unit:'.length).trim();
       if (!unit) throw new Error('Unit must not be empty.');
       if (!/^[a-z0-9]+(?:-[a-z0-9]+)*-unit-\d+$/i.test(unit)) {
@@ -111,98 +150,124 @@ export function parsePlan(raw) {
       }
       if (units.has(unit)) throw new Error(`Duplicate Unit ID: ${unit}`);
       units.add(unit);
-      currentUnit = { unit, review: null, paths: [], context: [], note: null };
-      currentIntent.units.push(unit);
-      readingPaths = false;
-      readingContext = false;
+      currentEntry = createEntry(unit);
+      stopReading();
       continue;
     }
 
     if (indent === 6 && content.startsWith('Review:')) {
-      requireUnit(currentUnit, line);
-      const review = content.slice('Review:'.length).trim();
-      if (![REQUIRED_REVIEW, ...OPTIONAL_REVIEW_ALIASES].includes(review)) {
-        throw new Error(
-          `Unit "${currentUnit.unit}" Review must be "${REQUIRED_REVIEW}" or "${OPTIONAL_REVIEW}".`,
-        );
-      }
-      currentUnit.review = review === 'not-required' ? OPTIONAL_REVIEW : review;
-      readingPaths = false;
-      readingContext = false;
+      requireEntry(currentEntry, line);
+      setReview(currentEntry, content);
+      stopReading();
       continue;
     }
 
     if (indent === 6 && content.startsWith('Paths:')) {
-      requireUnit(currentUnit, line);
+      requireEntry(currentEntry, line);
       if (content !== 'Paths:') throw new Error(`Paths must be a nested list: ${line}`);
       readingPaths = true;
       readingContext = false;
+      listIndent = 8;
       continue;
     }
 
     if (indent === 6 && content.startsWith('Context:')) {
-      requireUnit(currentUnit, line);
-      const contextValue = content.slice('Context:'.length).trim();
-      if (contextValue === '—' || contextValue === '-') {
-        currentUnit.context = [];
+      requireEntry(currentEntry, line);
+      const hasList = setContext(currentEntry, content, line);
+      if (hasList) {
         readingPaths = false;
-        readingContext = false;
-        continue;
+        readingContext = true;
+        listIndent = 8;
+      } else {
+        stopReading();
       }
-      if (content !== 'Context:') throw new Error(`Context must be a nested list: ${line}`);
-      readingPaths = false;
-      readingContext = true;
       continue;
     }
 
     if (indent === 6 && content.startsWith('Lines:')) {
-      requireUnit(currentUnit, line);
-      readingPaths = false;
-      readingContext = false;
+      requireEntry(currentEntry, line);
+      stopReading();
       continue;
     }
 
     if (indent === 6 && content.startsWith('Note:')) {
-      requireUnit(currentUnit, line);
-      const note = content.slice('Note:'.length).trim();
-      currentUnit.note = note === '—' || note === '-' ? null : note || null;
-      readingPaths = false;
+      requireEntry(currentEntry, line);
+      setNote(currentEntry, content);
+      stopReading();
+      continue;
+    }
+
+    if (indent === 2 && content.startsWith('Review:')) {
+      const entry = startDirectEntry(line);
+      setReview(entry, content);
+      stopReading();
+      continue;
+    }
+
+    if (indent === 2 && content.startsWith('Paths:')) {
+      startDirectEntry(line);
+      if (content !== 'Paths:') throw new Error(`Paths must be a nested list: ${line}`);
+      readingPaths = true;
       readingContext = false;
+      listIndent = 4;
       continue;
     }
 
-    if (indent === 8 && readingPaths) {
-      requireUnit(currentUnit, line);
-      currentUnit.paths.push(unquotePath(content));
+    if (indent === 2 && content.startsWith('Context:')) {
+      const entry = startDirectEntry(line);
+      const hasList = setContext(entry, content, line);
+      if (hasList) {
+        readingPaths = false;
+        readingContext = true;
+        listIndent = 4;
+      } else {
+        stopReading();
+      }
       continue;
     }
 
-    if (indent === 8 && readingContext) {
-      requireUnit(currentUnit, line);
-      currentUnit.context.push(unquotePath(content));
+    if (indent === 2 && content.startsWith('Lines:')) {
+      startDirectEntry(line);
+      stopReading();
+      continue;
+    }
+
+    if (indent === 2 && content.startsWith('Note:')) {
+      const entry = startDirectEntry(line);
+      setNote(entry, content);
+      stopReading();
+      continue;
+    }
+
+    if (indent === listIndent && readingPaths) {
+      requireEntry(currentEntry, line);
+      currentEntry.paths.push(unquotePath(content));
+      continue;
+    }
+
+    if (indent === listIndent && readingContext) {
+      requireEntry(currentEntry, line);
+      currentEntry.context.push(unquotePath(content));
       continue;
     }
 
     throw new Error(`Invalid plan line: ${line}`);
   }
 
-  flushUnit();
+  flushIntent();
   if (intents.length === 0) throw new Error('The plan must contain at least one Intent.');
-  for (const intent of intents) {
-    if (!intent.behavior) throw new Error(`Intent "${intent.intent}" is missing Behavior.`);
-    if (intent.units.length === 0) throw new Error(`Intent "${intent.intent}" has no Units.`);
-  }
   return { rows };
 }
 
 export function validatePlan(root, snapshot, plan) {
-  // 計画の分割判断はSkillが持ち、ここでは候補との一致だけを検証する。
+  // 分割判断はSkillが持ち、ここでは候補の全PathとContextの一致だけを検証する。
   const staged = new Set(snapshot.paths);
   const planned = [];
   const context = [];
   for (const row of plan.rows) {
+    const label = row.unit ? `Unit "${row.unit}"` : `Intent "${row.intent}"`;
     if (row.paths.length !== new Set(row.paths).size) {
-      throw new Error(`Unit "${row.unit}" contains a duplicate path.`);
+      throw new Error(`${label} contains a duplicate path.`);
     }
     for (const path of row.paths) {
       if (planned.includes(path)) throw new Error(`Path appears more than once: ${path}`);
@@ -216,10 +281,10 @@ export function validatePlan(root, snapshot, plan) {
       }
     }
     if (row.review === OPTIONAL_REVIEW && row.context.length > 0) {
-      throw new Error(`Unit "${row.unit}" cannot define Context without a reviewer.`);
+      throw new Error(`${label} cannot define Context without a reviewer.`);
     }
     if (row.context.length !== new Set(row.context).size) {
-      throw new Error(`Unit "${row.unit}" contains a duplicate Context path.`);
+      throw new Error(`${label} contains a duplicate Context path.`);
     }
     context.push(...row.context);
   }
@@ -241,6 +306,7 @@ export function validatePlan(root, snapshot, plan) {
 }
 
 export function measureRows(root, rows) {
+  // review対象だけをGitで計測し、no_review_required行には差分行数を付けない。
   const reviewablePaths = rows
     .filter((row) => row.review === REQUIRED_REVIEW)
     .flatMap((row) => row.paths);
@@ -252,6 +318,7 @@ export function measureRows(root, rows) {
         intent: row.intent,
         behavior: row.behavior,
         unit: row.unit,
+        commit: row.commit,
         review: row.review,
         paths: row.paths,
         context: row.context,
@@ -271,6 +338,7 @@ export function measureRows(root, rows) {
       intent: row.intent,
       behavior: row.behavior,
       unit: row.unit,
+      commit: row.commit,
       review: row.review,
       paths: row.paths,
       context: row.context,
@@ -314,10 +382,12 @@ function readNumstat(root, paths) {
 }
 
 function parseLineCount(value) {
+  // binary差分の「-」は数えられない値として扱い、後段で停止させる。
   return value === '-' ? null : Number.parseInt(value, 10);
 }
 
 function unquotePath(value) {
+  // 計画例で使うバッククォートを剥がし、Gitへ渡す実パスへ戻す。
   const path = value.trim();
   if (path.length >= 2 && path.startsWith('`') && path.endsWith('`')) {
     return path.slice(1, -1).replaceAll('\\`', '`');
@@ -325,15 +395,57 @@ function unquotePath(value) {
   return path;
 }
 
+function createEntry(unit) {
+  // 単一IntentとUnitが共有する最小の計画行状態を作る。
+  return { unit, review: null, paths: [], context: [], note: null };
+}
+
+function validateEntry(intent, entry) {
+  // 行単位でReviewとPathを必須にし、空のレビュー単位を通さない。
+  const label = entry.unit ? `Unit "${entry.unit}"` : `Intent "${intent.intent}"`;
+  if (!entry.review) throw new Error(`${label} is missing Review.`);
+  if (entry.paths.length === 0) throw new Error(`${label} must contain at least one path.`);
+}
+
 function requireIntent(intent, line) {
+  // Intentより外側にあるフィールドは、意味を持たないため拒否する。
   if (!intent) throw new Error(`Plan line is outside an Intent: ${line}`);
 }
 
-function requireUnit(unit, line) {
-  if (!unit) throw new Error(`Plan line is outside a Unit: ${line}`);
+function requireEntry(entry, line) {
+  // PathsやReviewがUnit/Intent行の外側に出ていないことを確認する。
+  if (!entry) throw new Error(`Plan line is outside a plan entry: ${line}`);
+}
+
+function setReview(entry, content) {
+  // 表記揺れを正規化し、後続処理が二つのReview状態だけを扱えるようにする。
+  const review = content.slice('Review:'.length).trim();
+  if (![REQUIRED_REVIEW, ...OPTIONAL_REVIEW_ALIASES].includes(review)) {
+    const label = entry.unit ? `Unit "${entry.unit}"` : 'Intent';
+    throw new Error(`${label} Review must be "${REQUIRED_REVIEW}" or "${OPTIONAL_REVIEW}".`);
+  }
+  entry.review = review === 'not-required' ? OPTIONAL_REVIEW : review;
+}
+
+function setContext(entry, content, line) {
+  // Context: — は空リスト、それ以外のContext:は次行のパスリストとして扱う。
+  const contextValue = content.slice('Context:'.length).trim();
+  if (contextValue === '—' || contextValue === '-') {
+    entry.context = [];
+    return false;
+  }
+  if (content !== 'Context:') throw new Error(`Context must be a nested list: ${line}`);
+  return true;
+}
+
+function setNote(entry, content) {
+  // Noteのダッシュ表記をnullへ正規化し、レビュー引数へ渡せる状態にする。
+  const note = content.slice('Note:'.length).trim();
+  entry.note = note === '—' || note === '-' ? null : note || null;
 }
 
 function parseArgs(argv) {
+  // 計画本文の入力元だけを受け取り、測定処理に不要な引数は拒否する。
   const args = { root: null, planStdin: false, planPath: null };
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
@@ -360,14 +472,17 @@ function parseArgs(argv) {
 }
 
 function readStdin() {
+  // Skillが合意済みの計画本文を標準入力からそのまま受け取る。
   return readFileSync(0, 'utf8');
 }
 
 function emit(value) {
+  // Skillが計画測定結果を機械的に解釈できるJSONだけを出力する。
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 
 function bufferText(value) {
+  // GitのBuffer出力と通常の文字列を同じ読み取り経路に揃える。
   return Buffer.isBuffer(value) ? value.toString('utf8') : String(value ?? '');
 }
 
@@ -379,5 +494,6 @@ try {
 }
 
 function errorMessage(error) {
+  // CLIの失敗応答へErrorのmessageだけを安定して取り出す。
   return error instanceof Error ? error.message : String(error);
 }

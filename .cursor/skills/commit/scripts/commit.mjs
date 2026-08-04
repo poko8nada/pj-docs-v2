@@ -8,9 +8,9 @@ import {
 } from './lib/artifact.mjs';
 import { collectStagedSnapshot, runGit } from './lib/snapshot.mjs';
 import { workspaceRoot } from './lib/workspace.mjs';
-import { normalizeCommitMessage } from './lib/commit-message.mjs';
+import { normalizeCommitMessage } from '../../lib/commit-message.mjs';
 
-export { normalizeCommitMessage } from './lib/commit-message.mjs';
+export { normalizeCommitMessage } from '../../lib/commit-message.mjs';
 
 function main() {
   const args = parseArgs(process.argv.slice(2));

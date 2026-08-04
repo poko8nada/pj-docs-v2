@@ -21,6 +21,7 @@ const MEASURE_SCRIPT = join(SCRIPT_DIR, 'measure.mjs');
 const INTEGRATE_SCRIPT = join(SCRIPT_DIR, 'integrate.mjs');
 const TMP_ROOT = join(SCRIPT_DIR, '.tmp');
 
+// 一時Gitリポジトリを使って、レビュー・計測・commit・統合の契約を順に検証する。
 function main() {
   mkdirSync(TMP_ROOT, { recursive: true });
   const runRoot = mkdtempSync(join(TMP_ROOT, 'smoke-'));
@@ -29,6 +30,8 @@ function main() {
     ['review includes explicit context files', testReviewContext],
     ['review notes are included in the artifact', testReviewNotes],
     ['large existing and new files are not truncated', testReviewFullDiff],
+    ['measure accepts a single Intent without a Unit', testMeasureSingleIntent],
+    ['measure rejects mixed Intent and Unit shapes', testMeasureRejectsMixedIntentShape],
     ['measure reports rows without changing the index', testMeasurePlan],
     ['measure reports line counts without splitting', testMeasureLargeUnit],
     ['measure rejects duplicate paths', testMeasureDuplicatePaths],
@@ -41,6 +44,8 @@ function main() {
     ['invalid commit message rejects commit', testInvalidCommitMessage],
     ['unit commit message is accepted', testUnitCommit],
     ['intent integration preserves the final tree', testIntentIntegration],
+    ['batch intent integration creates one commit per Intent', testBatchIntentIntegration],
+    ['intent manifest validation rejects invalid input', testIntentManifestValidation],
     ['intent integration rejects unsafe history operations', testIntentIntegrationFailures],
     ['hash mismatch rejects commit', testHashMismatch],
     ['verified candidate commits and cleans artifacts', testCommit],
@@ -65,6 +70,7 @@ function main() {
   if (failures > 0) process.exitCode = 1;
 }
 
+// review_requiredが完全なpayload artifactとhashを作ることを確認する。
 function testReviewRequired(runRoot) {
   const id = 'smoke-review-required';
   const repo = createRepo(runRoot, { changedContent: 'export const value = 2;\n' });
@@ -85,6 +91,7 @@ function testReviewRequired(runRoot) {
   assert(readArtifact(repo, id, 'result') === 'review_required', result);
 }
 
+// Contextはpayloadに一覧だけ入り、diff対象にはならないことを確認する。
 function testReviewContext(runRoot) {
   const id = 'smoke-review-context';
   const repo = createRepo(runRoot, { changedContent: 'export const value = 2;\n' });
@@ -98,6 +105,7 @@ function testReviewContext(runRoot) {
   assert(!payload.includes('### README.md'), payload);
 }
 
+// ユーザー注記がReview notesとしてpayloadへ渡ることを確認する。
 function testReviewNotes(runRoot) {
   const id = 'smoke-review-note';
   const repo = createRepo(runRoot, { changedContent: 'export const value = 2;\n' });
@@ -108,6 +116,7 @@ function testReviewNotes(runRoot) {
   assert(payload.includes('Review notes:\nHarness verifies PASS before commit.'), payload);
 }
 
+// 既存ファイルと新規ファイルのdiffが切り詰められず残ることを確認する。
 function testReviewFullDiff(runRoot) {
   const id = 'smoke-review-full-diff';
   const repo = createRepo(runRoot, { stagedFiles: [] });
@@ -128,6 +137,62 @@ function testReviewFullDiff(runRoot) {
   assert(!payload.includes('[omitted remaining'), payload);
 }
 
+// Unitsなしの単一Intentを解析し、Intent commit行として計測できることを確認する。
+function testMeasureSingleIntent(runRoot) {
+  const id = 'smoke-measure-single-intent';
+  const repo = createRepo(runRoot, { changedContent: 'export const value = 2;\n' });
+  const plan = [
+    '- Intent: Deliver one complete change',
+    '  - Behavior: The staged export is updated as one final Intent',
+    '  - Paths:',
+    '    - `src/change.mjs`',
+    '  - Context:',
+    '    - `src/context.mjs`',
+    '  - Review: required',
+    '  - Lines: pending',
+    '  - Note: —',
+  ].join('\n');
+  const before = runGit(repo, ['diff', '--cached', '--name-only']).stdout;
+  const result = runMeasure(repo, id, ['--plan-stdin'], plan);
+  const after = runGit(repo, ['diff', '--cached', '--name-only']).stdout;
+
+  assert(result.exitCode === 0, JSON.stringify(result));
+  assert(result.status === 'measured', JSON.stringify(result));
+  assert(before === after, 'measure.mjs changed the staged index');
+  assert(result.rows.length === 1, JSON.stringify(result));
+  assert(result.rows[0].unit === null, JSON.stringify(result));
+  assert(result.rows[0].commit === 'intent', JSON.stringify(result));
+  assert(result.rows[0].context[0] === 'src/context.mjs', JSON.stringify(result));
+  assert(result.rows[0].lines === 2, JSON.stringify(result));
+}
+
+// direct fieldsとUnitsの混在を計画構造エラーとして拒否することを確認する。
+function testMeasureRejectsMixedIntentShape(runRoot) {
+  const id = 'smoke-measure-mixed-intent';
+  const repo = createRepo(runRoot, { changedContent: 'export const value = 2;\n' });
+  const plan = [
+    '- Intent: Reject mixed shape',
+    '  - Behavior: A plan cannot combine direct fields and Units',
+    '  - Paths:',
+    '    - `src/change.mjs`',
+    '  - Review: required',
+    '  - Units:',
+    '    - Unit: reject-mixed-shape-unit-1',
+    '      - Paths:',
+    '        - `src/change.mjs`',
+    '      - Review: required',
+    '      - Lines: pending',
+  ].join('\n');
+  const result = runMeasure(repo, id, ['--plan-stdin'], plan);
+
+  assert(result.exitCode !== 0, JSON.stringify(result));
+  assert(
+    String(result.message).includes('cannot mix direct fields with Units'),
+    JSON.stringify(result),
+  );
+}
+
+// 複数Unit、Context、review分類を含む計画がindexを変更せず計測されることを確認する。
 function testMeasurePlan(runRoot) {
   const id = 'smoke-measure-plan';
   const repo = createRepo(runRoot, {
@@ -170,6 +235,7 @@ function testMeasurePlan(runRoot) {
   assert(result.rows[1].lines === null, JSON.stringify(result));
 }
 
+// 複数ファイルのGit diff行数を合算するが、分割判断はSkillへ残すことを確認する。
 function testMeasureLargeUnit(runRoot) {
   const id = 'smoke-measure-large-unit';
   const repo = createRepo(runRoot, { stagedFiles: [] });
@@ -201,6 +267,7 @@ function testMeasureLargeUnit(runRoot) {
   assert(!Object.hasOwn(result.rows[0], 'stopReason'), JSON.stringify(result));
 }
 
+// 一つのPathを複数Unitへ重複配置した計画を拒否することを確認する。
 function testMeasureDuplicatePaths(runRoot) {
   const id = 'smoke-measure-duplicate';
   const repo = createRepo(runRoot, { changedContent: 'export const value = 2;\n' });
@@ -228,6 +295,7 @@ function testMeasureDuplicatePaths(runRoot) {
   assert(result.message.includes('Path appears more than once'), JSON.stringify(result));
 }
 
+// staged candidateに存在する未計画Pathを見逃さないことを確認する。
 function testMeasureUnplannedPaths(runRoot) {
   const id = 'smoke-measure-unplanned';
   const repo = createRepo(runRoot, {
@@ -252,6 +320,7 @@ function testMeasureUnplannedPaths(runRoot) {
   assert(result.message.includes('Staged path is not planned'), JSON.stringify(result));
 }
 
+// 変更中のContextを読み取り専用の補助資料として許可しないことを確認する。
 function testMeasureDirtyContext(runRoot) {
   const id = 'smoke-measure-dirty-context';
   const repo = createRepo(runRoot, { changedContent: 'export const value = 2;\n' });
@@ -276,6 +345,7 @@ function testMeasureDirtyContext(runRoot) {
   assert(result.message.includes('Context path has uncommitted changes'), JSON.stringify(result));
 }
 
+// conversation IDが異なっても期限切れartifactをmtimeで掃除することを確認する。
 function testStaleArtifacts(runRoot) {
   const oldId = 'smoke-stale-artifacts';
   const currentId = 'smoke-current-artifacts';
@@ -297,6 +367,7 @@ function testStaleArtifacts(runRoot) {
   assert(artifactExists(repo, currentId, 'request'), currentReview);
 }
 
+// 非レビュー対象だけのcandidateではreviewer requestを作らないことを確認する。
 function testNoReviewRequired(runRoot) {
   const id = 'smoke-no-review';
   const repo = createRepo(runRoot, {
@@ -312,6 +383,7 @@ function testNoReviewRequired(runRoot) {
   assert(readArtifact(repo, id, 'result') === 'no_review_required', result);
 }
 
+// review結果がなくhashもない状態でcommitを拒否することを確認する。
 function testMissingHash(runRoot) {
   const id = 'smoke-missing-hash';
   const repo = createRepo(runRoot, {
@@ -325,6 +397,7 @@ function testMissingHash(runRoot) {
   assert(String(result.message).includes('Review hash is missing'), JSON.stringify(result));
 }
 
+// hash artifactの形式が壊れている場合にcommitを拒否することを確認する。
 function testInvalidHash(runRoot) {
   const id = 'smoke-invalid-hash';
   const repo = createRepo(runRoot, { stagedFiles: [] });
@@ -337,6 +410,7 @@ function testInvalidHash(runRoot) {
   assert(String(result.message).includes('stored hash is invalid'), JSON.stringify(result));
 }
 
+// Why/What/VerifyとUnit subjectの各不正形式をcommit前に拒否することを確認する。
 function testInvalidCommitMessage(runRoot) {
   const messages = [
     ['missing-sections', 'not a structured commit message'],
@@ -403,6 +477,7 @@ function testInvalidCommitMessage(runRoot) {
   }
 }
 
+// no_review_requiredのUnitが機械的なUnit subjectでcommitできることを確認する。
 function testUnitCommit(runRoot) {
   const id = 'smoke-unit-commit';
   const repo = createRepo(runRoot, {
@@ -424,6 +499,7 @@ function testUnitCommit(runRoot) {
   assert(log.includes('Co-authored-by: Cursor <cursoragent@cursor.com>'), log);
 }
 
+// 連続したUnit履歴を一つのIntent commitへ統合してtreeを保つことを確認する。
 function testIntentIntegration(runRoot) {
   const id = 'smoke-intent-integration';
   const repo = createRepo(runRoot, { stagedFiles: [] });
@@ -468,6 +544,154 @@ function testIntentIntegration(runRoot) {
   assert(log.includes('Co-authored-by: Cursor <cursoragent@cursor.com>'), log);
 }
 
+// 複数Intentと単一Intentを一括統合し、Intentごとに最終commitが残ることを確認する。
+function testBatchIntentIntegration(runRoot) {
+  const id = 'smoke-batch-intent-integration';
+  const repo = createRepo(runRoot, { stagedFiles: [] });
+  const base = runGit(repo, ['rev-parse', 'HEAD']).stdout.trim();
+  const groups = [];
+
+  for (const [intent, prefix] of [
+    ['Align review evidence', 'evidence'],
+    ['Finalize commit workflow', 'workflow'],
+  ]) {
+    const commits = [];
+    for (let index = 0; index < 2; index += 1) {
+      const path = `src/${prefix}-${index + 1}.mjs`;
+      writeFileSync(join(repo, path), `export const ${prefix}${index + 1} = true;\n`);
+      runGit(repo, ['add', '--', path]);
+      runGit(repo, ['commit', '-qm', `unit-${prefix}-unit-${index + 1}: stage ${prefix} change`]);
+      commits.push(runGit(repo, ['rev-parse', 'HEAD']).stdout.trim());
+    }
+    groups.push({
+      intent,
+      mode: 'unit',
+      commits,
+      message: validCommitMessage(intent),
+    });
+  }
+
+  writeFileSync(join(repo, 'README.md'), '# direct Intent smoke fixture\n');
+  runGit(repo, ['add', '--', 'README.md']);
+  runGit(repo, ['commit', '-qm', validCommitMessage('Document final Intent')]);
+  groups.push({
+    intent: 'Document final Intent',
+    mode: 'intent',
+    commits: [runGit(repo, ['rev-parse', 'HEAD']).stdout.trim()],
+    message: validCommitMessage('Document final Intent'),
+  });
+
+  const beforeTree = runGit(repo, ['rev-parse', 'HEAD^{tree}']).stdout.trim();
+  const result = runBatchIntegrate(repo, id, base, groups);
+  const afterTree = runGit(repo, ['rev-parse', 'HEAD^{tree}']).stdout.trim();
+  const count = runGit(repo, ['rev-list', '--count', `${base}..HEAD`]).stdout.trim();
+  const subjects = runGit(repo, ['log', '--format=%s', `${base}..HEAD`])
+    .stdout.trim()
+    .split('\n');
+
+  assert(result.exitCode === 0, JSON.stringify(result));
+  assert(result.status === 'integrated', JSON.stringify(result));
+  assert(result.intentCommits.length === 3, JSON.stringify(result));
+  assert(result.tree === beforeTree, JSON.stringify(result));
+  assert(afterTree === beforeTree, `${beforeTree} !== ${afterTree}`);
+  assert(count === '3', count);
+  assert(subjects[0] === 'Document final Intent', subjects.join('\n'));
+  assert(subjects[1] === 'Finalize commit workflow', subjects.join('\n'));
+  assert(subjects[2] === 'Align review evidence', subjects.join('\n'));
+}
+
+// manifestの入力境界とIntent modeのcommit数制約を、履歴操作前に拒否することを確認する。
+function testIntentManifestValidation(runRoot) {
+  const invalidJsonRepo = createRepo(runRoot, { stagedFiles: [] });
+  const invalidJsonBase = runGit(invalidJsonRepo, ['rev-parse', 'HEAD']).stdout.trim();
+  const invalidJson = runRawIntegrate(
+    invalidJsonRepo,
+    'smoke-manifest-invalid-json',
+    invalidJsonBase,
+    '{',
+  );
+  assert(invalidJson.exitCode !== 0, JSON.stringify(invalidJson));
+  assert(String(invalidJson.message).includes('not valid JSON'), JSON.stringify(invalidJson));
+
+  const emptyManifestRepo = createRepo(runRoot, { stagedFiles: [] });
+  const emptyManifestBase = runGit(emptyManifestRepo, ['rev-parse', 'HEAD']).stdout.trim();
+  const emptyManifest = runRawIntegrate(
+    emptyManifestRepo,
+    'smoke-manifest-empty',
+    emptyManifestBase,
+    JSON.stringify({ groups: [] }),
+  );
+  assert(emptyManifest.exitCode !== 0, JSON.stringify(emptyManifest));
+  assert(
+    String(emptyManifest.message).includes('at least one group'),
+    JSON.stringify(emptyManifest),
+  );
+
+  const invalidGroupRepo = createRepo(runRoot, { stagedFiles: [] });
+  const invalidGroupBase = runGit(invalidGroupRepo, ['rev-parse', 'HEAD']).stdout.trim();
+  const invalidGroup = runRawIntegrate(
+    invalidGroupRepo,
+    'smoke-manifest-invalid-group',
+    invalidGroupBase,
+    JSON.stringify({ groups: [null] }),
+  );
+  assert(invalidGroup.exitCode !== 0, JSON.stringify(invalidGroup));
+  assert(String(invalidGroup.message).includes('group 1 is invalid'), JSON.stringify(invalidGroup));
+
+  const invalidModeRepo = createRepo(runRoot, { stagedFiles: [] });
+  const invalidModeBase = runGit(invalidModeRepo, ['rev-parse', 'HEAD']).stdout.trim();
+  const invalidMode = runRawIntegrate(
+    invalidModeRepo,
+    'smoke-manifest-invalid-mode',
+    invalidModeBase,
+    JSON.stringify({
+      groups: [{ intent: 'Invalid mode', mode: 'other', commits: ['HEAD'], message: 'invalid' }],
+    }),
+  );
+  assert(invalidMode.exitCode !== 0, JSON.stringify(invalidMode));
+  assert(
+    String(invalidMode.message).includes('mode "unit" or "intent"'),
+    JSON.stringify(invalidMode),
+  );
+
+  const missingCommitsRepo = createRepo(runRoot, { stagedFiles: [] });
+  const missingCommitsBase = runGit(missingCommitsRepo, ['rev-parse', 'HEAD']).stdout.trim();
+  const missingCommits = runRawIntegrate(
+    missingCommitsRepo,
+    'smoke-manifest-missing-commits',
+    missingCommitsBase,
+    JSON.stringify({
+      groups: [{ intent: 'Missing commits', mode: 'unit', message: 'invalid' }],
+    }),
+  );
+  assert(missingCommits.exitCode !== 0, JSON.stringify(missingCommits));
+  assert(String(missingCommits.message).includes('needs commits'), JSON.stringify(missingCommits));
+
+  const multiIntent = createUnitHistory(runRoot, 2);
+  const multiIntentMessage = validCommitMessage('Already final Intent');
+  const multiIntentResult = runRawIntegrate(
+    multiIntent.repo,
+    'smoke-manifest-multiple-intent-commits',
+    multiIntent.base,
+    JSON.stringify({
+      groups: [
+        {
+          intent: 'Already final Intent',
+          mode: 'intent',
+          commits: multiIntent.commits,
+          message: multiIntentMessage,
+        },
+      ],
+    }),
+  );
+  assert(multiIntentResult.exitCode !== 0, JSON.stringify(multiIntentResult));
+  assert(
+    String(multiIntentResult.message).includes('exactly one source commit'),
+    JSON.stringify(multiIntentResult),
+  );
+}
+
+// dirty、重複、非連続、hook失敗、tree改変を安全に拒否・復旧することを確認する。
 function testIntentIntegrationFailures(runRoot) {
   // 履歴操作の拒否と復旧経路を、実際のGit状態で確認する。
   const dirty = createUnitHistory(runRoot, 2);
@@ -536,7 +760,7 @@ function testIntentIntegrationFailures(runRoot) {
   );
   assert(hookFailureResult.exitCode !== 0, JSON.stringify(hookFailureResult));
   assert(
-    String(hookFailureResult.message).includes('original HEAD and index were restored'),
+    String(hookFailureResult.message).includes('original HEAD, index, and worktree were restored'),
     JSON.stringify(hookFailureResult),
   );
   assert(
@@ -569,12 +793,13 @@ function testIntentIntegrationFailures(runRoot) {
   );
   assert(
     runGit(treeMismatch.repo, ['status', '--porcelain']).stdout.includes(
-      'A  src/integration-hook.mjs',
+      'src/integration-hook.mjs',
     ),
     JSON.stringify(treeMismatchResult),
   );
 }
 
+// review後にstaged内容が変わったcandidateをhash不一致として拒否することを確認する。
 function testHashMismatch(runRoot) {
   const id = 'smoke-hash-mismatch';
   const repo = createRepo(runRoot, { changedContent: 'export const value = 2;\n' });
@@ -594,6 +819,7 @@ function testHashMismatch(runRoot) {
   assert(!artifactExists(repo, id, 'request'), review);
 }
 
+// Why/What/Verify形式のIntent messageで検証済みcandidateをcommitできることを確認する。
 function testCommit(runRoot) {
   const id = 'smoke-commit';
   const repo = createRepo(runRoot, {
@@ -614,6 +840,7 @@ function testCommit(runRoot) {
   assert(!artifactExists(repo, id, 'request'), review);
 }
 
+// commit自体は成功してもartifact掃除に失敗した場合の警告を確認する。
 function testCleanupFailure(runRoot) {
   const id = 'smoke-cleanup-failure';
   const repo = createRepo(runRoot, {
@@ -638,6 +865,7 @@ function testCleanupFailure(runRoot) {
   }
 }
 
+// 各テストが互いのGit状態やartifactを共有しないよう、独立したfixture repoを作る。
 function createRepo(runRoot, { stagedFiles = ['src/change.mjs'], changedContent = null } = {}) {
   const repo = mkdtempSync(join(runRoot, 'repo-'));
   mkdirSync(join(repo, 'src'), { recursive: true });
@@ -660,6 +888,7 @@ function createRepo(runRoot, { stagedFiles = ['src/change.mjs'], changedContent 
   return repo;
 }
 
+// integrate.mjsの検証対象になるlinearなUnit履歴を、指定件数だけ作る。
 function createUnitHistory(runRoot, count, { nonUnitIndex = null } = {}) {
   const repo = createRepo(runRoot, { stagedFiles: [] });
   const base = runGit(repo, ['rev-parse', 'HEAD']).stdout.trim();
@@ -680,6 +909,7 @@ function createUnitHistory(runRoot, count, { nonUnitIndex = null } = {}) {
   return { repo, base, commits };
 }
 
+// commit hookによる失敗やtree改変を再現するため、fixture repoへhookを配置する。
 function writeGitHook(repo, name, body) {
   const path = join(repo, '.git', 'hooks', name);
   mkdirSync(dirname(path), { recursive: true });
@@ -687,6 +917,7 @@ function writeGitHook(repo, name, body) {
   chmodSync(path, 0o755);
 }
 
+// review scriptを実プロセスで呼び、stdoutのJSONと終了コードを返す。
 function runReview(repo, id, extraArgs = []) {
   const result = spawnSync(process.execPath, [REVIEW_SCRIPT, '--root', repo, ...extraArgs], {
     cwd: repo,
@@ -696,6 +927,7 @@ function runReview(repo, id, extraArgs = []) {
   return { ...parseJson(result.stdout), exitCode: result.status };
 }
 
+// measure scriptへ計画本文を渡し、indexを共有しない子プロセスとして実行する。
 function runMeasure(repo, id, extraArgs = [], input = null) {
   const result = spawnSync(process.execPath, [MEASURE_SCRIPT, '--root', repo, ...extraArgs], {
     cwd: repo,
@@ -706,6 +938,7 @@ function runMeasure(repo, id, extraArgs = [], input = null) {
   return { ...parseJson(result.stdout), exitCode: result.status };
 }
 
+// commit scriptへmessageを標準入力で渡し、Harnessに近い境界を検証する。
 function runCommit(repo, id, message) {
   const result = spawnSync(process.execPath, [COMMIT_SCRIPT, '--root', repo, '--message-stdin'], {
     cwd: repo,
@@ -716,30 +949,51 @@ function runCommit(repo, id, message) {
   return { ...parseJson(result.stdout), exitCode: result.status };
 }
 
+// 旧来の単一Intentテストを、batch manifest一組の呼び出しへ変換する。
 function runIntegrate(repo, id, base, commits, message) {
+  return runBatchIntegrate(repo, id, base, [
+    {
+      intent: 'Smoke integration',
+      mode: 'unit',
+      commits: commits.split(',').map((commit) => commit.trim()),
+      message,
+    },
+  ]);
+}
+
+// 複数Intentのmanifestを標準入力で渡し、履歴統合結果を返す。
+function runBatchIntegrate(repo, id, base, groups) {
+  return runRawIntegrate(repo, id, base, `${JSON.stringify({ groups })}\n`);
+}
+
+// manifest本文をそのまま渡し、JSON解析や入力検証の失敗を観測できるようにする。
+function runRawIntegrate(repo, id, base, input) {
   const result = spawnSync(
     process.execPath,
-    [INTEGRATE_SCRIPT, '--root', repo, '--base', base, '--commits', commits, '--message-stdin'],
+    [INTEGRATE_SCRIPT, '--root', repo, '--base', base, '--manifest-stdin'],
     {
       cwd: repo,
       encoding: 'utf8',
-      input: `${message}\n`,
+      input,
       env: cleanEnv(id),
     },
   );
   return { ...parseJson(result.stdout), exitCode: result.status };
 }
 
+// 子プロセスへconversation IDを渡しつつ、親の一時Git indexは持ち込まない。
 function cleanEnv(id) {
   const env = { ...process.env, CURSOR_CONVERSATION_ID: id };
   delete env.GIT_INDEX_FILE;
   return env;
 }
 
+// Skill固有artifactを読み、テスト側で余計な改行を無視する。
 function readArtifact(repo, id, kind) {
   return readFileSync(artifactPath(repo, id, kind), 'utf8').trim();
 }
 
+// artifactが存在しないこと自体を異常にせず、存在判定だけを返す。
 function artifactExists(repo, id, kind) {
   try {
     readArtifact(repo, id, kind);
@@ -749,25 +1003,28 @@ function artifactExists(repo, id, kind) {
   }
 }
 
+// fixture repo内のconversation-scoped artifact pathを組み立てる。
 function artifactPath(repo, id, kind) {
   return join(repo, '.cursor/skills/commit/scripts/.tmp', `${id}.${kind}`);
 }
 
+// 統合テストで使う最小のWhy/What/Verify messageを一貫して作る。
 function validCommitMessage(subject) {
   return [
     subject,
     '',
     'Why:',
-    'The smoke test verifies the commit Skill boundary.',
+    'commit Skillの境界を検証するため。',
     '',
     'What:',
-    'Exercise the staged candidate flow.',
+    'staged candidateの処理を実行する。',
     '',
     'Verify:',
-    '- colocated smoke test',
+    '- colocated smoke testを実行した。',
   ].join('\n');
 }
 
+// 子プロセスが契約外の出力を返した場合、stdout付きで原因を示す。
 function parseJson(output) {
   try {
     return JSON.parse(String(output || '{}'));
@@ -776,6 +1033,7 @@ function parseJson(output) {
   }
 }
 
+// fixture repoのGit操作を実行し、失敗をテスト失敗として即座に伝える。
 function runGit(repo, args) {
   const result = spawnSync('git', args, {
     cwd: repo,
@@ -788,10 +1046,12 @@ function runGit(repo, args) {
   return result;
 }
 
+// Smokeの失敗箇所を一行で特定できるよう、条件と詳細をまとめて検証する。
 function assert(condition, detail) {
   if (!condition) throw new Error(`assertion failed: ${detail}`);
 }
 
+// 子プロセスやassertのErrorを安定したテキストへ変換する。
 function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }

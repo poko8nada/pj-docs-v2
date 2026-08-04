@@ -17,10 +17,7 @@ The generated artifact starts with `[commit-review-payload]` and contains:
 - a `Reviewable Files:` list
 - one complete `diff` section for every listed path
 
-The payload contains the complete staged diff for the current Unit. There is
-no character-based truncation or omission fallback. If any listed diff cannot
-be included completely, `review.mjs` returns `status: error` and does not
-write a reviewer request.
+The payload contains the complete staged diff for the current Intent row or Unit. There is no character-based truncation or omission fallback. If any listed diff cannot be included completely, `review.mjs` returns `status: error` and does not write a reviewer request.
 
 Context files are listed by exact path and are tracked, clean files outside the
 staged candidate. Their contents are not copied into the payload, are not
@@ -28,10 +25,7 @@ hashed or committed, and are supplied only so the reviewer can read necessary
 one-hop context. The reviewer must not report findings against Context files.
 
 When the Skill has user-agreed context for the current review, the artifact
-may also contain a `Review notes:` section supplied through one `--note`
-argument. It may explain an accepted finding, an agreed design constraint, or
-why a Unit was split. Treat it as context for this review only, not as
-evidence that the supplied diff was reviewed or that a finding is resolved.
+may also contain a `Review notes:` section supplied through one `--note` argument. It may explain an accepted finding, an agreed design constraint, or why a row was split. Treat it as context for this review only, not as evidence that the supplied diff was reviewed or that a finding is resolved.
 
 The reviewer must read exactly the generated artifact named by the handoff,
 then validate that each listed file has a corresponding complete diff section.
